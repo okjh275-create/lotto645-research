@@ -1,0 +1,6 @@
+project:
+  name: Lotto645 Research Platform
+  version: "4.0.0"
+
+database:
+  path: data/lotto.db
