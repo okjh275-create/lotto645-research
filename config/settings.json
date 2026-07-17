@@ -1,0 +1,6 @@
+{
+    "candidate_size": 18,
+    "generator_samples": 10000,
+    "predict_count": 5,
+    "random_seed": 20260717
+}

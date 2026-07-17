@@ -1,9 +1,11 @@
 from pathlib import Path
 import sqlite3
+from itertools import combinations
 from collections import Counter
 
 
-class StatisticsEngine:
+class PairEngine:
+
     def __init__(self):
         self.db_path = Path("data") / "lotto.db"
 
@@ -15,16 +17,17 @@ class StatisticsEngine:
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT round, n1, n2, n3, n4, n5, n6
+            SELECT n1, n2, n3, n4, n5, n6
             FROM draw_history
             ORDER BY round DESC
         """)
 
         rows = cur.fetchall()
         conn.close()
+
         return rows
 
-    def frequency(self, last_n=None):
+    def pair_frequency(self, last_n=None):
         rows = self.load_draws()
 
         if last_n is not None:
@@ -33,24 +36,22 @@ class StatisticsEngine:
         counter = Counter()
 
         for row in rows:
-            counter.update(row[1:])
+            for pair in combinations(sorted(row), 2):
+                counter[pair] += 1
 
         return counter
 
-    def gap(self):
-        rows = self.load_draws()
+    def number_scores(self, last_n=50):
+        """
+        번호별 Pair Score 계산
+        """
 
-        latest_round = rows[0][0]
-        gaps = {}
+        pair_freq = self.pair_frequency(last_n)
 
-        for number in range(1, 46):
-            gap = latest_round
+        scores = Counter()
 
-            for row in rows:
-                if number in row[1:]:
-                    gap = latest_round - row[0]
-                    break
+        for (a, b), count in pair_freq.items():
+            scores[a] += count
+            scores[b] += count
 
-            gaps[number] = gap
-
-        return gaps
+        return scores

@@ -1,0 +1,11 @@
+{
+    "sum_min": 90,
+    "sum_max": 180,
+    "odd_min": 2,
+    "odd_max": 4,
+    "even_min": 2,
+    "even_max": 4,
+    "max_consecutive": 2,
+    "max_same_last_digit": 2,
+    "max_prev_overlap": 1
+}

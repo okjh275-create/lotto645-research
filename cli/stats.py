@@ -4,40 +4,34 @@ from engine.statistics import StatisticsEngine
 def main():
     stats = StatisticsEngine()
 
-    print("=" * 50)
-    print("Statistics Report")
-    print("=" * 50)
+    print("=" * 60)
+    print("Lotto645 Statistics")
+    print("=" * 60)
 
-    # 전체 빈도
-    freq_all = stats.frequency()
-
-    print("\nTop 10 Frequency (All)")
-    for num, cnt in freq_all.most_common(10):
+    print("\n[Top 10 Frequency - All Draws]")
+    for num, cnt in stats.frequency().most_common(10):
         print(f"{num:2d} : {cnt}")
 
-    # 최근 10회
-    print("\nTop Frequency (Recent 10)")
+    print("\n[Top 10 Frequency - Recent 10]")
     for num, cnt in stats.frequency(10).most_common(10):
         print(f"{num:2d} : {cnt}")
 
-    # 최근 20회
-    print("\nTop Frequency (Recent 20)")
+    print("\n[Top 10 Frequency - Recent 20]")
     for num, cnt in stats.frequency(20).most_common(10):
         print(f"{num:2d} : {cnt}")
 
-    # 최근 50회
-    print("\nTop Frequency (Recent 50)")
+    print("\n[Top 10 Frequency - Recent 50]")
     for num, cnt in stats.frequency(50).most_common(10):
         print(f"{num:2d} : {cnt}")
 
-    # Gap
+    print("\n[Longest Gap Top 10]")
+
     gaps = stats.gap()
 
-    print("\nLongest Gap Top 10")
-    for num, gap in sorted(gaps.items(), key=lambda x: x[1], reverse=True)[:10]:
-        print(f"{num:2d} : {gap}")
+    for number, gap in sorted(gaps.items(), key=lambda x: x[1], reverse=True)[:10]:
+        print(f"{number:2d} : {gap}")
 
-    print("=" * 50)
+    print("\n" + "=" * 60)
 
 
 if __name__ == "__main__":
