@@ -93,4 +93,13 @@ __all__ = [
     "StrategyStatistics",
     "determine_prize_rank",
     "evaluate_prediction",
+    "LearningCoordinator",
+    "LearningCoordinatorConfig",
+    "LearningCoordinatorResult",
 ]
+
+from .coordinator import (
+    LearningCoordinator,
+    LearningCoordinatorConfig,
+    LearningCoordinatorResult,
+)
