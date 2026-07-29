@@ -1,0 +1,64 @@
+{
+  "status": "BLOCKED",
+  "python": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "root": "C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research",
+  "steps": [
+    {
+      "name": "quick_build",
+      "command": [
+        "C:\\Users\\PC2303\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "tools.lrp_build",
+        "quick"
+      ],
+      "required": true,
+      "returncode": 1,
+      "status": "FAIL",
+      "elapsed_seconds": 0.202,
+      "stdout": "\nBUILD FAILED\n",
+      "stderr": "UnicodeEncodeError: 'cp949' codec can't encode character '\\u2014' in position 24: illegal multibyte sequence\n"
+    },
+    {
+      "name": "m3_application_smoke",
+      "command": [
+        "C:\\Users\\PC2303\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\tests\\test_m3_application.py"
+      ],
+      "required": true,
+      "returncode": 0,
+      "status": "PASS",
+      "elapsed_seconds": 0.271,
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"history_draws\": 60,\n  \"previous_numbers\": [\n    1,\n    16,\n    22,\n    28,\n    34,\n    40\n  ],\n  \"long_gap_count\": 19,\n  \"prediction_path\": \"C:\\\\Users\\\\PC2303\\\\AppData\\\\Local\\\\Temp\\\\tmp6wv4tbr_\\\\predictions\\\\round_0061\\\\seed_20260721\\\\prediction.json\",\n  \"manifest_path\": \"C:\\\\Users\\\\PC2303\\\\AppData\\\\Local\\\\Temp\\\\tmp6wv4tbr_\\\\predictions\\\\round_0061\\\\seed_20260721\\\\manifest.json\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "m2_prediction_orchestrator",
+      "command": [
+        "C:\\Users\\PC2303\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\tests\\test_prediction_orchestrator.py"
+      ],
+      "required": true,
+      "returncode": 1,
+      "status": "FAIL",
+      "elapsed_seconds": 2.48,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\tests\\test_prediction_orchestrator.py\", line 121, in <module>\n    main()\n    ~~~~^^\n  File \"C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\tests\\test_prediction_orchestrator.py\", line 67, in main\n    first_payload = prediction_to_dict(first)\n  File \"C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\lrp\\pipelines\\serializer.py\", line 247, in prediction_to_dict\n    numbers = _numbers(item)\n  File \"C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\lrp\\pipelines\\serializer.py\", line 51, in _numbers\n    candidate = _candidate_object(value)\n  File \"C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research\\lrp\\pipelines\\serializer.py\", line 45, in _candidate_object\n    raise ContractError(\n        \"unable to locate candidate numbers\"\n    )\nlrp.contracts.exceptions.ContractError: unable to locate candidate numbers\n"
+    },
+    {
+      "name": "lrp_cli_help",
+      "command": [
+        "C:\\Users\\PC2303\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "lrp",
+        "--help"
+      ],
+      "required": true,
+      "returncode": 0,
+      "status": "PASS",
+      "elapsed_seconds": 0.225,
+      "stdout": "usage: python -m lrp [-h] {predict} ...\n\nLotto645 Research Platform\n\npositional arguments:\n  {predict}\n    predict   Generate prediction artifacts\n\noptions:\n  -h, --help  show this help message and exit\n",
+      "stderr": ""
+    }
+  ],
+  "failure_count": 2
+}

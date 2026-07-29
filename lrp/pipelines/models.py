@@ -27,7 +27,10 @@ def _normalize_numbers(
     field_name: str,
 ) -> frozenset[int]:
     try:
-        normalized = frozenset(int(value) for value in values)
+        normalized = frozenset(
+            int(value)
+            for value in values
+        )
     except (TypeError, ValueError) as exc:
         raise ContractError(
             f"{field_name} must contain integers"
@@ -40,9 +43,11 @@ def _normalize_numbers(
             if not 1 <= number <= 45
         )
     )
+
     if invalid:
         raise ContractError(
-            f"{field_name} contains invalid lotto numbers: {invalid}"
+            f"{field_name} contains invalid "
+            f"lotto numbers: {invalid}"
         )
 
     return normalized
@@ -68,7 +73,9 @@ class PredictionRequest:
     )
 
     weights: Mapping[str, float] = field(
-        default_factory=lambda: dict(_DEFAULT_WEIGHTS)
+        default_factory=lambda: dict(
+            _DEFAULT_WEIGHTS
+        )
     )
 
     sum_min: int = 90
@@ -90,21 +97,35 @@ class PredictionRequest:
                 "round_no must be a positive integer"
             )
 
-        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
-            raise ContractError("seed must be an integer")
+        if (
+            isinstance(self.seed, bool)
+            or not isinstance(self.seed, int)
+        ):
+            raise ContractError(
+                "seed must be an integer"
+            )
 
         if (
             isinstance(self.temperature, bool)
-            or not isinstance(self.temperature, (int, float))
-            or not math.isfinite(float(self.temperature))
+            or not isinstance(
+                self.temperature,
+                (int, float),
+            )
+            or not math.isfinite(
+                float(self.temperature)
+            )
             or self.temperature <= 0.0
         ):
             raise ContractError(
-                "temperature must be a finite positive number"
+                "temperature must be a finite "
+                "positive number"
             )
 
         for name, value in (
-            ("candidate_count", self.candidate_count),
+            (
+                "candidate_count",
+                self.candidate_count,
+            ),
             (
                 "max_attempts_multiplier",
                 self.max_attempts_multiplier,
@@ -130,9 +151,11 @@ class PredictionRequest:
             self.previous_numbers,
             field_name="previous_numbers",
         )
+
         if previous and len(previous) != 6:
             raise ContractError(
-                "previous_numbers must contain exactly six numbers"
+                "previous_numbers must contain "
+                "exactly six numbers"
             )
 
         long_gap = _normalize_numbers(
@@ -142,40 +165,56 @@ class PredictionRequest:
 
         if not long_gap:
             raise ContractError(
-                "long_gap_numbers must contain at least one number"
+                "long_gap_numbers must contain "
+                "at least one number"
             )
 
         if not isinstance(self.weights, Mapping):
-            raise ContractError("weights must be a mapping")
+            raise ContractError(
+                "weights must be a mapping"
+            )
 
         missing = tuple(
             name
             for name in _DEFAULT_WEIGHTS
             if name not in self.weights
         )
+
         if missing:
             raise ContractError(
                 f"weights are missing fields: {missing}"
             )
 
-        normalized_weights: dict[str, float] = {}
+        normalized_weights: dict[
+            str,
+            float,
+        ] = {}
 
         for name in _DEFAULT_WEIGHTS:
             value = self.weights[name]
 
             if (
                 isinstance(value, bool)
-                or not isinstance(value, (int, float))
+                or not isinstance(
+                    value,
+                    (int, float),
+                )
                 or not math.isfinite(float(value))
                 or float(value) < 0.0
             ):
                 raise ContractError(
-                    f"weight {name} must be finite and non-negative"
+                    f"weight {name} must be finite "
+                    "and non-negative"
                 )
 
-            normalized_weights[name] = float(value)
+            normalized_weights[name] = float(
+                value
+            )
 
-        if sum(normalized_weights.values()) <= 0.0:
+        if (
+            sum(normalized_weights.values())
+            <= 0.0
+        ):
             raise ContractError(
                 "at least one weight must be positive"
             )
@@ -185,17 +224,25 @@ class PredictionRequest:
                 "sum_min must not exceed sum_max"
             )
 
-        if self.preferred_sum_min > self.preferred_sum_max:
+        if (
+            self.preferred_sum_min
+            > self.preferred_sum_max
+        ):
             raise ContractError(
-                "preferred_sum_min must not exceed preferred_sum_max"
+                "preferred_sum_min must not exceed "
+                "preferred_sum_max"
             )
 
-        if not 0.0 <= float(self.jaccard_max) <= 1.0:
+        if not 0.0 <= float(
+            self.jaccard_max
+        ) <= 1.0:
             raise ContractError(
                 "jaccard_max must be between 0 and 1"
             )
 
-        if not 0.0 <= float(self.mmr_lambda) <= 1.0:
+        if not 0.0 <= float(
+            self.mmr_lambda
+        ) <= 1.0:
             raise ContractError(
                 "mmr_lambda must be between 0 and 1"
             )
@@ -226,19 +273,29 @@ class PredictionRequest:
             "round_no": self.round_no,
             "seed": self.seed,
             "temperature": self.temperature,
-            "candidate_count": self.candidate_count,
+            "candidate_count": (
+                self.candidate_count
+            ),
             "max_attempts_multiplier": (
                 self.max_attempts_multiplier
             ),
             "top_k": self.top_k,
             "practical_k": self.practical_k,
-            "previous_numbers": sorted(self.previous_numbers),
-            "long_gap_numbers": sorted(self.long_gap_numbers),
+            "previous_numbers": sorted(
+                self.previous_numbers
+            ),
+            "long_gap_numbers": sorted(
+                self.long_gap_numbers
+            ),
             "weights": dict(self.weights),
             "sum_min": self.sum_min,
             "sum_max": self.sum_max,
-            "preferred_sum_min": self.preferred_sum_min,
-            "preferred_sum_max": self.preferred_sum_max,
+            "preferred_sum_min": (
+                self.preferred_sum_min
+            ),
+            "preferred_sum_max": (
+                self.preferred_sum_max
+            ),
             "jaccard_max": self.jaccard_max,
             "max_overlap_between_sets": (
                 self.max_overlap_between_sets
@@ -266,7 +323,10 @@ class PredictionGenerationResult:
 
     @property
     def complete(self) -> bool:
-        return self.generated_count >= self.request.candidate_count
+        return (
+            self.generated_count
+            >= self.request.candidate_count
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,6 +339,7 @@ class PredictionResult:
     diversity: object
     practical: object
     generated_at_kst: datetime
+    ensemble: object | None = None
 
     @property
     def request(self) -> PredictionRequest:

@@ -1,0 +1,282 @@
+{
+  "files": {
+    "lrp/__init__.py": {
+      "mtime_ns": 1784469921900841500,
+      "size": 801
+    },
+    "lrp/__main__.py": {
+      "mtime_ns": 1784626982005440900,
+      "size": 176
+    },
+    "lrp/adapters/__init__.py": {
+      "mtime_ns": 1784570068151438700,
+      "size": 482
+    },
+    "lrp/adapters/candidate.py": {
+      "mtime_ns": 1784624241515185200,
+      "size": 2955
+    },
+    "lrp/adapters/foundation.py": {
+      "mtime_ns": 1784568540347218100,
+      "size": 3618
+    },
+    "lrp/adapters/signal_bridge.py": {
+      "mtime_ns": 1784570068148369700,
+      "size": 9843
+    },
+    "lrp/adapters/statistics.py": {
+      "mtime_ns": 1784568540352563700,
+      "size": 4399
+    },
+    "lrp/cli/__init__.py": {
+      "mtime_ns": 1784740259722223800,
+      "size": 2027
+    },
+    "lrp/cli/backup.py": {
+      "mtime_ns": 1784596544000000000,
+      "size": 684
+    },
+    "lrp/cli/doctor.py": {
+      "mtime_ns": 1784740259711924500,
+      "size": 928
+    },
+    "lrp/cli/predict.py": {
+      "mtime_ns": 1784626981999408000,
+      "size": 5738
+    },
+    "lrp/cli/restore.py": {
+      "mtime_ns": 1784597506000000000,
+      "size": 950
+    },
+    "lrp/cli/review.py": {
+      "mtime_ns": 1784596544000000000,
+      "size": 1399
+    },
+    "lrp/cli/status.py": {
+      "mtime_ns": 1784738860546568100,
+      "size": 1171
+    },
+    "lrp/cli/verify.py": {
+      "mtime_ns": 1784596544000000000,
+      "size": 546
+    },
+    "lrp/cli/weekly.py": {
+      "mtime_ns": 1784596544000000000,
+      "size": 2565
+    },
+    "lrp/contracts/__init__.py": {
+      "mtime_ns": 1784564350448090300,
+      "size": 796
+    },
+    "lrp/contracts/component.py": {
+      "mtime_ns": 1784564350445968300,
+      "size": 5016
+    },
+    "lrp/contracts/exceptions.py": {
+      "mtime_ns": 1784564350440591200,
+      "size": 777
+    },
+    "lrp/contracts/versions.py": {
+      "mtime_ns": 1784564350442621200,
+      "size": 6582
+    },
+    "lrp/core/__init__.py": {
+      "mtime_ns": 1784565043874868500,
+      "size": 743
+    },
+    "lrp/core/assembly.py": {
+      "mtime_ns": 1784565043871722900,
+      "size": 10782
+    },
+    "lrp/core/component_catalog.py": {
+      "mtime_ns": 1784565043807116600,
+      "size": 6071
+    },
+    "lrp/core/runtime.py": {
+      "mtime_ns": 1784565043812522500,
+      "size": 4783
+    },
+    "lrp/ensemble/__init__.py": {
+      "mtime_ns": 1785151577870111200,
+      "size": 2927
+    },
+    "lrp/ensemble/adapters.py": {
+      "mtime_ns": 1785143884072239900,
+      "size": 13337
+    },
+    "lrp/ensemble/engine.py": {
+      "mtime_ns": 1784919465138764200,
+      "size": 7017
+    },
+    "lrp/ensemble/explain.py": {
+      "mtime_ns": 1785146728495897300,
+      "size": 1673
+    },
+    "lrp/ensemble/features.py": {
+      "mtime_ns": 1785146688337642800,
+      "size": 9657
+    },
+    "lrp/ensemble/integration.py": {
+      "mtime_ns": 1785151448108889600,
+      "size": 16794
+    },
+    "lrp/ensemble/models.py": {
+      "mtime_ns": 1784919423306772900,
+      "size": 13078
+    },
+    "lrp/ensemble/repository.py": {
+      "mtime_ns": 1785143907433940800,
+      "size": 10626
+    },
+    "lrp/ensemble/rescoring.py": {
+      "mtime_ns": 1785146712112816500,
+      "size": 16053
+    },
+    "lrp/ensemble/snapshot.py": {
+      "mtime_ns": 1785143861165206800,
+      "size": 17748
+    },
+    "lrp/ensemble/version.py": {
+      "mtime_ns": 1784918663918511900,
+      "size": 101
+    },
+    "lrp/io/__init__.py": {
+      "mtime_ns": 1784626981995380700,
+      "size": 615
+    },
+    "lrp/io/artifacts.py": {
+      "mtime_ns": 1784626981993364600,
+      "size": 2846
+    },
+    "lrp/io/draws.py": {
+      "mtime_ns": 1784626981991352700,
+      "size": 8441
+    },
+    "lrp/learning/__init__.py": {
+      "mtime_ns": 1784772806000000000,
+      "size": 1603
+    },
+    "lrp/learning/adaptive_engine.py": {
+      "mtime_ns": 1784772764000000000,
+      "size": 4883
+    },
+    "lrp/learning/adaptive_models.py": {
+      "mtime_ns": 1784772764000000000,
+      "size": 2837
+    },
+    "lrp/learning/adaptive_repository.py": {
+      "mtime_ns": 1784772784000000000,
+      "size": 3988
+    },
+    "lrp/learning/aggregator.py": {
+      "mtime_ns": 1784743411755038800,
+      "size": 2817
+    },
+    "lrp/learning/evaluator.py": {
+      "mtime_ns": 1784742390723739600,
+      "size": 2232
+    },
+    "lrp/learning/learning_facade.py": {
+      "mtime_ns": 1784772784000000000,
+      "size": 2230
+    },
+    "lrp/learning/models.py": {
+      "mtime_ns": 1784741679665602800,
+      "size": 5036
+    },
+    "lrp/learning/ranking.py": {
+      "mtime_ns": 1784714670000000000,
+      "size": 11310
+    },
+    "lrp/learning/ranking_repository.py": {
+      "mtime_ns": 1784716400000000000,
+      "size": 7836
+    },
+    "lrp/learning/repository.py": {
+      "mtime_ns": 1784743411752046300,
+      "size": 21790
+    },
+    "lrp/learning/service.py": {
+      "mtime_ns": 1784772806000000000,
+      "size": 4820
+    },
+    "lrp/learning/strategy_stats.py": {
+      "mtime_ns": 1784743411745065200,
+      "size": 2268
+    },
+    "lrp/management/__init__.py": {
+      "mtime_ns": 1784740259716773000,
+      "size": 198
+    },
+    "lrp/management/doctor.py": {
+      "mtime_ns": 1784740259706417900,
+      "size": 3065
+    },
+    "lrp/management/status.py": {
+      "mtime_ns": 1784738504734194900,
+      "size": 3059
+    },
+    "lrp/operations/__init__.py": {
+      "mtime_ns": 1784597506000000000,
+      "size": 509
+    },
+    "lrp/operations/review.py": {
+      "mtime_ns": 1784596544000000000,
+      "size": 4059
+    },
+    "lrp/operations/runtime.py": {
+      "mtime_ns": 1784597506000000000,
+      "size": 6839
+    },
+    "lrp/pipelines/__init__.py": {
+      "mtime_ns": 1784624241535769700,
+      "size": 542
+    },
+    "lrp/pipelines/models.py": {
+      "mtime_ns": 1785152537299111900,
+      "size": 8931
+    },
+    "lrp/pipelines/prediction.py": {
+      "mtime_ns": 1785152562676645800,
+      "size": 11775
+    },
+    "lrp/pipelines/probability.py": {
+      "mtime_ns": 1784571342973583800,
+      "size": 4078
+    },
+    "lrp/pipelines/serializer.py": {
+      "mtime_ns": 1784916998819299800,
+      "size": 8118
+    },
+    "tools/build_runner.py": {
+      "mtime_ns": 1784782206000000000,
+      "size": 2628
+    },
+    "tools/dev_check.py": {
+      "mtime_ns": 1784741002839145400,
+      "size": 3075
+    },
+    "tools/export_e004_contracts.py": {
+      "mtime_ns": 1785149860494628400,
+      "size": 9632
+    },
+    "tools/inspect_e002_m6.py": {
+      "mtime_ns": 1784920219832832000,
+      "size": 5842
+    },
+    "tools/inspect_e004_pipeline.py": {
+      "mtime_ns": 1785149151247207100,
+      "size": 19353
+    },
+    "tools/lrp_build.py": {
+      "mtime_ns": 1784782206000000000,
+      "size": 8019
+    },
+    "tools/lrp_contract_probe.py": {
+      "mtime_ns": 1784571847730764300,
+      "size": 6453
+    }
+  },
+  "generated_at_utc": "2026-07-27T11:53:55Z",
+  "schema_version": 1
+}

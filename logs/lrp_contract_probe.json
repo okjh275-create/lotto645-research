@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-07-20T18:24:14Z",
+  "packages": {
+    "foundation": {
+      "error": "ModuleNotFoundError: No module named 'foundation'",
+      "installed": false
+    },
+    "lotto645_candidates": {
+      "error": "ModuleNotFoundError: No module named 'lotto645_candidates'",
+      "installed": false
+    },
+    "lotto645_statistics": {
+      "error": "ModuleNotFoundError: No module named 'lotto645_statistics'",
+      "installed": false
+    }
+  }
+}

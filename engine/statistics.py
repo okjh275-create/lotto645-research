@@ -4,6 +4,7 @@ from collections import Counter
 
 
 class StatisticsEngine:
+
     def __init__(self):
         self.db_path = Path("data") / "lotto.db"
 
@@ -22,9 +23,10 @@ class StatisticsEngine:
 
         rows = cur.fetchall()
         conn.close()
+
         return rows
 
-    def frequency(self, last_n=None):
+    def frequency(self, last_n=None, until_round=None):
         rows = self.load_draws()
 
         if last_n is not None:
@@ -37,7 +39,7 @@ class StatisticsEngine:
 
         return counter
 
-    def gap(self):
+    def gap(self, until_round=None):
         rows = self.load_draws()
 
         latest_round = rows[0][0]
@@ -54,3 +56,40 @@ class StatisticsEngine:
             gaps[number] = gap
 
         return gaps
+
+    def get_draw(self, round_no):
+        """
+        특정 회차의 당첨번호 반환
+        """
+
+        conn = self._connect()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            SELECT n1, n2, n3, n4, n5, n6
+            FROM draw_history
+            WHERE round=?
+            """,
+            (round_no,),
+        )
+
+        row = cur.fetchone()
+        conn.close()
+
+        if row is None:
+            return None
+
+        return list(row)
+
+    def latest_round(self):
+        """
+        DB의 최신 회차 반환
+        """
+
+        rows = self.load_draws()
+
+        if not rows:
+            return None
+
+        return rows[0][0]

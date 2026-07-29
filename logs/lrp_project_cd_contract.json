@@ -1,0 +1,30 @@
+{
+  "statistics": {
+    "file": "C:\\Users\\PC2303\\Documents\\GitHub\\_integration_probe\\project_c\\Project-C-Lotto645-Statistics-Engine-v1.0.0\\src\\lotto645_statistics\\__init__.py",
+    "version": "1.0.0",
+    "stable_api_version": "1.0"
+  },
+  "candidates": {
+    "file": "C:\\Users\\PC2303\\Documents\\GitHub\\_integration_probe\\project_d\\src\\lotto645_candidates\\__init__.py",
+    "version": "0.8.0.dev0",
+    "stable_api_version": null,
+    "functions": {
+      "validate_statistics_contract": "(statistics: 'Mapping[int, Mapping[str, Any]]') -> 'StatisticsContractReport'",
+      "number_signals_from_statistics": "(statistics: 'Mapping[int, Mapping[str, Any]]') -> 'dict[int, NumberSignals]'",
+      "generate_candidates": "(probabilities: collections.abc.Mapping[int, float], *, candidate_config: lotto645_candidates.models.CandidateConfig | None = None, risk_config: lotto645_candidates.models.RiskFilterConfig | None = None, previous_numbers: frozenset[int] = frozenset(), long_gap_numbers: frozenset[int] = frozenset()) -> tuple[lotto645_candidates.models.CandidateSet, ...]",
+      "score_candidates": "(candidates: tuple[lotto645_candidates.models.CandidateSet, ...], *, signals: collections.abc.Mapping[int, lotto645_candidates.models.NumberSignals | collections.abc.Mapping[str, float]], weights: lotto645_candidates.models.ScoreWeights | None = None, pair_affinities: collections.abc.Mapping[tuple[int, int], float] | None = None, sum_band_center: float = 145.0, sum_band_scale: float = 35.0) -> tuple[lotto645_candidates.models.ScoredCandidate, ...]",
+      "score_candidates_fast": "(candidates: tuple[lotto645_candidates.models.CandidateSet, ...], context: lotto645_candidates.models.PreparedScoringContext) -> tuple[lotto645_candidates.models.ScoredCandidate, ...]",
+      "rank_candidates": "(candidates: tuple[lotto645_candidates.models.ScoredCandidate, ...], *, config: lotto645_candidates.models.RankingConfig | None = None) -> lotto645_candidates.models.RankingSnapshot",
+      "select_diverse_candidates": "(candidates: tuple[lotto645_candidates.models.ScoredCandidate, ...], *, config: lotto645_candidates.models.DiversityConfig | None = None) -> lotto645_candidates.models.DiversitySelection",
+      "select_practical_sets": "(ranking: lotto645_candidates.models.RankingSnapshot, *, config: lotto645_candidates.models.PracticalSelectionConfig | None = None, previous_numbers: frozenset[int] = frozenset()) -> lotto645_candidates.models.PracticalSelection"
+    },
+    "classes": {
+      "CandidateConfig": "(seed: 'int' = 20260719, temperature: 'float' = 0.85, candidate_count: 'int' = 10000, max_attempts_multiplier: 'int' = 50) -> None",
+      "RiskFilterConfig": "(sum_min: 'int' = 90, sum_max: 'int' = 200, min_odd: 'int' = 2, max_odd: 'int' = 4, low_high_min_each: 'int' = 1, max_consecutive_run: 'int' = 2, max_same_ending: 'int' = 2, max_overlap_previous: 'int' = 1, min_long_gap_inclusion: 'int' = 1, max_same_decade: 'int' = 3) -> None",
+      "ScoreWeights": "(recency: 'float' = 0.35, frequency: 'float' = 0.2, gap_reversion: 'float' = 0.15, pair_graph: 'float' = 0.1, terminal_dispersion: 'float' = 0.08, sum_band: 'float' = 0.07, parity_balance: 'float' = 0.05) -> None",
+      "RankingConfig": "(score_weight: 'float' = 0.7, robustness_weight: 'float' = 0.15, diversity_weight: 'float' = 0.15, pareto_penalty: 'float' = 0.05) -> None",
+      "DiversityConfig": "(k: 'int' = 10, mmr_lambda: 'float' = 0.75, jaccard_max: 'float' = 0.33, max_overlap_between_sets: 'int' = 3) -> None",
+      "PracticalSelectionConfig": "(k: 'int' = 5, preferred_sum_min: 'int' = 110, preferred_sum_max: 'int' = 180, max_overlap_previous_draw: 'int' = 1, require_no_risk_flags: 'bool' = True, jaccard_max: 'float' = 0.33, max_overlap_between_sets: 'int' = 3) -> None"
+    }
+  }
+}

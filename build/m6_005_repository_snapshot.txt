@@ -1,0 +1,3624 @@
+LRP M6-005 REPOSITORY SNAPSHOT
+Generated: 2026-07-23 18:07:47 +09:00
+Root: C:\Users\PC2303\Documents\GitHub\lotto645-research
+
+============================================================
+FILE: .\lrp\learning\models.py
+============================================================
+"""Immutable learning-domain records."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Sequence
+
+
+def _normalize_numbers(
+    values: Sequence[int],
+    *,
+    field_name: str,
+    expected_count: int = 6,
+) -> tuple[int, ...]:
+    try:
+        numbers = tuple(sorted(int(value) for value in values))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{field_name} must contain integers"
+        ) from exc
+
+    if len(numbers) != expected_count:
+        raise ValueError(
+            f"{field_name} must contain exactly "
+            f"{expected_count} numbers"
+        )
+
+    if len(set(numbers)) != expected_count:
+        raise ValueError(
+            f"{field_name} must not contain duplicates"
+        )
+
+    if any(number < 1 or number > 45 for number in numbers):
+        raise ValueError(
+            f"{field_name} numbers must be between 1 and 45"
+        )
+
+    return numbers
+
+
+def _validate_round(round_no: int) -> int:
+    if isinstance(round_no, bool) or not isinstance(round_no, int):
+        raise ValueError("round_no must be an integer")
+
+    if round_no <= 0:
+        raise ValueError("round_no must be positive")
+
+    return round_no
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionRecord:
+    """One generated combination and its generation context."""
+
+    prediction_id: str
+    round_no: int
+    set_id: str
+    numbers: tuple[int, ...]
+    score: float
+    model_name: str
+    seed: int
+    generated_at_kst: str
+    features: Mapping[str, Any] = field(
+        default_factory=dict
+    )
+    parameters: Mapping[str, Any] = field(
+        default_factory=dict
+    )
+
+    def __post_init__(self) -> None:
+        if not self.prediction_id.strip():
+            raise ValueError(
+                "prediction_id must not be empty"
+            )
+
+        _validate_round(self.round_no)
+
+        if not self.set_id.strip():
+            raise ValueError("set_id must not be empty")
+
+        object.__setattr__(
+            self,
+            "numbers",
+            _normalize_numbers(
+                self.numbers,
+                field_name="numbers",
+            ),
+        )
+
+        if not 0.0 <= float(self.score) <= 1.0:
+            raise ValueError(
+                "score must be between 0 and 1"
+            )
+
+        if not self.model_name.strip():
+            raise ValueError(
+                "model_name must not be empty"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ResultRecord:
+    """Official winning result for one round."""
+
+    round_no: int
+    numbers: tuple[int, ...]
+    bonus: int
+    recorded_at_kst: str
+
+    def __post_init__(self) -> None:
+        _validate_round(self.round_no)
+
+        normalized = _normalize_numbers(
+            self.numbers,
+            field_name="numbers",
+        )
+        object.__setattr__(
+            self,
+            "numbers",
+            normalized,
+        )
+
+        if (
+            isinstance(self.bonus, bool)
+            or not isinstance(self.bonus, int)
+            or self.bonus < 1
+            or self.bonus > 45
+        ):
+            raise ValueError(
+                "bonus must be an integer between 1 and 45"
+            )
+
+        if self.bonus in normalized:
+            raise ValueError(
+                "bonus must not duplicate a winning number"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewRecord:
+    """Evaluation of one prediction against one result."""
+
+    prediction_id: str
+    round_no: int
+    matched_numbers: tuple[int, ...]
+    match_count: int
+    bonus_matched: bool
+    prize_rank: int | None
+    reviewed_at_kst: str
+    metrics: Mapping[str, Any] = field(
+        default_factory=dict
+    )
+
+    def __post_init__(self) -> None:
+        if not self.prediction_id.strip():
+            raise ValueError(
+                "prediction_id must not be empty"
+            )
+
+        _validate_round(self.round_no)
+
+        normalized = tuple(
+            sorted(int(value) for value in self.matched_numbers)
+        )
+
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(
+                "matched_numbers must not contain duplicates"
+            )
+
+        if any(number < 1 or number > 45 for number in normalized):
+            raise ValueError(
+                "matched_numbers must be between 1 and 45"
+            )
+
+        object.__setattr__(
+            self,
+            "matched_numbers",
+            normalized,
+        )
+
+        if self.match_count != len(normalized):
+            raise ValueError(
+                "match_count must equal matched_numbers length"
+            )
+
+        if self.match_count < 0 or self.match_count > 6:
+            raise ValueError(
+                "match_count must be between 0 and 6"
+            )
+
+        if self.prize_rank is not None and (
+            self.prize_rank < 1 or self.prize_rank > 5
+        ):
+            raise ValueError(
+                "prize_rank must be 1 to 5 or None"
+            )
+
+
+============================================================
+FILE: .\lrp\learning\repository.py
+============================================================
+"""Append-only SQLite repository for learning records."""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from pathlib import Path
+import json
+import sqlite3
+from typing import Any, Iterator
+
+from .models import (
+    PredictionRecord,
+    ResultRecord,
+    ReviewRecord,
+)
+from .strategy_stats import StrategyStatistics
+
+
+_SCHEMA = """
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS learning_predictions (
+    prediction_id TEXT PRIMARY KEY,
+    round_no INTEGER NOT NULL,
+    set_id TEXT NOT NULL,
+    numbers_json TEXT NOT NULL,
+    score REAL NOT NULL,
+    model_name TEXT NOT NULL,
+    seed INTEGER NOT NULL,
+    generated_at_kst TEXT NOT NULL,
+    features_json TEXT NOT NULL,
+    parameters_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_learning_predictions_round
+ON learning_predictions(round_no);
+
+CREATE INDEX IF NOT EXISTS
+idx_learning_predictions_model
+ON learning_predictions(model_name);
+
+CREATE TABLE IF NOT EXISTS learning_results (
+    round_no INTEGER PRIMARY KEY,
+    numbers_json TEXT NOT NULL,
+    bonus INTEGER NOT NULL,
+    recorded_at_kst TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS learning_reviews (
+    prediction_id TEXT PRIMARY KEY,
+    round_no INTEGER NOT NULL,
+    matched_numbers_json TEXT NOT NULL,
+    match_count INTEGER NOT NULL,
+    bonus_matched INTEGER NOT NULL,
+    prize_rank INTEGER,
+    reviewed_at_kst TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
+    FOREIGN KEY(prediction_id)
+        REFERENCES learning_predictions(prediction_id)
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_learning_reviews_round
+ON learning_reviews(round_no);
+
+CREATE TABLE IF NOT EXISTS learning_strategy_stats (
+    strategy_type TEXT NOT NULL,
+    strategy_name TEXT NOT NULL,
+    sample_count INTEGER NOT NULL,
+    total_matches INTEGER NOT NULL,
+    total_prediction_score REAL NOT NULL,
+    hit3_count INTEGER NOT NULL,
+    hit4_count INTEGER NOT NULL,
+    hit5_count INTEGER NOT NULL,
+    hit6_count INTEGER NOT NULL,
+    prize_count INTEGER NOT NULL,
+    updated_at_kst TEXT NOT NULL,
+    PRIMARY KEY(strategy_type, strategy_name)
+);
+
+CREATE TABLE IF NOT EXISTS learning_strategy_events (
+    prediction_id TEXT NOT NULL,
+    strategy_type TEXT NOT NULL,
+    strategy_name TEXT NOT NULL,
+    aggregated_at_kst TEXT NOT NULL,
+    PRIMARY KEY(
+        prediction_id,
+        strategy_type,
+        strategy_name
+    ),
+    FOREIGN KEY(prediction_id)
+        REFERENCES learning_predictions(prediction_id)
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_learning_strategy_events_prediction
+ON learning_strategy_events(prediction_id);
+"""
+
+
+def _json(value: Any) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _decode_json(value: str) -> Any:
+    return json.loads(value)
+
+
+def _prediction_from_row(
+    row: sqlite3.Row,
+) -> PredictionRecord:
+    return PredictionRecord(
+        prediction_id=str(row["prediction_id"]),
+        round_no=int(row["round_no"]),
+        set_id=str(row["set_id"]),
+        numbers=tuple(
+            int(value)
+            for value in _decode_json(row["numbers_json"])
+        ),
+        score=float(row["score"]),
+        model_name=str(row["model_name"]),
+        seed=int(row["seed"]),
+        generated_at_kst=str(row["generated_at_kst"]),
+        features=dict(
+            _decode_json(row["features_json"])
+        ),
+        parameters=dict(
+            _decode_json(row["parameters_json"])
+        ),
+    )
+
+
+class LearningRepository:
+    """Idempotent append-only learning data store."""
+
+    def __init__(
+        self,
+        database_path: str | Path = "data/learning.db",
+    ) -> None:
+        self.database_path = Path(database_path)
+        self._initialized = False
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        self.database_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        connection = sqlite3.connect(
+            self.database_path,
+            timeout=10.0,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        try:
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def initialize(self) -> None:
+        if self._initialized:
+            return
+
+        with self._connect() as connection:
+            connection.executescript(_SCHEMA)
+
+        self._initialized = True
+
+    def add_prediction(
+        self,
+        record: PredictionRecord,
+    ) -> bool:
+        self.initialize()
+
+        values = (
+            record.prediction_id,
+            record.round_no,
+            record.set_id,
+            _json(record.numbers),
+            float(record.score),
+            record.model_name,
+            int(record.seed),
+            record.generated_at_kst,
+            _json(dict(record.features)),
+            _json(dict(record.parameters)),
+        )
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO learning_predictions (
+                    prediction_id,
+                    round_no,
+                    set_id,
+                    numbers_json,
+                    score,
+                    model_name,
+                    seed,
+                    generated_at_kst,
+                    features_json,
+                    parameters_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                values,
+            )
+
+            if cursor.rowcount == 1:
+                return True
+
+            existing = connection.execute(
+                """
+                SELECT
+                    prediction_id,
+                    round_no,
+                    set_id,
+                    numbers_json,
+                    score,
+                    model_name,
+                    seed,
+                    generated_at_kst,
+                    features_json,
+                    parameters_json
+                FROM learning_predictions
+                WHERE prediction_id = ?
+                """,
+                (record.prediction_id,),
+            ).fetchone()
+
+            if existing is None or tuple(existing) != values:
+                raise ValueError(
+                    "prediction_id already exists "
+                    "with different content"
+                )
+
+            return False
+
+    def add_result(
+        self,
+        record: ResultRecord,
+    ) -> bool:
+        self.initialize()
+
+        values = (
+            record.round_no,
+            _json(record.numbers),
+            record.bonus,
+            record.recorded_at_kst,
+        )
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO learning_results (
+                    round_no,
+                    numbers_json,
+                    bonus,
+                    recorded_at_kst
+                ) VALUES (?, ?, ?, ?)
+                """,
+                values,
+            )
+
+            if cursor.rowcount == 1:
+                return True
+
+            existing = connection.execute(
+                """
+                SELECT
+                    round_no,
+                    numbers_json,
+                    bonus,
+                    recorded_at_kst
+                FROM learning_results
+                WHERE round_no = ?
+                """,
+                (record.round_no,),
+            ).fetchone()
+
+            if existing is None or tuple(existing) != values:
+                raise ValueError(
+                    "round result already exists "
+                    "with different content"
+                )
+
+            return False
+
+    def add_review(
+        self,
+        record: ReviewRecord,
+    ) -> bool:
+        self.initialize()
+
+        values = (
+            record.prediction_id,
+            record.round_no,
+            _json(record.matched_numbers),
+            record.match_count,
+            int(record.bonus_matched),
+            record.prize_rank,
+            record.reviewed_at_kst,
+            _json(dict(record.metrics)),
+        )
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO learning_reviews (
+                    prediction_id,
+                    round_no,
+                    matched_numbers_json,
+                    match_count,
+                    bonus_matched,
+                    prize_rank,
+                    reviewed_at_kst,
+                    metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                values,
+            )
+
+            if cursor.rowcount == 1:
+                return True
+
+            existing = connection.execute(
+                """
+                SELECT
+                    prediction_id,
+                    round_no,
+                    matched_numbers_json,
+                    match_count,
+                    bonus_matched,
+                    prize_rank,
+                    reviewed_at_kst,
+                    metrics_json
+                FROM learning_reviews
+                WHERE prediction_id = ?
+                """,
+                (record.prediction_id,),
+            ).fetchone()
+
+            if existing is None or tuple(existing) != values:
+                raise ValueError(
+                    "prediction review already exists "
+                    "with different content"
+                )
+
+            return False
+
+    def get_prediction(
+        self,
+        prediction_id: str,
+    ) -> PredictionRecord | None:
+        self.initialize()
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM learning_predictions
+                WHERE prediction_id = ?
+                """,
+                (prediction_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return _prediction_from_row(row)
+
+    def get_result(
+        self,
+        round_no: int,
+    ) -> ResultRecord | None:
+        self.initialize()
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM learning_results
+                WHERE round_no = ?
+                """,
+                (round_no,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return ResultRecord(
+            round_no=int(row["round_no"]),
+            numbers=tuple(
+                int(value)
+                for value in _decode_json(
+                    row["numbers_json"]
+                )
+            ),
+            bonus=int(row["bonus"]),
+            recorded_at_kst=str(
+                row["recorded_at_kst"]
+            ),
+        )
+
+    def pending_predictions_with_results(
+        self,
+        *,
+        round_no: int | None = None,
+        limit: int | None = None,
+    ) -> tuple[PredictionRecord, ...]:
+        self.initialize()
+
+        query = """
+            SELECT p.*
+            FROM learning_predictions AS p
+            INNER JOIN learning_results AS official
+                ON official.round_no = p.round_no
+            LEFT JOIN learning_reviews AS review
+                ON review.prediction_id = p.prediction_id
+            WHERE review.prediction_id IS NULL
+        """
+        parameters: list[Any] = []
+
+        if round_no is not None:
+            query += " AND p.round_no = ?"
+            parameters.append(round_no)
+
+        query += """
+            ORDER BY
+                p.round_no ASC,
+                p.prediction_id ASC
+        """
+
+        if limit is not None:
+            if limit <= 0:
+                raise ValueError("limit must be positive")
+
+            query += " LIMIT ?"
+            parameters.append(limit)
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                query,
+                tuple(parameters),
+            ).fetchall()
+
+        return tuple(
+            _prediction_from_row(row)
+            for row in rows
+        )
+
+    def pending_strategy_reviews(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> tuple[tuple[PredictionRecord, ReviewRecord], ...]:
+        """Return reviewed predictions not yet aggregated."""
+
+        self.initialize()
+
+        query = """
+            SELECT
+                p.*,
+                r.matched_numbers_json,
+                r.match_count,
+                r.bonus_matched,
+                r.prize_rank,
+                r.reviewed_at_kst,
+                r.metrics_json
+            FROM learning_predictions AS p
+            INNER JOIN learning_reviews AS r
+                ON r.prediction_id = p.prediction_id
+            LEFT JOIN learning_strategy_events AS event
+                ON event.prediction_id = p.prediction_id
+                AND event.strategy_type = 'model'
+                AND event.strategy_name = p.model_name
+            WHERE event.prediction_id IS NULL
+            ORDER BY
+                p.round_no ASC,
+                p.prediction_id ASC
+        """
+        parameters: list[Any] = []
+
+        if limit is not None:
+            if limit <= 0:
+                raise ValueError("limit must be positive")
+
+            query += " LIMIT ?"
+            parameters.append(limit)
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                query,
+                tuple(parameters),
+            ).fetchall()
+
+        items = []
+
+        for row in rows:
+            prediction = _prediction_from_row(row)
+            review = ReviewRecord(
+                prediction_id=str(row["prediction_id"]),
+                round_no=int(row["round_no"]),
+                matched_numbers=tuple(
+                    int(value)
+                    for value in _decode_json(
+                        row["matched_numbers_json"]
+                    )
+                ),
+                match_count=int(row["match_count"]),
+                bonus_matched=bool(row["bonus_matched"]),
+                prize_rank=(
+                    None
+                    if row["prize_rank"] is None
+                    else int(row["prize_rank"])
+                ),
+                reviewed_at_kst=str(
+                    row["reviewed_at_kst"]
+                ),
+                metrics=dict(
+                    _decode_json(row["metrics_json"])
+                ),
+            )
+            items.append((prediction, review))
+
+        return tuple(items)
+
+    def apply_strategy_stat_event(
+        self,
+        *,
+        prediction_id: str,
+        strategy_type: str,
+        strategy_name: str,
+        match_count: int,
+        prediction_score: float,
+        prize_rank: int | None,
+        aggregated_at_kst: str,
+    ) -> bool:
+        """Atomically register and aggregate one strategy event."""
+
+        self.initialize()
+
+        hit3 = int(match_count == 3)
+        hit4 = int(match_count == 4)
+        hit5 = int(match_count == 5)
+        hit6 = int(match_count == 6)
+        prize = int(prize_rank is not None)
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO learning_strategy_events (
+                    prediction_id,
+                    strategy_type,
+                    strategy_name,
+                    aggregated_at_kst
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    prediction_id,
+                    strategy_type,
+                    strategy_name,
+                    aggregated_at_kst,
+                ),
+            )
+
+            if cursor.rowcount == 0:
+                return False
+
+            connection.execute(
+                """
+                INSERT INTO learning_strategy_stats (
+                    strategy_type,
+                    strategy_name,
+                    sample_count,
+                    total_matches,
+                    total_prediction_score,
+                    hit3_count,
+                    hit4_count,
+                    hit5_count,
+                    hit6_count,
+                    prize_count,
+                    updated_at_kst
+                ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(strategy_type, strategy_name)
+                DO UPDATE SET
+                    sample_count =
+                        sample_count + 1,
+                    total_matches =
+                        total_matches + excluded.total_matches,
+                    total_prediction_score =
+                        total_prediction_score
+                        + excluded.total_prediction_score,
+                    hit3_count =
+                        hit3_count + excluded.hit3_count,
+                    hit4_count =
+                        hit4_count + excluded.hit4_count,
+                    hit5_count =
+                        hit5_count + excluded.hit5_count,
+                    hit6_count =
+                        hit6_count + excluded.hit6_count,
+                    prize_count =
+                        prize_count + excluded.prize_count,
+                    updated_at_kst =
+                        excluded.updated_at_kst
+                """,
+                (
+                    strategy_type,
+                    strategy_name,
+                    match_count,
+                    float(prediction_score),
+                    hit3,
+                    hit4,
+                    hit5,
+                    hit6,
+                    prize,
+                    aggregated_at_kst,
+                ),
+            )
+
+            return True
+
+    def get_strategy_statistics(
+        self,
+        *,
+        strategy_type: str | None = None,
+    ) -> tuple[StrategyStatistics, ...]:
+        self.initialize()
+
+        query = """
+            SELECT *
+            FROM learning_strategy_stats
+        """
+        parameters: tuple[Any, ...] = ()
+
+        if strategy_type is not None:
+            query += " WHERE strategy_type = ?"
+            parameters = (strategy_type,)
+
+        query += """
+            ORDER BY
+                average_match_order DESC,
+                sample_count DESC,
+                strategy_type ASC,
+                strategy_name ASC
+        """
+
+        query = query.replace(
+            "average_match_order",
+            """
+            CASE
+                WHEN sample_count = 0 THEN 0.0
+                ELSE CAST(total_matches AS REAL)
+                     / sample_count
+            END
+            """,
+        )
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                query,
+                parameters,
+            ).fetchall()
+
+        return tuple(
+            StrategyStatistics(
+                strategy_type=str(row["strategy_type"]),
+                strategy_name=str(row["strategy_name"]),
+                sample_count=int(row["sample_count"]),
+                total_matches=int(row["total_matches"]),
+                total_prediction_score=float(
+                    row["total_prediction_score"]
+                ),
+                hit3_count=int(row["hit3_count"]),
+                hit4_count=int(row["hit4_count"]),
+                hit5_count=int(row["hit5_count"]),
+                hit6_count=int(row["hit6_count"]),
+                prize_count=int(row["prize_count"]),
+                updated_at_kst=str(row["updated_at_kst"]),
+            )
+            for row in rows
+        )
+
+    def counts(self) -> dict[str, int]:
+        self.initialize()
+
+        with self._connect() as connection:
+            return {
+                "predictions": int(
+                    connection.execute(
+                        "SELECT COUNT(*) "
+                        "FROM learning_predictions"
+                    ).fetchone()[0]
+                ),
+                "results": int(
+                    connection.execute(
+                        "SELECT COUNT(*) "
+                        "FROM learning_results"
+                    ).fetchone()[0]
+                ),
+                "reviews": int(
+                    connection.execute(
+                        "SELECT COUNT(*) "
+                        "FROM learning_reviews"
+                    ).fetchone()[0]
+                ),
+                "strategy_stats": int(
+                    connection.execute(
+                        "SELECT COUNT(*) "
+                        "FROM learning_strategy_stats"
+                    ).fetchone()[0]
+                ),
+                "strategy_events": int(
+                    connection.execute(
+                        "SELECT COUNT(*) "
+                        "FROM learning_strategy_events"
+                    ).fetchone()[0]
+                ),
+            }
+
+    def pending_prediction_ids(
+        self,
+        *,
+        round_no: int | None = None,
+    ) -> tuple[str, ...]:
+        self.initialize()
+
+        query = """
+            SELECT p.prediction_id
+            FROM learning_predictions AS p
+            LEFT JOIN learning_reviews AS r
+                ON r.prediction_id = p.prediction_id
+            WHERE r.prediction_id IS NULL
+        """
+        parameters: tuple[Any, ...] = ()
+
+        if round_no is not None:
+            query += " AND p.round_no = ?"
+            parameters = (round_no,)
+
+        query += " ORDER BY p.round_no, p.prediction_id"
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                query,
+                parameters,
+            ).fetchall()
+
+        return tuple(
+            str(row["prediction_id"])
+            for row in rows
+        )
+
+
+============================================================
+FILE: .\lrp\learning\strategy_stats.py
+============================================================
+"""Strategy-performance statistics models."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyStatistics:
+    """Incrementally accumulated performance for one strategy."""
+
+    strategy_type: str
+    strategy_name: str
+    sample_count: int
+    total_matches: int
+    total_prediction_score: float
+    hit3_count: int
+    hit4_count: int
+    hit5_count: int
+    hit6_count: int
+    prize_count: int
+    updated_at_kst: str
+
+    @property
+    def average_match_count(self) -> float:
+        if self.sample_count == 0:
+            return 0.0
+
+        return self.total_matches / self.sample_count
+
+    @property
+    def average_prediction_score(self) -> float:
+        if self.sample_count == 0:
+            return 0.0
+
+        return self.total_prediction_score / self.sample_count
+
+    @property
+    def hit3_plus_rate(self) -> float:
+        if self.sample_count == 0:
+            return 0.0
+
+        hit_count = (
+            self.hit3_count
+            + self.hit4_count
+            + self.hit5_count
+            + self.hit6_count
+        )
+        return hit_count / self.sample_count
+
+    @property
+    def prize_rate(self) -> float:
+        if self.sample_count == 0:
+            return 0.0
+
+        return self.prize_count / self.sample_count
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "strategy_type": self.strategy_type,
+            "strategy_name": self.strategy_name,
+            "sample_count": self.sample_count,
+            "average_match_count": round(
+                self.average_match_count,
+                6,
+            ),
+            "average_prediction_score": round(
+                self.average_prediction_score,
+                6,
+            ),
+            "hit3_count": self.hit3_count,
+            "hit4_count": self.hit4_count,
+            "hit5_count": self.hit5_count,
+            "hit6_count": self.hit6_count,
+            "hit3_plus_rate": round(
+                self.hit3_plus_rate,
+                6,
+            ),
+            "prize_count": self.prize_count,
+            "prize_rate": round(
+                self.prize_rate,
+                6,
+            ),
+            "updated_at_kst": self.updated_at_kst,
+        }
+
+
+============================================================
+FILE: .\lrp\learning\aggregator.py
+============================================================
+"""Incremental strategy-statistics aggregation."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+import time
+from zoneinfo import ZoneInfo
+
+from .repository import LearningRepository
+
+
+_KST = ZoneInfo("Asia/Seoul")
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyAggregationSummary:
+    scanned: int
+    created_events: int
+    skipped_events: int
+    elapsed_seconds: float
+
+    def as_dict(self) -> dict[str, int | float]:
+        return {
+            "scanned": self.scanned,
+            "created_events": self.created_events,
+            "skipped_events": self.skipped_events,
+            "elapsed_seconds": self.elapsed_seconds,
+        }
+
+
+class StrategyAggregator:
+    """Incrementally aggregate reviewed prediction performance."""
+
+    def __init__(
+        self,
+        repository: LearningRepository,
+    ) -> None:
+        self.repository = repository
+
+    def run(
+        self,
+        *,
+        limit: int | None = None,
+        aggregated_at_kst: str | None = None,
+    ) -> StrategyAggregationSummary:
+        started = time.perf_counter()
+
+        timestamp = aggregated_at_kst
+        if timestamp is None:
+            timestamp = datetime.now(_KST).isoformat(
+                timespec="seconds"
+            )
+
+        pending = self.repository.pending_strategy_reviews(
+            limit=limit
+        )
+
+        created = 0
+        skipped = 0
+
+        for prediction, review in pending:
+            strategy_keys = [
+                ("model", prediction.model_name),
+            ]
+
+            scenario = prediction.parameters.get("scenario")
+            if scenario:
+                strategy_keys.append(
+                    ("scenario", str(scenario))
+                )
+
+            for strategy_type, strategy_name in strategy_keys:
+                inserted = (
+                    self.repository
+                    .apply_strategy_stat_event(
+                        prediction_id=(
+                            prediction.prediction_id
+                        ),
+                        strategy_type=strategy_type,
+                        strategy_name=strategy_name,
+                        match_count=review.match_count,
+                        prediction_score=prediction.score,
+                        prize_rank=review.prize_rank,
+                        aggregated_at_kst=timestamp,
+                    )
+                )
+
+                if inserted:
+                    created += 1
+                else:
+                    skipped += 1
+
+        return StrategyAggregationSummary(
+            scanned=len(pending),
+            created_events=created,
+            skipped_events=skipped,
+            elapsed_seconds=round(
+                time.perf_counter() - started,
+                6,
+            ),
+        )
+
+
+============================================================
+FILE: .\lrp\learning\ranking.py
+============================================================
+"""Strategy ranking models and deterministic ranking engine.
+
+M6-004 keeps ranking as a derived calculation layer.  No ranking table is
+required: the engine consumes incrementally accumulated StrategyStatistics
+plus a bounded recent-performance window supplied by the repository.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import math
+from statistics import fmean, pstdev
+from typing import Iterable, Mapping, Sequence
+
+from .strategy_stats import StrategyStatistics
+
+
+_VALID_TRENDS = {"UP", "DOWN", "FLAT"}
+
+
+def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    return max(lower, min(upper, float(value)))
+
+
+def _safe_mean(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    return float(fmean(values))
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyPerformancePoint:
+    """One reviewed prediction used by bounded rolling-window calculations."""
+
+    prediction_id: str
+    round_no: int
+    match_count: int
+    prediction_score: float
+    prize_rank: int | None
+
+    def __post_init__(self) -> None:
+        if not self.prediction_id.strip():
+            raise ValueError("prediction_id must not be empty")
+        if self.round_no <= 0:
+            raise ValueError("round_no must be positive")
+        if self.match_count < 0 or self.match_count > 6:
+            raise ValueError("match_count must be between 0 and 6")
+        if not 0.0 <= float(self.prediction_score) <= 1.0:
+            raise ValueError("prediction_score must be between 0 and 1")
+        if self.prize_rank is not None and not 1 <= self.prize_rank <= 5:
+            raise ValueError("prize_rank must be 1 to 5 or None")
+
+
+@dataclass(frozen=True, slots=True)
+class RankingWeights:
+    """Weights used to build one normalized rank score."""
+
+    performance: float = 0.42
+    recent_gain: float = 0.18
+    prize_rate: float = 0.12
+    stability: float = 0.10
+    confidence: float = 0.10
+    prediction_quality: float = 0.08
+
+    def __post_init__(self) -> None:
+        values = (
+            self.performance,
+            self.recent_gain,
+            self.prize_rate,
+            self.stability,
+            self.confidence,
+            self.prediction_quality,
+        )
+        if any(value < 0.0 for value in values):
+            raise ValueError("ranking weights must be non-negative")
+        if not math.isclose(sum(values), 1.0, abs_tol=1e-9):
+            raise ValueError("ranking weights must sum to 1.0")
+
+
+@dataclass(frozen=True, slots=True)
+class RankingConfig:
+    """Deterministic ranking parameters."""
+
+    windows: tuple[int, ...] = (10, 20, 50, 100)
+    trend_short_window: int = 10
+    trend_long_window: int = 30
+    trend_threshold: float = 0.20
+    confidence_scale: float = 20.0
+    weights: RankingWeights = field(default_factory=RankingWeights)
+
+    def __post_init__(self) -> None:
+        if not self.windows:
+            raise ValueError("windows must not be empty")
+        if any(window <= 0 for window in self.windows):
+            raise ValueError("windows must contain positive integers")
+        if len(set(self.windows)) != len(self.windows):
+            raise ValueError("windows must not contain duplicates")
+        if self.trend_short_window <= 0 or self.trend_long_window <= 0:
+            raise ValueError("trend windows must be positive")
+        if self.trend_short_window > self.trend_long_window:
+            raise ValueError(
+                "trend_short_window must be less than or equal to "
+                "trend_long_window"
+            )
+        if self.trend_threshold < 0.0:
+            raise ValueError("trend_threshold must be non-negative")
+        if self.confidence_scale <= 0.0:
+            raise ValueError("confidence_scale must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyRanking:
+    """Derived ranking output for one model or scenario strategy."""
+
+    strategy_type: str
+    strategy_name: str
+    rank_position: int
+    rank_score: float
+    confidence: float
+    stability: float
+    trend: str
+    recent_gain: float
+    sample_count: int
+    average_match_count: float
+    average_prediction_score: float
+    prize_rate: float
+    rolling_matches: Mapping[int, float]
+    rolling_prize_rates: Mapping[int, float]
+
+    def __post_init__(self) -> None:
+        if not self.strategy_type.strip():
+            raise ValueError("strategy_type must not be empty")
+        if not self.strategy_name.strip():
+            raise ValueError("strategy_name must not be empty")
+        if self.rank_position <= 0:
+            raise ValueError("rank_position must be positive")
+        if self.trend not in _VALID_TRENDS:
+            raise ValueError("trend must be UP, DOWN, or FLAT")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "strategy_type": self.strategy_type,
+            "strategy_name": self.strategy_name,
+            "rank_position": self.rank_position,
+            "rank_score": round(self.rank_score, 6),
+            "confidence": round(self.confidence, 6),
+            "stability": round(self.stability, 6),
+            "trend": self.trend,
+            "recent_gain": round(self.recent_gain, 6),
+            "sample_count": self.sample_count,
+            "average_match_count": round(self.average_match_count, 6),
+            "average_prediction_score": round(
+                self.average_prediction_score,
+                6,
+            ),
+            "prize_rate": round(self.prize_rate, 6),
+            "rolling_matches": {
+                str(window): round(value, 6)
+                for window, value in sorted(self.rolling_matches.items())
+            },
+            "rolling_prize_rates": {
+                str(window): round(value, 6)
+                for window, value in sorted(
+                    self.rolling_prize_rates.items()
+                )
+            },
+        }
+
+
+class StrategyRankingEngine:
+    """Build deterministic, normalized rankings from bounded history."""
+
+    def __init__(
+        self,
+        config: RankingConfig | None = None,
+    ) -> None:
+        self.config = config or RankingConfig()
+
+    def rank(
+        self,
+        statistics: Sequence[StrategyStatistics],
+        histories: Mapping[
+            tuple[str, str],
+            Sequence[StrategyPerformancePoint],
+        ],
+    ) -> tuple[StrategyRanking, ...]:
+        """Rank strategies, then assign stable one-based positions."""
+
+        provisional: list[dict[str, object]] = []
+
+        for item in statistics:
+            key = (item.strategy_type, item.strategy_name)
+            history = tuple(histories.get(key, ()))
+            provisional.append(
+                self._calculate_one(
+                    statistics=item,
+                    history=history,
+                )
+            )
+
+        provisional.sort(
+            key=lambda row: (
+                -float(row["rank_score"]),
+                -float(row["confidence"]),
+                -int(row["sample_count"]),
+                str(row["strategy_type"]),
+                str(row["strategy_name"]),
+            )
+        )
+
+        return tuple(
+            StrategyRanking(
+                rank_position=index,
+                **row,
+            )
+            for index, row in enumerate(provisional, start=1)
+        )
+
+    def _calculate_one(
+        self,
+        *,
+        statistics: StrategyStatistics,
+        history: Sequence[StrategyPerformancePoint],
+    ) -> dict[str, object]:
+        ordered_history = tuple(
+            sorted(
+                history,
+                key=lambda point: (
+                    point.round_no,
+                    point.prediction_id,
+                ),
+            )
+        )
+
+        match_values = [
+            float(point.match_count)
+            for point in ordered_history
+        ]
+        prize_values = [
+            1.0 if point.prize_rank is not None else 0.0
+            for point in ordered_history
+        ]
+
+        rolling_matches = {
+            window: _safe_mean(match_values[-window:])
+            for window in self.config.windows
+        }
+        rolling_prize_rates = {
+            window: _safe_mean(prize_values[-window:])
+            for window in self.config.windows
+        }
+
+        confidence = self._confidence(statistics.sample_count)
+        stability = self._stability(match_values)
+        trend, recent_gain = self._trend(match_values)
+
+        performance_component = _clamp(
+            statistics.average_match_count / 6.0
+        )
+        recent_component = _clamp(
+            0.5 + (recent_gain / 6.0)
+        )
+        prize_component = _clamp(statistics.prize_rate)
+        prediction_quality_component = _clamp(
+            statistics.average_prediction_score
+        )
+
+        weights = self.config.weights
+        rank_score = _clamp(
+            weights.performance * performance_component
+            + weights.recent_gain * recent_component
+            + weights.prize_rate * prize_component
+            + weights.stability * stability
+            + weights.confidence * confidence
+            + weights.prediction_quality
+            * prediction_quality_component
+        )
+
+        return {
+            "strategy_type": statistics.strategy_type,
+            "strategy_name": statistics.strategy_name,
+            "rank_score": rank_score,
+            "confidence": confidence,
+            "stability": stability,
+            "trend": trend,
+            "recent_gain": recent_gain,
+            "sample_count": statistics.sample_count,
+            "average_match_count": statistics.average_match_count,
+            "average_prediction_score": (
+                statistics.average_prediction_score
+            ),
+            "prize_rate": statistics.prize_rate,
+            "rolling_matches": rolling_matches,
+            "rolling_prize_rates": rolling_prize_rates,
+        }
+
+    def _confidence(self, sample_count: int) -> float:
+        if sample_count <= 0:
+            return 0.0
+
+        # Smoothly approaches 1.0 without allowing tiny samples to dominate.
+        return _clamp(
+            1.0 - math.exp(
+                -float(sample_count)
+                / self.config.confidence_scale
+            )
+        )
+
+    @staticmethod
+    def _stability(match_values: Sequence[float]) -> float:
+        if not match_values:
+            return 0.0
+        if len(match_values) == 1:
+            return 0.5
+
+        deviation = float(pstdev(match_values))
+        # Match counts are bounded to 0..6.  A deviation of three or more is
+        # treated as maximally unstable.
+        return _clamp(1.0 - deviation / 3.0)
+
+    def _trend(
+        self,
+        match_values: Sequence[float],
+    ) -> tuple[str, float]:
+        if not match_values:
+            return "FLAT", 0.0
+
+        short_values = match_values[
+            -self.config.trend_short_window:
+        ]
+        long_values = match_values[
+            -self.config.trend_long_window:
+        ]
+
+        short_average = _safe_mean(short_values)
+        long_average = _safe_mean(long_values)
+        recent_gain = short_average - long_average
+
+        if recent_gain > self.config.trend_threshold:
+            return "UP", recent_gain
+        if recent_gain < -self.config.trend_threshold:
+            return "DOWN", recent_gain
+        return "FLAT", recent_gain
+
+
+============================================================
+FILE: .\lrp\learning\ranking_repository.py
+============================================================
+"""Read-optimized data source for the M6-004 ranking engine.
+
+This module deliberately avoids changing the append-only learning schema.
+It composes the existing public LearningRepository statistics API with
+bounded, read-only SQLite queries over strategy events.
+
+The cache is revision-aware: a new strategy event changes the repository
+revision and invalidates cached ranking datasets automatically.
+"""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from dataclasses import dataclass
+import sqlite3
+from typing import Iterator, Mapping, Sequence
+
+from .ranking import StrategyPerformancePoint
+from .repository import LearningRepository
+from .strategy_stats import StrategyStatistics
+
+
+StrategyKey = tuple[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class RankingDataset:
+    """Immutable input bundle consumed by StrategyRankingEngine."""
+
+    revision: tuple[int, int]
+    statistics: tuple[StrategyStatistics, ...]
+    histories: Mapping[
+        StrategyKey,
+        tuple[StrategyPerformancePoint, ...],
+    ]
+
+    @property
+    def strategy_count(self) -> int:
+        return len(self.statistics)
+
+    @property
+    def history_point_count(self) -> int:
+        return sum(
+            len(points)
+            for points in self.histories.values()
+        )
+
+
+class RankingRepository:
+    """Build and cache bounded ranking datasets from learning records."""
+
+    def __init__(
+        self,
+        repository: LearningRepository,
+    ) -> None:
+        self.repository = repository
+        self._cache_key: tuple[
+            tuple[int, int],
+            str | None,
+            int,
+        ] | None = None
+        self._cache_value: RankingDataset | None = None
+
+    def repository_revision(self) -> tuple[int, int]:
+        """Return a cheap monotonic fingerprint for strategy events.
+
+        The tuple is ``(event_count, maximum_rowid)``.  Because strategy
+        events are append-only, either value changes whenever new ranking
+        evidence is aggregated.
+        """
+
+        self.repository.initialize()
+
+        with self._read_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS event_count,
+                    COALESCE(MAX(rowid), 0) AS maximum_rowid
+                FROM learning_strategy_events
+                """
+            ).fetchone()
+
+        return (
+            int(row["event_count"]),
+            int(row["maximum_rowid"]),
+        )
+
+    def get_strategy_history(
+        self,
+        *,
+        strategy_type: str,
+        strategy_name: str,
+        limit: int = 100,
+    ) -> tuple[StrategyPerformancePoint, ...]:
+        """Return the newest bounded history in chronological order."""
+
+        normalized_type = self._required_text(
+            strategy_type,
+            field_name="strategy_type",
+        )
+        normalized_name = self._required_text(
+            strategy_name,
+            field_name="strategy_name",
+        )
+
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+
+        self.repository.initialize()
+
+        with self._read_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    event.prediction_id,
+                    prediction.round_no,
+                    review.match_count,
+                    prediction.score AS prediction_score,
+                    review.prize_rank
+                FROM learning_strategy_events AS event
+                INNER JOIN learning_predictions AS prediction
+                    ON prediction.prediction_id =
+                       event.prediction_id
+                INNER JOIN learning_reviews AS review
+                    ON review.prediction_id =
+                       event.prediction_id
+                WHERE event.strategy_type = ?
+                  AND event.strategy_name = ?
+                ORDER BY
+                    prediction.round_no DESC,
+                    event.prediction_id DESC
+                LIMIT ?
+                """,
+                (
+                    normalized_type,
+                    normalized_name,
+                    int(limit),
+                ),
+            ).fetchall()
+
+        # SQL reads newest first for an indexed bounded query.  The engine
+        # receives chronological order to make rolling/trend semantics clear.
+        return tuple(
+            StrategyPerformancePoint(
+                prediction_id=str(row["prediction_id"]),
+                round_no=int(row["round_no"]),
+                match_count=int(row["match_count"]),
+                prediction_score=float(
+                    row["prediction_score"]
+                ),
+                prize_rank=(
+                    None
+                    if row["prize_rank"] is None
+                    else int(row["prize_rank"])
+                ),
+            )
+            for row in reversed(rows)
+        )
+
+    def build_dataset(
+        self,
+        *,
+        strategy_type: str | None = None,
+        history_limit: int = 100,
+    ) -> RankingDataset:
+        """Build or reuse a complete ranking-engine input dataset."""
+
+        if history_limit <= 0:
+            raise ValueError("history_limit must be positive")
+
+        normalized_type = (
+            None
+            if strategy_type is None
+            else self._required_text(
+                strategy_type,
+                field_name="strategy_type",
+            )
+        )
+
+        revision = self.repository_revision()
+        cache_key = (
+            revision,
+            normalized_type,
+            int(history_limit),
+        )
+
+        if (
+            self._cache_key == cache_key
+            and self._cache_value is not None
+        ):
+            return self._cache_value
+
+        statistics = self.repository.get_strategy_statistics(
+            strategy_type=normalized_type
+        )
+
+        histories: dict[
+            StrategyKey,
+            tuple[StrategyPerformancePoint, ...],
+        ] = {}
+
+        for item in statistics:
+            key = (
+                item.strategy_type,
+                item.strategy_name,
+            )
+            histories[key] = self.get_strategy_history(
+                strategy_type=item.strategy_type,
+                strategy_name=item.strategy_name,
+                limit=history_limit,
+            )
+
+        dataset = RankingDataset(
+            revision=revision,
+            statistics=statistics,
+            histories=histories,
+        )
+
+        self._cache_key = cache_key
+        self._cache_value = dataset
+        return dataset
+
+    def invalidate_cache(self) -> None:
+        """Explicitly clear the local read cache."""
+
+        self._cache_key = None
+        self._cache_value = None
+
+    @contextmanager
+    def _read_connection(
+        self,
+    ) -> Iterator[sqlite3.Connection]:
+        """Open and always close a short-lived read connection.
+
+        ``sqlite3.Connection`` used directly as a context manager commits
+        or rolls back a transaction, but it does not close the connection.
+        Explicit cleanup is required so Windows can remove temporary
+        database files immediately after a regression test.
+        """
+
+        connection = sqlite3.connect(
+            self.repository.database_path,
+            timeout=10.0,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _required_text(
+        value: str,
+        *,
+        field_name: str,
+    ) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError(
+                f"{field_name} must not be empty"
+            )
+        return normalized
+
+
+============================================================
+FILE: .\lrp\learning\service.py
+============================================================
+"""Incremental learning, aggregation, and strategy-ranking service."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import time
+
+from .aggregator import (
+    StrategyAggregationSummary,
+    StrategyAggregator,
+)
+from .evaluator import evaluate_prediction
+from .ranking import (
+    RankingConfig,
+    StrategyRanking,
+    StrategyRankingEngine,
+)
+from .ranking_repository import RankingRepository
+from .repository import LearningRepository
+from .strategy_stats import StrategyStatistics
+
+
+@dataclass(frozen=True, slots=True)
+class IncrementalReviewSummary:
+    scanned: int
+    created: int
+    skipped: int
+    elapsed_seconds: float
+
+    def as_dict(self) -> dict[str, int | float]:
+        return {
+            "scanned": self.scanned,
+            "created": self.created,
+            "skipped": self.skipped,
+            "elapsed_seconds": self.elapsed_seconds,
+        }
+
+
+class LearningService:
+    """Stable entry point for learning workflows."""
+
+    def __init__(
+        self,
+        repository: LearningRepository,
+        *,
+        ranking_config: RankingConfig | None = None,
+    ) -> None:
+        self.repository = repository
+        self.strategy_aggregator = StrategyAggregator(
+            repository
+        )
+        self.ranking_repository = RankingRepository(
+            repository
+        )
+        self.ranking_engine = StrategyRankingEngine(
+            ranking_config
+        )
+
+    def run_incremental_review(
+        self,
+        *,
+        round_no: int | None = None,
+        limit: int | None = None,
+        reviewed_at_kst: str | None = None,
+    ) -> IncrementalReviewSummary:
+        started = time.perf_counter()
+
+        pending = (
+            self.repository
+            .pending_predictions_with_results(
+                round_no=round_no,
+                limit=limit,
+            )
+        )
+
+        created = 0
+        skipped = 0
+        result_cache = {}
+
+        for prediction in pending:
+            result = result_cache.get(
+                prediction.round_no
+            )
+
+            if result is None:
+                result = self.repository.get_result(
+                    prediction.round_no
+                )
+
+                if result is None:
+                    skipped += 1
+                    continue
+
+                result_cache[prediction.round_no] = result
+
+            review = evaluate_prediction(
+                prediction,
+                result,
+                reviewed_at_kst=reviewed_at_kst,
+            )
+
+            if self.repository.add_review(review):
+                created += 1
+            else:
+                skipped += 1
+
+        return IncrementalReviewSummary(
+            scanned=len(pending),
+            created=created,
+            skipped=skipped,
+            elapsed_seconds=round(
+                time.perf_counter() - started,
+                6,
+            ),
+        )
+
+    def run_strategy_aggregation(
+        self,
+        *,
+        limit: int | None = None,
+        aggregated_at_kst: str | None = None,
+    ) -> StrategyAggregationSummary:
+        summary = self.strategy_aggregator.run(
+            limit=limit,
+            aggregated_at_kst=aggregated_at_kst,
+        )
+
+        if summary.created_events:
+            self.ranking_repository.invalidate_cache()
+
+        return summary
+
+    def get_strategy_statistics(
+        self,
+        *,
+        strategy_type: str | None = None,
+    ) -> tuple[StrategyStatistics, ...]:
+        return self.repository.get_strategy_statistics(
+            strategy_type=strategy_type
+        )
+
+    def rank_strategies(
+        self,
+        *,
+        strategy_type: str | None = None,
+        history_limit: int = 100,
+    ) -> tuple[StrategyRanking, ...]:
+        """Return deterministic rankings from current aggregated evidence."""
+
+        dataset = self.ranking_repository.build_dataset(
+            strategy_type=strategy_type,
+            history_limit=history_limit,
+        )
+
+        return self.ranking_engine.rank(
+            dataset.statistics,
+            dataset.histories,
+        )
+
+
+============================================================
+FILE: .\lrp\learning\__init__.py
+============================================================
+"""Public learning package API."""
+
+from .aggregator import (
+    StrategyAggregationSummary,
+    StrategyAggregator,
+)
+from .evaluator import (
+    determine_prize_rank,
+    evaluate_prediction,
+)
+from .models import (
+    PredictionRecord,
+    ResultRecord,
+    ReviewRecord,
+)
+from .ranking import (
+    RankingConfig,
+    RankingWeights,
+    StrategyPerformancePoint,
+    StrategyRanking,
+    StrategyRankingEngine,
+)
+from .ranking_repository import (
+    RankingDataset,
+    RankingRepository,
+)
+from .repository import LearningRepository
+from .service import (
+    IncrementalReviewSummary,
+    LearningService,
+)
+from .strategy_stats import StrategyStatistics
+
+__all__ = [
+    "IncrementalReviewSummary",
+    "LearningRepository",
+    "LearningService",
+    "PredictionRecord",
+    "RankingConfig",
+    "RankingDataset",
+    "RankingRepository",
+    "RankingWeights",
+    "ResultRecord",
+    "ReviewRecord",
+    "StrategyAggregationSummary",
+    "StrategyAggregator",
+    "StrategyPerformancePoint",
+    "StrategyRanking",
+    "StrategyRankingEngine",
+    "StrategyStatistics",
+    "determine_prize_rank",
+    "evaluate_prediction",
+]
+
+
+============================================================
+FILE: .\tests\test_m6_learning_foundation.py
+============================================================
+"""M6-001 learning foundation tests."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+
+from lrp.learning import (
+    LearningRepository,
+    PredictionRecord,
+    ResultRecord,
+    ReviewRecord,
+)
+
+
+def main() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        database_path = (
+            Path(temporary) / "learning.db"
+        )
+
+        repository = LearningRepository(
+            database_path
+        )
+
+        prediction = PredictionRecord(
+            prediction_id="1219:GPT-v3.3:S1",
+            round_no=1219,
+            set_id="S1",
+            numbers=(3, 8, 14, 21, 34, 42),
+            score=0.91,
+            model_name="GPT-v3.3",
+            seed=20260721,
+            generated_at_kst=(
+                "2026-07-21T14:32:00+09:00"
+            ),
+            features={
+                "gap_mix": 0.73,
+                "pair_affinity": 0.61,
+            },
+            parameters={
+                "temperature": 0.82,
+            },
+        )
+
+        result = ResultRecord(
+            round_no=1219,
+            numbers=(3, 8, 14, 22, 35, 41),
+            bonus=9,
+            recorded_at_kst=(
+                "2026-07-25T21:00:00+09:00"
+            ),
+        )
+
+        review = ReviewRecord(
+            prediction_id=prediction.prediction_id,
+            round_no=1219,
+            matched_numbers=(3, 8, 14),
+            match_count=3,
+            bonus_matched=False,
+            prize_rank=5,
+            reviewed_at_kst=(
+                "2026-07-25T21:01:00+09:00"
+            ),
+            metrics={
+                "precision": 0.5,
+            },
+        )
+
+        assert repository.add_prediction(
+            prediction
+        ) is True
+
+        assert repository.add_prediction(
+            prediction
+        ) is False
+
+        assert repository.pending_prediction_ids() == (
+            prediction.prediction_id,
+        )
+
+        assert repository.add_result(result) is True
+        assert repository.add_result(result) is False
+
+        assert repository.add_review(review) is True
+        assert repository.add_review(review) is False
+
+        assert repository.pending_prediction_ids() == ()
+
+        counts = repository.counts()
+
+        assert counts["predictions"] == 1
+        assert counts["results"] == 1
+        assert counts["reviews"] == 1
+
+        print(
+            "PASS: M6-001 learning foundation"
+        )
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: .\tests\test_m6_automatic_review.py
+============================================================
+"""M6-002 automatic review and incremental service tests."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+
+from lrp.learning import (
+    LearningRepository,
+    LearningService,
+    PredictionRecord,
+    ResultRecord,
+    determine_prize_rank,
+    evaluate_prediction,
+)
+
+
+def make_prediction(
+    prediction_id: str,
+    set_id: str,
+    numbers: tuple[int, ...],
+) -> PredictionRecord:
+    return PredictionRecord(
+        prediction_id=prediction_id,
+        round_no=1219,
+        set_id=set_id,
+        numbers=numbers,
+        score=0.85,
+        model_name="GPT-v3.3",
+        seed=20260723,
+        generated_at_kst=(
+            "2026-07-23T03:00:00+09:00"
+        ),
+        features={
+            "gap_mix": 0.71,
+            "pair_affinity": 0.62,
+        },
+        parameters={
+            "temperature": 0.82,
+        },
+    )
+
+
+def main() -> None:
+    assert determine_prize_rank(
+        match_count=6,
+        bonus_matched=False,
+    ) == 1
+
+    assert determine_prize_rank(
+        match_count=5,
+        bonus_matched=True,
+    ) == 2
+
+    assert determine_prize_rank(
+        match_count=5,
+        bonus_matched=False,
+    ) == 3
+
+    assert determine_prize_rank(
+        match_count=4,
+        bonus_matched=False,
+    ) == 4
+
+    assert determine_prize_rank(
+        match_count=3,
+        bonus_matched=False,
+    ) == 5
+
+    assert determine_prize_rank(
+        match_count=2,
+        bonus_matched=False,
+    ) is None
+
+    with tempfile.TemporaryDirectory() as temporary:
+        database_path = (
+            Path(temporary) / "learning.db"
+        )
+
+        repository = LearningRepository(
+            database_path
+        )
+        service = LearningService(repository)
+
+        prediction_1 = make_prediction(
+            "1219:GPT-v3.3:S1",
+            "S1",
+            (3, 8, 14, 21, 34, 42),
+        )
+        prediction_2 = make_prediction(
+            "1219:GPT-v3.3:S2",
+            "S2",
+            (3, 8, 14, 22, 35, 41),
+        )
+
+        result = ResultRecord(
+            round_no=1219,
+            numbers=(3, 8, 14, 22, 35, 41),
+            bonus=9,
+            recorded_at_kst=(
+                "2026-07-25T21:00:00+09:00"
+            ),
+        )
+
+        repository.add_prediction(prediction_1)
+        repository.add_prediction(prediction_2)
+
+        before_result = (
+            service.run_incremental_review(
+                reviewed_at_kst=(
+                    "2026-07-25T21:01:00+09:00"
+                )
+            )
+        )
+
+        assert before_result.scanned == 0
+        assert before_result.created == 0
+
+        repository.add_result(result)
+
+        direct_review = evaluate_prediction(
+            prediction_1,
+            result,
+            reviewed_at_kst=(
+                "2026-07-25T21:01:00+09:00"
+            ),
+        )
+
+        assert direct_review.matched_numbers == (
+            3,
+            8,
+            14,
+        )
+        assert direct_review.match_count == 3
+        assert direct_review.prize_rank == 5
+        assert direct_review.metrics["miss_count"] == 3
+
+        first_run = service.run_incremental_review(
+            reviewed_at_kst=(
+                "2026-07-25T21:01:00+09:00"
+            )
+        )
+
+        assert first_run.scanned == 2
+        assert first_run.created == 2
+        assert first_run.skipped == 0
+
+        second_run = service.run_incremental_review(
+            reviewed_at_kst=(
+                "2026-07-25T21:02:00+09:00"
+            )
+        )
+
+        assert second_run.scanned == 0
+        assert second_run.created == 0
+        assert second_run.skipped == 0
+
+        counts = repository.counts()
+
+        assert counts["predictions"] == 2
+        assert counts["results"] == 1
+        assert counts["reviews"] == 2
+
+        assert repository.pending_prediction_ids() == ()
+
+        print(
+            "PASS: M6-002 automatic incremental review"
+        )
+        print(
+            "first_run:",
+            first_run.as_dict(),
+        )
+        print(
+            "second_run:",
+            second_run.as_dict(),
+        )
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: .\tests\test_m6_strategy_statistics.py
+============================================================
+"""M6-003 strategy-statistics aggregation regression test."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+import time
+
+from lrp.learning import (
+    LearningRepository,
+    LearningService,
+    PredictionRecord,
+    ResultRecord,
+    StrategyStatistics,
+)
+
+
+ROUND_NO = 1220
+GENERATED_AT_KST = "2026-07-23T04:00:00+09:00"
+RESULT_RECORDED_AT_KST = "2026-07-25T21:00:00+09:00"
+REVIEWED_AT_KST = "2026-07-25T21:01:00+09:00"
+AGGREGATED_AT_KST = "2026-07-25T21:02:00+09:00"
+
+
+def make_prediction(
+    *,
+    prediction_id: str,
+    set_id: str,
+    model_name: str,
+    numbers: tuple[int, ...],
+    score: float,
+    scenario: str,
+) -> PredictionRecord:
+    """Create deterministic prediction data for this test."""
+
+    return PredictionRecord(
+        prediction_id=prediction_id,
+        round_no=ROUND_NO,
+        set_id=set_id,
+        numbers=numbers,
+        score=score,
+        model_name=model_name,
+        seed=20260723,
+        generated_at_kst=GENERATED_AT_KST,
+        features={
+            "gap_mix": 0.7,
+            "pair_affinity": 0.6,
+        },
+        parameters={
+            "temperature": 0.82,
+            "scenario": scenario,
+        },
+    )
+
+
+def statistics_by_name(
+    statistics: tuple[StrategyStatistics, ...],
+) -> dict[str, StrategyStatistics]:
+    """Index statistics by strategy name and reject duplicates."""
+
+    indexed: dict[str, StrategyStatistics] = {}
+
+    for item in statistics:
+        if item.strategy_name in indexed:
+            raise AssertionError(
+                "duplicate strategy name in statistics: "
+                f"{item.strategy_name}"
+            )
+
+        indexed[item.strategy_name] = item
+
+    return indexed
+
+
+def assert_repository_counts(
+    repository: LearningRepository,
+    *,
+    predictions: int,
+    results: int,
+    reviews: int,
+    strategy_stats: int,
+    strategy_events: int,
+) -> None:
+    """Check expected counters without requiring exact API equality."""
+
+    counts = repository.counts()
+
+    assert counts["predictions"] == predictions
+    assert counts["results"] == results
+    assert counts["reviews"] == reviews
+    assert counts["strategy_stats"] == strategy_stats
+    assert counts["strategy_events"] == strategy_events
+
+
+def main() -> None:
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        database_path = (
+            Path(temporary_directory) / "learning.db"
+        )
+
+        repository = LearningRepository(database_path)
+        service = LearningService(repository)
+
+        # Exact 6-number match.
+        assert repository.add_prediction(
+            make_prediction(
+                prediction_id="1220:GPT-v3.3:S1",
+                set_id="S1",
+                model_name="GPT-v3.3",
+                numbers=(3, 8, 14, 22, 35, 41),
+                score=0.91,
+                scenario="gap",
+            )
+        )
+
+        # One-number match: 14.
+        assert repository.add_prediction(
+            make_prediction(
+                prediction_id="1220:GPT-v3.3:S2",
+                set_id="S2",
+                model_name="GPT-v3.3",
+                numbers=(1, 6, 14, 21, 33, 44),
+                score=0.83,
+                scenario="pair",
+            )
+        )
+
+        # Four-number match: 3, 8, 14, 35.
+        assert repository.add_prediction(
+            make_prediction(
+                prediction_id="1220:Gemini-v7.1:S1",
+                set_id="S1",
+                model_name="Gemini-v7.1",
+                numbers=(3, 8, 14, 21, 35, 42),
+                score=0.86,
+                scenario="gap",
+            )
+        )
+
+        assert repository.add_result(
+            ResultRecord(
+                round_no=ROUND_NO,
+                numbers=(3, 8, 14, 22, 35, 41),
+                bonus=9,
+                recorded_at_kst=RESULT_RECORDED_AT_KST,
+            )
+        )
+
+        review_summary = service.run_incremental_review(
+            reviewed_at_kst=REVIEWED_AT_KST
+        )
+
+        assert review_summary.scanned == 3
+        assert review_summary.created == 3
+        assert review_summary.skipped == 0
+
+        started = time.perf_counter()
+
+        first_run = service.run_strategy_aggregation(
+            aggregated_at_kst=AGGREGATED_AT_KST
+        )
+
+        measured_elapsed_seconds = (
+            time.perf_counter() - started
+        )
+
+        assert first_run.scanned == 3
+        assert first_run.created_events == 6
+        assert first_run.skipped_events == 0
+
+        # Incremental checkpoint verification:
+        # the same reviewed predictions must not be aggregated again.
+        second_run = service.run_strategy_aggregation(
+            aggregated_at_kst=(
+                "2026-07-25T21:03:00+09:00"
+            )
+        )
+
+        assert second_run.scanned == 0
+        assert second_run.created_events == 0
+        assert second_run.skipped_events == 0
+
+        model_statistics = (
+            service.get_strategy_statistics(
+                strategy_type="model"
+            )
+        )
+
+        assert len(model_statistics) == 2
+
+        models = statistics_by_name(model_statistics)
+
+        assert set(models) == {
+            "GPT-v3.3",
+            "Gemini-v7.1",
+        }
+
+        gpt = models["GPT-v3.3"]
+
+        # GPT: 6 matches + 1 match = 7 total.
+        assert gpt.sample_count == 2
+        assert gpt.total_matches == 7
+        assert round(
+            gpt.average_match_count,
+            6,
+        ) == 3.5
+        assert round(
+            gpt.average_prediction_score,
+            6,
+        ) == 0.87
+        assert gpt.hit3_count == 0
+        assert gpt.hit4_count == 0
+        assert gpt.hit5_count == 0
+        assert gpt.hit6_count == 1
+        assert gpt.prize_count == 1
+        assert round(gpt.hit3_plus_rate, 6) == 0.5
+        assert round(gpt.prize_rate, 6) == 0.5
+
+        gemini = models["Gemini-v7.1"]
+
+        # Gemini: 3, 8, 14, 35 = four matches.
+        assert gemini.sample_count == 1
+        assert gemini.total_matches == 4
+        assert round(
+            gemini.average_match_count,
+            6,
+        ) == 4.0
+        assert round(
+            gemini.average_prediction_score,
+            6,
+        ) == 0.86
+        assert gemini.hit3_count == 0
+        assert gemini.hit4_count == 1
+        assert gemini.hit5_count == 0
+        assert gemini.hit6_count == 0
+        assert gemini.prize_count == 1
+        assert round(
+            gemini.hit3_plus_rate,
+            6,
+        ) == 1.0
+        assert round(
+            gemini.prize_rate,
+            6,
+        ) == 1.0
+
+        scenario_statistics = (
+            service.get_strategy_statistics(
+                strategy_type="scenario"
+            )
+        )
+
+        assert len(scenario_statistics) == 2
+
+        scenarios = statistics_by_name(
+            scenario_statistics
+        )
+
+        assert set(scenarios) == {
+            "gap",
+            "pair",
+        }
+
+        gap = scenarios["gap"]
+
+        # Gap scenario: GPT exact hit 6 + Gemini hit 4.
+        assert gap.sample_count == 2
+        assert gap.total_matches == 10
+        assert round(
+            gap.average_match_count,
+            6,
+        ) == 5.0
+        assert round(
+            gap.average_prediction_score,
+            6,
+        ) == 0.885
+        assert gap.hit3_count == 0
+        assert gap.hit4_count == 1
+        assert gap.hit5_count == 0
+        assert gap.hit6_count == 1
+        assert gap.prize_count == 2
+        assert round(gap.hit3_plus_rate, 6) == 1.0
+        assert round(gap.prize_rate, 6) == 1.0
+
+        pair = scenarios["pair"]
+
+        # Pair scenario: one match only.
+        assert pair.sample_count == 1
+        assert pair.total_matches == 1
+        assert round(
+            pair.average_match_count,
+            6,
+        ) == 1.0
+        assert round(
+            pair.average_prediction_score,
+            6,
+        ) == 0.83
+        assert pair.hit3_count == 0
+        assert pair.hit4_count == 0
+        assert pair.hit5_count == 0
+        assert pair.hit6_count == 0
+        assert pair.prize_count == 0
+        assert round(pair.hit3_plus_rate, 6) == 0.0
+        assert round(pair.prize_rate, 6) == 0.0
+
+        assert_repository_counts(
+            repository,
+            predictions=3,
+            results=1,
+            reviews=3,
+            strategy_stats=4,
+            strategy_events=6,
+        )
+
+        # Generous regression threshold for Windows/CI variance.
+        assert measured_elapsed_seconds < 1.0
+
+        print("PASS: M6-003 strategy statistics")
+        print("review_run:", review_summary.as_dict())
+        print("first_run:", first_run.as_dict())
+        print("second_run:", second_run.as_dict())
+        print(
+            "model_stats:",
+            [
+                item.as_dict()
+                for item in model_statistics
+            ],
+        )
+        print(
+            "scenario_stats:",
+            [
+                item.as_dict()
+                for item in scenario_statistics
+            ],
+        )
+        print(
+            "aggregation_elapsed:",
+            round(measured_elapsed_seconds, 6),
+        )
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: .\tests\test_m6_strategy_ranking.py
+============================================================
+"""M6-004 strategy-ranking regression test."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+
+from lrp.learning import (
+    LearningRepository,
+    LearningService,
+    PredictionRecord,
+    ResultRecord,
+)
+
+
+GENERATED_AT_KST = "2026-07-23T05:00:00+09:00"
+RESULT_RECORDED_AT_KST = "2026-07-25T21:00:00+09:00"
+REVIEWED_AT_KST = "2026-07-25T21:01:00+09:00"
+AGGREGATED_AT_KST = "2026-07-25T21:02:00+09:00"
+
+
+def make_prediction(
+    *,
+    prediction_id: str,
+    round_no: int,
+    model_name: str,
+    numbers: tuple[int, ...],
+    score: float,
+    scenario: str,
+) -> PredictionRecord:
+    return PredictionRecord(
+        prediction_id=prediction_id,
+        round_no=round_no,
+        set_id=prediction_id.rsplit(":", 1)[-1],
+        numbers=numbers,
+        score=score,
+        model_name=model_name,
+        seed=20260723,
+        generated_at_kst=GENERATED_AT_KST,
+        features={
+            "gap_mix": 0.70,
+            "pair_affinity": 0.60,
+        },
+        parameters={
+            "temperature": 0.85,
+            "scenario": scenario,
+        },
+    )
+
+
+def add_round(
+    *,
+    repository: LearningRepository,
+    round_no: int,
+    winning_numbers: tuple[int, ...],
+    bonus: int,
+    predictions: tuple[PredictionRecord, ...],
+) -> None:
+    for prediction in predictions:
+        assert repository.add_prediction(prediction) is True
+
+    assert repository.add_result(
+        ResultRecord(
+            round_no=round_no,
+            numbers=winning_numbers,
+            bonus=bonus,
+            recorded_at_kst=RESULT_RECORDED_AT_KST,
+        )
+    ) is True
+
+
+def main() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        database_path = Path(temporary) / "learning.db"
+        repository = LearningRepository(database_path)
+        service = LearningService(repository)
+
+        add_round(
+            repository=repository,
+            round_no=1220,
+            winning_numbers=(1, 2, 3, 4, 5, 6),
+            bonus=7,
+            predictions=(
+                make_prediction(
+                    prediction_id="1220:GPT-v3.3:S1",
+                    round_no=1220,
+                    model_name="GPT-v3.3",
+                    numbers=(1, 2, 3, 4, 5, 6),
+                    score=0.92,
+                    scenario="gap",
+                ),
+                make_prediction(
+                    prediction_id="1220:Gemini-v7.1:S1",
+                    round_no=1220,
+                    model_name="Gemini-v7.1",
+                    numbers=(1, 2, 3, 20, 21, 22),
+                    score=0.84,
+                    scenario="pair",
+                ),
+            ),
+        )
+
+        add_round(
+            repository=repository,
+            round_no=1221,
+            winning_numbers=(10, 11, 12, 13, 14, 15),
+            bonus=16,
+            predictions=(
+                make_prediction(
+                    prediction_id="1221:GPT-v3.3:S1",
+                    round_no=1221,
+                    model_name="GPT-v3.3",
+                    numbers=(10, 11, 12, 13, 30, 31),
+                    score=0.88,
+                    scenario="gap",
+                ),
+                make_prediction(
+                    prediction_id="1221:Gemini-v7.1:S1",
+                    round_no=1221,
+                    model_name="Gemini-v7.1",
+                    numbers=(10, 11, 25, 26, 27, 28),
+                    score=0.82,
+                    scenario="pair",
+                ),
+            ),
+        )
+
+        review = service.run_incremental_review(
+            reviewed_at_kst=REVIEWED_AT_KST,
+        )
+        assert review.scanned == 4
+        assert review.created == 4
+        assert review.skipped == 0
+
+        aggregation = service.run_strategy_aggregation(
+            aggregated_at_kst=AGGREGATED_AT_KST,
+        )
+        assert aggregation.scanned == 4
+        assert aggregation.created_events == 8
+        assert aggregation.skipped_events == 0
+
+        model_rankings = service.rank_strategies(
+            strategy_type="model",
+            history_limit=100,
+        )
+
+        assert len(model_rankings) == 2
+        assert model_rankings[0].rank_position == 1
+        assert model_rankings[1].rank_position == 2
+        assert model_rankings[0].strategy_name == "GPT-v3.3"
+        assert model_rankings[1].strategy_name == "Gemini-v7.1"
+
+        gpt = model_rankings[0]
+        gemini = model_rankings[1]
+
+        assert gpt.sample_count == 2
+        assert gpt.average_match_count == 5.0
+        assert gpt.prize_rate == 1.0
+        assert gpt.rolling_matches[10] == 5.0
+        assert gpt.rolling_prize_rates[10] == 1.0
+        assert gpt.rank_score > gemini.rank_score
+        assert 0.0 <= gpt.rank_score <= 1.0
+        assert 0.0 <= gpt.confidence <= 1.0
+        assert 0.0 <= gpt.stability <= 1.0
+        assert gpt.trend in {"UP", "DOWN", "FLAT"}
+
+        scenario_rankings = service.rank_strategies(
+            strategy_type="scenario",
+            history_limit=100,
+        )
+
+        assert len(scenario_rankings) == 2
+        assert scenario_rankings[0].strategy_name == "gap"
+        assert scenario_rankings[1].strategy_name == "pair"
+
+        first_dataset = (
+            service.ranking_repository.build_dataset(
+                strategy_type="model",
+                history_limit=100,
+            )
+        )
+        second_dataset = (
+            service.ranking_repository.build_dataset(
+                strategy_type="model",
+                history_limit=100,
+            )
+        )
+
+        assert first_dataset is second_dataset
+        assert first_dataset.strategy_count == 2
+        assert first_dataset.history_point_count == 4
+        assert first_dataset.revision == (8, 8)
+
+        second_aggregation = service.run_strategy_aggregation(
+            aggregated_at_kst=AGGREGATED_AT_KST,
+        )
+
+        assert second_aggregation.scanned == 0
+        assert second_aggregation.created_events == 0
+        assert second_aggregation.skipped_events == 0
+
+        rankings_again = service.rank_strategies(
+            strategy_type="model",
+            history_limit=100,
+        )
+
+        assert rankings_again == model_rankings
+
+        print("PASS: M6-004 strategy ranking")
+        print(
+            "model_rankings:",
+            [item.as_dict() for item in model_rankings],
+        )
+        print(
+            "scenario_rankings:",
+            [item.as_dict() for item in scenario_rankings],
+        )
+        print(
+            "dataset:",
+            {
+                "revision": first_dataset.revision,
+                "strategy_count": first_dataset.strategy_count,
+                "history_point_count": (
+                    first_dataset.history_point_count
+                ),
+            },
+        )
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: .\tools\dev_check.py
+============================================================
+"""Fast development environment checks for LRP."""
+
+from __future__ import annotations
+
+import importlib
+import json
+from pathlib import Path
+import sqlite3
+import sys
+import time
+
+
+REQUIRED_PATHS = (
+    "config.yaml",
+    "lrp",
+    "lrp/contracts",
+    "lrp/core",
+    "lrp/adapters",
+    "lrp/pipelines",
+    "tests",
+    "tools",
+    "tools/lrp_build.py",
+)
+
+REQUIRED_MODULES = (
+    "lrp",
+    "lrp.contracts",
+    "lrp.core",
+    "lrp.adapters",
+    "lrp.pipelines",
+)
+
+
+def main() -> int:
+    started = time.perf_counter()
+    root = Path(__file__).resolve().parents[1]
+    checks: list[dict[str, object]] = []
+
+    def record(
+        name: str,
+        passed: bool,
+        detail: str,
+        elapsed: float = 0.0,
+    ) -> None:
+        checks.append(
+            {
+                "name": name,
+                "status": "PASS" if passed else "FAIL",
+                "detail": detail,
+                "elapsed_seconds": round(elapsed, 6),
+            }
+        )
+
+    for relative in REQUIRED_PATHS:
+        target = root / relative
+        record(
+            f"path:{relative}",
+            target.exists(),
+            str(target),
+        )
+
+    for module_name in REQUIRED_MODULES:
+        check_started = time.perf_counter()
+
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:
+            record(
+                f"import:{module_name}",
+                False,
+                f"{type(exc).__name__}: {exc}",
+                time.perf_counter() - check_started,
+            )
+        else:
+            record(
+                f"import:{module_name}",
+                True,
+                "importable",
+                time.perf_counter() - check_started,
+            )
+
+    sqlite_started = time.perf_counter()
+
+    try:
+        connection = sqlite3.connect(":memory:")
+        value = connection.execute("SELECT 1").fetchone()
+        connection.close()
+
+        if value != (1,):
+            raise RuntimeError(
+                f"unexpected sqlite result: {value}"
+            )
+    except Exception as exc:
+        record(
+            "sqlite",
+            False,
+            f"{type(exc).__name__}: {exc}",
+            time.perf_counter() - sqlite_started,
+        )
+    else:
+        record(
+            "sqlite",
+            True,
+            sqlite3.sqlite_version,
+            time.perf_counter() - sqlite_started,
+        )
+
+    failures = [
+        item
+        for item in checks
+        if item["status"] == "FAIL"
+    ]
+
+    result = {
+        "schema_version": "1.0",
+        "python": sys.version.split()[0],
+        "project_root": str(root),
+        "status": "PASS" if not failures else "FAIL",
+        "failure_count": len(failures),
+        "elapsed_seconds": round(
+            time.perf_counter() - started,
+            6,
+        ),
+        "checks": checks,
+    }
+
+    print(
+        json.dumps(
+            result,
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+    return 0 if not failures else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+============================================================
+FILE: .\tools\lrp_build.py
+============================================================
+"""Fast and reproducible build system for Lotto645 Research Platform.
+
+Modes
+-----
+quick:
+    Compile recently changed Python files and run import smoke tests.
+
+full:
+    Compile all project Python files, run available tests, create a
+    SHA-256 manifest and produce a reproducible ZIP archive.
+
+Usage
+-----
+    python tools/lrp_build.py quick
+    python tools/lrp_build.py full
+"""
+
+from __future__ import annotations
+
+import argparse
+import compileall
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import hashlib
+import importlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+from typing import Iterable
+import zipfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+BUILD_DIR = ROOT / "build"
+CACHE_PATH = BUILD_DIR / ".lrp_build_cache.json"
+MANIFEST_PATH = BUILD_DIR / "lrp_build_manifest.json"
+LATEST_ZIP_PATH = BUILD_DIR / "lrp_latest.zip"
+
+PYTHON_DIRS = (
+    ROOT / "lrp",
+    ROOT / "tools",
+)
+
+OPTIONAL_TEST_DIRS = (
+    ROOT / "tests",
+    ROOT / "lrp" / "tests",
+)
+
+SMOKE_MODULES = (
+    "lrp",
+    "lrp.contracts",
+    "lrp.core",
+    "lrp.adapters",
+    "lrp.pipelines",
+)
+
+EXCLUDED_PARTS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+}
+
+ARCHIVE_ROOTS = (
+    "lrp",
+    "tools",
+    "tests",
+)
+
+ARCHIVE_FILES = (
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "README.md",
+    "build.ps1",
+)
+
+
+@dataclass(slots=True)
+class BuildResult:
+    mode: str
+    started_at_utc: str
+    elapsed_seconds: float
+    compiled_files: int
+    smoke_modules: int
+    tests_status: str
+    manifest_files: int
+    archive_path: str | None
+    archive_sha256: str | None
+    success: bool
+
+
+def utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def is_excluded(path: Path) -> bool:
+    try:
+        relative = path.relative_to(ROOT)
+    except ValueError:
+        return True
+
+    return any(part in EXCLUDED_PARTS for part in relative.parts)
+
+
+def discover_python_files() -> list[Path]:
+    files: list[Path] = []
+
+    for directory in PYTHON_DIRS:
+        if not directory.exists():
+            continue
+
+        for path in directory.rglob("*.py"):
+            if path.is_file() and not is_excluded(path):
+                files.append(path)
+
+    return sorted(set(files))
+
+
+def file_signature(path: Path) -> dict[str, int]:
+    stat = path.stat()
+    return {
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def load_cache() -> dict[str, dict[str, int]]:
+    if not CACHE_PATH.exists():
+        return {}
+
+    try:
+        value = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(value, dict):
+        return {}
+
+    files = value.get("files", {})
+    return files if isinstance(files, dict) else {}
+
+
+def save_cache(files: Iterable[Path]) -> None:
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "generated_at_utc": utc_now(),
+        "files": {
+            path.relative_to(ROOT).as_posix(): file_signature(path)
+            for path in files
+        },
+    }
+
+    CACHE_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def changed_python_files(
+    files: list[Path],
+    cache: dict[str, dict[str, int]],
+) -> list[Path]:
+    changed: list[Path] = []
+
+    for path in files:
+        key = path.relative_to(ROOT).as_posix()
+        if cache.get(key) != file_signature(path):
+            changed.append(path)
+
+    return changed
+
+
+def compile_file(path: Path) -> None:
+    import py_compile
+
+    py_compile.compile(
+        str(path),
+        doraise=True,
+    )
+
+
+def compile_quick(files: list[Path]) -> int:
+    cache = load_cache()
+    targets = changed_python_files(files, cache)
+
+    if not targets:
+        print("PASS: compile cache hit — 변경된 Python 파일 없음")
+        return 0
+
+    for path in targets:
+        compile_file(path)
+
+    print(f"PASS: quick compile — {len(targets)} files")
+    return len(targets)
+
+
+def compile_full() -> int:
+    compiled_count = 0
+
+    for directory in PYTHON_DIRS:
+        if not directory.exists():
+            continue
+
+        success = compileall.compile_dir(
+            str(directory),
+            force=True,
+            quiet=1,
+        )
+        if not success:
+            raise RuntimeError(
+                f"compileall failed: {directory.relative_to(ROOT)}"
+            )
+
+        compiled_count += sum(
+            1
+            for path in directory.rglob("*.py")
+            if path.is_file() and not is_excluded(path)
+        )
+
+    print(f"PASS: full compile — {compiled_count} files")
+    return compiled_count
+
+
+def run_smoke_imports() -> int:
+    imported = 0
+
+    for module_name in SMOKE_MODULES:
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError as exc:
+            if exc.name == module_name:
+                print(f"SKIP: optional smoke module unavailable — {module_name}")
+                continue
+            raise
+
+        imported += 1
+        print(f"PASS: import {module_name}")
+
+    if imported == 0:
+        raise RuntimeError("no LRP smoke modules could be imported")
+
+    return imported
+
+
+def command_exists(command: str) -> bool:
+    return shutil.which(command) is not None
+
+
+def run_subprocess(command: list[str]) -> int:
+    print("RUN:", " ".join(command))
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        check=False,
+    )
+    return completed.returncode
+
+
+def has_test_files() -> bool:
+    for directory in OPTIONAL_TEST_DIRS:
+        if not directory.exists():
+            continue
+
+        if any(directory.rglob("test_*.py")):
+            return True
+        if any(directory.rglob("*_test.py")):
+            return True
+
+    return False
+
+
+def run_tests() -> str:
+    if not has_test_files():
+        print("SKIP: 테스트 파일 없음")
+        return "skipped:no_tests"
+
+    pytest_available = (
+        importlib.util.find_spec("pytest") is not None
+        or command_exists("pytest")
+    )
+
+    if pytest_available:
+        code = run_subprocess(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--disable-warnings",
+                "--maxfail=1",
+            ]
+        )
+        if code != 0:
+            raise RuntimeError(f"pytest failed with exit code {code}")
+
+        print("PASS: pytest")
+        return "passed:pytest"
+
+    code = run_subprocess(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+        ]
+    )
+    if code != 0:
+        raise RuntimeError(f"unittest failed with exit code {code}")
+
+    print("PASS: unittest")
+    return "passed:unittest"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+
+    with path.open("rb") as stream:
+        while True:
+            chunk = stream.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def archive_candidates() -> list[Path]:
+    candidates: list[Path] = []
+
+    for root_name in ARCHIVE_ROOTS:
+        root = ROOT / root_name
+        if not root.exists():
+            continue
+
+        for path in root.rglob("*"):
+            if (
+                path.is_file()
+                and not is_excluded(path)
+                and path.suffix not in {".pyc", ".pyo"}
+            ):
+                candidates.append(path)
+
+    for file_name in ARCHIVE_FILES:
+        path = ROOT / file_name
+        if path.is_file():
+            candidates.append(path)
+
+    return sorted(set(candidates))
+
+
+def create_manifest(files: list[Path]) -> dict[str, object]:
+    entries = []
+
+    for path in files:
+        relative = path.relative_to(ROOT).as_posix()
+        entries.append(
+            {
+                "path": relative,
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        )
+
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "generated_at_utc": utc_now(),
+        "python_version": sys.version.split()[0],
+        "file_count": len(entries),
+        "files": entries,
+    }
+
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFEST_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    print(
+        "PASS: manifest — "
+        f"{MANIFEST_PATH.relative_to(ROOT)} "
+        f"({len(entries)} files)"
+    )
+    return payload
+
+
+def create_reproducible_zip(files: list[Path]) -> tuple[Path, str]:
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+    temporary = BUILD_DIR / ".lrp_latest.tmp.zip"
+    if temporary.exists():
+        temporary.unlink()
+
+    fixed_timestamp = (2020, 1, 1, 0, 0, 0)
+
+    with zipfile.ZipFile(
+        temporary,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as archive:
+        for path in files:
+            relative = path.relative_to(ROOT).as_posix()
+            data = path.read_bytes()
+
+            info = zipfile.ZipInfo(
+                filename=relative,
+                date_time=fixed_timestamp,
+            )
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+
+            archive.writestr(info, data)
+
+        manifest_data = MANIFEST_PATH.read_bytes()
+        manifest_info = zipfile.ZipInfo(
+            filename="build/lrp_build_manifest.json",
+            date_time=fixed_timestamp,
+        )
+        manifest_info.compress_type = zipfile.ZIP_DEFLATED
+        manifest_info.external_attr = 0o644 << 16
+        archive.writestr(manifest_info, manifest_data)
+
+    temporary.replace(LATEST_ZIP_PATH)
+    digest = sha256_file(LATEST_ZIP_PATH)
+
+    print(
+        "PASS: archive — "
+        f"{LATEST_ZIP_PATH.relative_to(ROOT)}"
+    )
+    print(f"PASS: archive SHA-256 — {digest}")
+
+    return LATEST_ZIP_PATH, digest
+
+
+def write_result(result: BuildResult) -> None:
+    path = BUILD_DIR / "lrp_build_result.json"
+    path.write_text(
+        json.dumps(
+            asdict(result),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
+def clean() -> None:
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+
+    removed = 0
+    for path in ROOT.rglob("__pycache__"):
+        if path.is_dir() and not is_excluded(path.parent):
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+
+    print(f"PASS: clean — removed {removed} cache directories")
+
+
+def build(mode: str) -> BuildResult:
+    started = time.perf_counter()
+    started_at = utc_now()
+
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    python_files = discover_python_files()
+
+    if not python_files:
+        raise RuntimeError("no Python files found under lrp/ or tools/")
+
+    if mode == "quick":
+        compiled = compile_quick(python_files)
+        smoke_count = run_smoke_imports()
+        tests_status = "skipped:quick_mode"
+        manifest_count = 0
+        archive_path = None
+        archive_sha256 = None
+
+    elif mode == "full":
+        compiled = compile_full()
+        smoke_count = run_smoke_imports()
+        tests_status = run_tests()
+
+        files = archive_candidates()
+        manifest = create_manifest(files)
+        archive, archive_sha256 = create_reproducible_zip(files)
+
+        manifest_count = int(manifest["file_count"])
+        archive_path = str(archive.relative_to(ROOT))
+
+    else:
+        raise ValueError(f"unsupported build mode: {mode}")
+
+    save_cache(python_files)
+
+    result = BuildResult(
+        mode=mode,
+        started_at_utc=started_at,
+        elapsed_seconds=round(time.perf_counter() - started, 3),
+        compiled_files=compiled,
+        smoke_modules=smoke_count,
+        tests_status=tests_status,
+        manifest_files=manifest_count,
+        archive_path=archive_path,
+        archive_sha256=archive_sha256,
+        success=True,
+    )
+
+    write_result(result)
+
+    print("")
+    print("BUILD SUCCESS")
+    print(f"mode: {result.mode}")
+    print(f"elapsed: {result.elapsed_seconds:.3f}s")
+
+    return result
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="LRP fast build and release utility"
+    )
+    parser.add_argument(
+        "mode",
+        choices=("quick", "full", "clean"),
+        nargs="?",
+        default="quick",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+
+    try:
+        if args.mode == "clean":
+            clean()
+            return 0
+
+        build(args.mode)
+        return 0
+
+    except Exception as exc:
+        BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+        failure = {
+            "generated_at_utc": utc_now(),
+            "mode": args.mode,
+            "success": False,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }
+
+        (BUILD_DIR / "lrp_build_failure.json").write_text(
+            json.dumps(
+                failure,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
+        print("")
+        print("BUILD FAILED")
+        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+

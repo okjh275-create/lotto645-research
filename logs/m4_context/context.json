@@ -1,0 +1,7 @@
+﻿{
+    "generated_at":  "2026-07-21 19:07:04",
+    "root":  "C:\\Users\\PC2303\\Documents\\GitHub\\lotto645-research",
+    "git_status":  "M cli/experiment.py\r\n M cli/replay.py\r\n M config/settings.json\r\n M engine/candidate.py\r\n M engine/config.py\r\n M engine/experiment.py\r\n M engine/feature.py\r\n M engine/generator.py\r\n M engine/pair.py\r\n M engine/predictor.py\r\n M engine/ranking.py\r\n M engine/replay.py\r\n M engine/score.py\r\n M engine/statistics.py\r\n?? SHA256SUMS.txt\r\n?? build.ps1\r\n?? build/\r\n?? cli/backtest.py\r\n?? cli/ranking.py\r\n?? engine/backtest.py\r\n?? engine/benchmark.py\r\n?? logs/\r\n?? lrp/\r\n?? tests/test_m3_application.py\r\n?? tests/test_prediction_orchestrator.py\r\n?? tools/",
+    "git_branch":  "main",
+    "python":  "Python 3.13.5"
+}

@@ -1,5 +1,5 @@
 {
-  "file_count": 74,
+  "file_count": 92,
   "files": [
     {
       "path": "build.ps1",
@@ -127,6 +127,61 @@
       "size": 4783
     },
     {
+      "path": "lrp/ensemble/__init__.py",
+      "sha256": "5b0bda4f63b62abd045cde118eb9cf275a0ba466d6b8a4a7f26731b696465cb7",
+      "size": 2927
+    },
+    {
+      "path": "lrp/ensemble/adapters.py",
+      "sha256": "c1009cacf95127a29d028383cecab797fac57c0ce1170f52937441d1b75db8e1",
+      "size": 13337
+    },
+    {
+      "path": "lrp/ensemble/engine.py",
+      "sha256": "d1e011cf3a0d61390f4aa9b11fdb9fb841a8054418323fe4222ab36b8cb38d96",
+      "size": 7017
+    },
+    {
+      "path": "lrp/ensemble/explain.py",
+      "sha256": "e47d550d331c30b1b2fd1edb228382122be6bd5d8e919e70ceb8fdd5d469a525",
+      "size": 1673
+    },
+    {
+      "path": "lrp/ensemble/features.py",
+      "sha256": "1d45cf6d8ccc4ae3c3cbbd3166961a9a9bbe53647c6af67c487ce522f4877e9e",
+      "size": 9657
+    },
+    {
+      "path": "lrp/ensemble/integration.py",
+      "sha256": "2850e20ba700de62aa640f1bf3ac743cbd1e4f212434d7c0dd59e5fabea02827",
+      "size": 16794
+    },
+    {
+      "path": "lrp/ensemble/models.py",
+      "sha256": "736260f6f71f595154d2ed9defe320dba1d2fbf7b9e4ce34e20eadef88e81593",
+      "size": 13078
+    },
+    {
+      "path": "lrp/ensemble/repository.py",
+      "sha256": "8d6a3d1f43c75ca9d1f3823a05a2c853ce3f62f79bfff21752ec36df8bd9c0b8",
+      "size": 10626
+    },
+    {
+      "path": "lrp/ensemble/rescoring.py",
+      "sha256": "3410dd3f8c2eb4afd1794537fb9a074a010a026baea9e67cd5c25cb96890a704",
+      "size": 16053
+    },
+    {
+      "path": "lrp/ensemble/snapshot.py",
+      "sha256": "87cacb805de35cb481dab6d58235a0421924b2e759408553278ca32bdb5b19c1",
+      "size": 17748
+    },
+    {
+      "path": "lrp/ensemble/version.py",
+      "sha256": "aef9f26eec0418ba1d4953f9b59baba043df33673e76c68b1eee17c5ed38abe2",
+      "size": 101
+    },
+    {
       "path": "lrp/io/__init__.py",
       "sha256": "bc2b72c86a37110b36dae8fb10a68d6b618a572459dea0539838b297c2d486e2",
       "size": 615
@@ -248,13 +303,13 @@
     },
     {
       "path": "lrp/pipelines/models.py",
-      "sha256": "8db4d68db5d644617fe576868958807ef618abd7c1a543e17abeefc14cfa71bf",
-      "size": 8070
+      "sha256": "15ca30958e66dc04ca1c174e77a8b745150c02637b58b849bba6df501e00079c",
+      "size": 8931
     },
     {
       "path": "lrp/pipelines/prediction.py",
-      "sha256": "40a5537aba3bf9d18dcfc12865adb50c354acf1b48b77f0d037db5e0f2d23ff1",
-      "size": 8667
+      "sha256": "0afc4b9bee319e8bdce53c4516621e57cc161effeac00bbce3929a94fd29d1bd",
+      "size": 11775
     },
     {
       "path": "lrp/pipelines/probability.py",
@@ -285,6 +340,26 @@
       "path": "tests/test_candidate.py",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
+    },
+    {
+      "path": "tests/test_e001_ensemble_foundation.py",
+      "sha256": "8b5759f86d7db7bff62d0a469565da0ba6bf992cd62322824587cf821a143b98",
+      "size": 4534
+    },
+    {
+      "path": "tests/test_e002_learning_snapshot.py",
+      "sha256": "70a827bb80db411ea3e3dc139f73921a600d38e35a6f3c8a3edaeba269e00c1d",
+      "size": 11175
+    },
+    {
+      "path": "tests/test_e003_feature_rescoring.py",
+      "sha256": "64e6aecf790a64b60d6ed9aee32753f24d7fb38a38041686c8d8f42fab9ba2d6",
+      "size": 12774
+    },
+    {
+      "path": "tests/test_e004_pipeline_integration.py",
+      "sha256": "40a71c7113da280bd37d672696ef2d842a8de6281cce4228e8f8b2cfef610711",
+      "size": 10839
     },
     {
       "path": "tests/test_m3_application.py",
@@ -357,6 +432,21 @@
       "size": 3075
     },
     {
+      "path": "tools/export_e004_contracts.py",
+      "sha256": "64648208094ae817bb6400d3e04476a55d8acca19a6516d6bb4eb27e3a85aad8",
+      "size": 9632
+    },
+    {
+      "path": "tools/inspect_e002_m6.py",
+      "sha256": "ff581e44836b5f9ec6b5d89c941af687def99540cc12fd2f800b68541d2281ac",
+      "size": 5842
+    },
+    {
+      "path": "tools/inspect_e004_pipeline.py",
+      "sha256": "b7d804b34877b4c5ac8f73976c3d07ad46ec0a705d39dc692c289950e0a93fef",
+      "size": 19353
+    },
+    {
       "path": "tools/lrp_build.py",
       "sha256": "6d16930012a4b54157b082a272f868f1961e529e46a3668914db9869b3b83ecf",
       "size": 8019
@@ -372,7 +462,7 @@
       "size": 6453
     }
   ],
-  "generated_at_utc": "2026-07-24T18:18:29Z",
+  "generated_at_utc": "2026-07-27T11:53:55Z",
   "python_version": "3.13.5",
   "schema_version": 1
 }

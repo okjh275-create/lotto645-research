@@ -1,0 +1,12 @@
+{
+  "archive_path": "build\\lrp_latest.zip",
+  "archive_sha256": "6028a1149140e22becf7f6325d30c96dcb7a2e396399e5740c4f963b0c1a10ea",
+  "compiled_files": 69,
+  "elapsed_seconds": 17.234,
+  "manifest_files": 92,
+  "mode": "full",
+  "smoke_modules": 5,
+  "started_at_utc": "2026-07-27T11:53:37Z",
+  "success": true,
+  "tests_status": "passed:script:17/17"
+}

@@ -1,0 +1,224 @@
+{
+  "source_files": {
+    "lrp/adapters/candidate.py": "\"\"\"Project D public-API adapter.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom importlib import import_module\nfrom types import ModuleType\nfrom typing import Any, Mapping\n\nfrom lrp.contracts import CompatibilityError, ContractError\n\n\n_REQUIRED_EXPORTS = (\n    \"generate_candidates\",\n    \"number_signals_from_statistics\",\n    \"rank_candidates\",\n    \"select_diverse_candidates\",\n    \"select_practical_sets\",\n    \"validate_statistics_contract\",\n)\n\n\n@dataclass(frozen=True, slots=True)\nclass CandidateAdapter:\n    \"\"\"Thin adapter over Project D's public package.\"\"\"\n\n    module: ModuleType\n\n    @classmethod\n    def load(cls) -> \"CandidateAdapter\":\n        \"\"\"Import and validate Project D.\"\"\"\n\n        try:\n            module = import_module(\"lotto645_candidates\")\n        except ImportError as exc:\n            raise CompatibilityError(\n                \"Project D Candidate Engine is not importable\"\n            ) from exc\n\n        missing = tuple(\n            name for name in _REQUIRED_EXPORTS\n            if not hasattr(module, name)\n        )\n        if missing:\n            raise CompatibilityError(\n                \"Candidate public API is incomplete: \"\n                + \", \".join(missing)\n            )\n\n        return cls(module=module)\n\n    @property\n    def version(self) -> str:\n        value = getattr(self.module, \"__version__\", None)\n        if not isinstance(value, str):\n            raise CompatibilityError(\n                \"Candidate package does not expose __version__\"\n            )\n        return value\n\n    def validate_statistics(\n        self,\n        statistics: Mapping[int, Mapping[str, Any]],\n    ) -> object:\n        \"\"\"Validate the Project C→D normalized statistics contract.\"\"\"\n\n        validator = getattr(\n            self.module,\n            \"validate_statistics_contract\",\n        )\n        return validator(statistics)\n\n    def number_signals(\n        self,\n        statistics: Mapping[int, Mapping[str, Any]],\n    ) -> Mapping[int, object]:\n        \"\"\"Convert normalized statistics to Project D NumberSignals.\"\"\"\n\n        converter = getattr(\n            self.module,\n            \"number_signals_from_statistics\",\n        )\n        result = converter(statistics)\n\n        if not isinstance(result, Mapping):\n            raise ContractError(\n                \"number_signals_from_statistics must return a mapping\"\n            )\n\n        return result\n\n    def generate_candidates(\n        self,\n        *args: Any,\n        **kwargs: Any,\n    ) -> object:\n        \"\"\"Delegate candidate generation.\"\"\"\n\n        generator = getattr(\n            self.module,\n            \"generate_candidates\",\n        )\n        return generator(*args, **kwargs)\n\n    def rank_candidates(\n        self,\n        *args: Any,\n        **kwargs: Any,\n    ) -> object:\n        \"\"\"Delegate candidate ranking.\"\"\"\n\n        ranker = getattr(self.module, \"rank_candidates\")\n        return ranker(*args, **kwargs)\n\n    def select_diverse_candidates(\n        self,\n        *args: Any,\n        **kwargs: Any,\n    ) -> object:\n        \"\"\"Delegate diversity compression.\"\"\"\n\n        selector = getattr(\n            self.module,\n            \"select_diverse_candidates\",\n        )\n        return selector(*args, **kwargs)\n\n    def select_practical_sets(\n        self,\n        *args: Any,\n        **kwargs: Any,\n    ) -> object:\n        \"\"\"Delegate practical Top-5 selection.\"\"\"\n\n        selector = getattr(\n            self.module,\n            \"select_practical_sets\",\n        )\n        return selector(*args, **kwargs)\n",
+    "lrp/adapters/statistics.py": "\"\"\"Project C stable-public-API adapter.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom importlib import import_module\nfrom types import ModuleType\nfrom typing import Any, Iterable, Mapping\n\nfrom lrp.contracts import CompatibilityError, ContractError\n\n\n_REQUIRED_EXPORTS = (\n    \"AnalysisConfig\",\n    \"AnalysisReport\",\n    \"StatisticsEngine\",\n    \"analyze_all\",\n    \"build_feature_matrix\",\n    \"feature_matrix_to_dict\",\n    \"snapshot_to_dict\",\n)\n\n\n@dataclass(frozen=True, slots=True)\nclass StatisticsAdapter:\n    \"\"\"Thin adapter over Project C's stable API 1.x.\"\"\"\n\n    module: ModuleType\n\n    @classmethod\n    def load(cls) -> \"StatisticsAdapter\":\n        \"\"\"Import and validate Project C.\"\"\"\n\n        try:\n            module = import_module(\"lotto645_statistics\")\n        except ImportError as exc:\n            raise CompatibilityError(\n                \"Project C Statistics Engine is not importable\"\n            ) from exc\n\n        missing = tuple(\n            name for name in _REQUIRED_EXPORTS\n            if not hasattr(module, name)\n        )\n        if missing:\n            raise CompatibilityError(\n                \"Statistics stable API is incomplete: \"\n                + \", \".join(missing)\n            )\n\n        api_version = getattr(module, \"STABLE_API_VERSION\", None)\n        if api_version != \"1.0\":\n            raise CompatibilityError(\n                \"unsupported Statistics stable API: \"\n                f\"{api_version!r}\"\n            )\n\n        return cls(module=module)\n\n    @property\n    def version(self) -> str:\n        value = getattr(self.module, \"__version__\", None)\n        if not isinstance(value, str):\n            raise CompatibilityError(\n                \"Statistics package does not expose __version__\"\n            )\n        return value\n\n    @property\n    def api_version(self) -> str:\n        value = getattr(\n            self.module,\n            \"STABLE_API_VERSION\",\n            None,\n        )\n        if not isinstance(value, str):\n            raise CompatibilityError(\n                \"Statistics package does not expose \"\n                \"STABLE_API_VERSION\"\n            )\n        return value\n\n    def create_config(self, **kwargs: Any) -> object:\n        \"\"\"Create Project C's public AnalysisConfig.\"\"\"\n\n        config_type = getattr(self.module, \"AnalysisConfig\")\n        return config_type(**kwargs)\n\n    def create_engine(self, *args: Any, **kwargs: Any) -> object:\n        \"\"\"Create Project C's public StatisticsEngine.\"\"\"\n\n        engine_type = getattr(self.module, \"StatisticsEngine\")\n        return engine_type(*args, **kwargs)\n\n    def analyze_all(\n        self,\n        draws: Iterable[object],\n        *,\n        config: object | None = None,\n    ) -> object:\n        \"\"\"Run Project C's unified stable analysis function.\"\"\"\n\n        analyze = getattr(self.module, \"analyze_all\")\n\n        if config is None:\n            return analyze(draws)\n\n        try:\n            return analyze(draws, config=config)\n        except TypeError:\n            return analyze(draws, config)\n\n    def build_feature_matrix(self, snapshot: object) -> object:\n        \"\"\"Build Project C's stable feature matrix.\"\"\"\n\n        build = getattr(self.module, \"build_feature_matrix\")\n        return build(snapshot)\n\n    def snapshot_to_dict(self, snapshot: object) -> Mapping[str, Any]:\n        \"\"\"Serialize a Project C snapshot through its stable serializer.\"\"\"\n\n        serializer = getattr(self.module, \"snapshot_to_dict\")\n        result = serializer(snapshot)\n\n        if not isinstance(result, Mapping):\n            raise ContractError(\n                \"snapshot_to_dict must return a mapping\"\n            )\n\n        return result\n\n    def feature_matrix_to_dict(\n        self,\n        matrix: object,\n    ) -> Mapping[str, Any]:\n        \"\"\"Serialize a Project C feature matrix.\"\"\"\n\n        serializer = getattr(\n            self.module,\n            \"feature_matrix_to_dict\",\n        )\n        result = serializer(matrix)\n\n        if not isinstance(result, Mapping):\n            raise ContractError(\n                \"feature_matrix_to_dict must return a mapping\"\n            )\n\n        return result\n\n    def public_exports(self) -> tuple[str, ...]:\n        exports = getattr(self.module, \"STABLE_EXPORTS\", ())\n        if not isinstance(exports, (tuple, list)):\n            return ()\n        return tuple(str(name) for name in exports)\n",
+    "lrp/adapters/signal_bridge.py": "\"\"\"Bridge from Project C snapshots to Project D statistics signals.\n\nThe bridge depends only on the stable Project C snapshot attributes:\n\n- snapshot.windows\n- snapshot.numbers\n- snapshot.relationships.affinity_graph.weighted_degree\n\nIt does not import Project C implementation modules.\n\"\"\"\n\nfrom __future__ import annotations\n\nfrom collections.abc import Mapping, Sequence\nfrom dataclasses import dataclass\nimport math\nfrom typing import Any\n\nfrom lrp.contracts import ContractError\n\n\n_REQUIRED_NUMBERS = tuple(range(1, 46))\n_SIGNAL_FIELDS = (\n    \"recency\",\n    \"frequency\",\n    \"gap_reversion\",\n    \"pair_graph\",\n)\n\n\ndef _finite_float(value: object, *, field: str) -> float:\n    if isinstance(value, bool) or not isinstance(value, (int, float)):\n        raise ContractError(f\"{field} must be numeric\")\n\n    result = float(value)\n    if not math.isfinite(result):\n        raise ContractError(f\"{field} must be finite\")\n\n    return result\n\n\ndef _unit_interval(value: float) -> float:\n    return min(1.0, max(0.0, value))\n\n\ndef _read_attribute(value: object, name: str) -> Any:\n    if isinstance(value, Mapping):\n        if name not in value:\n            raise ContractError(f\"missing snapshot field: {name}\")\n        return value[name]\n\n    if not hasattr(value, name):\n        raise ContractError(f\"missing snapshot attribute: {name}\")\n\n    return getattr(value, name)\n\n\ndef _read_number_row(\n    numbers: object,\n    number: int,\n) -> object:\n    if not isinstance(numbers, Mapping):\n        raise ContractError(\"snapshot.numbers must be a mapping\")\n\n    row = numbers.get(number)\n    if row is None:\n        row = numbers.get(str(number))\n\n    if row is None:\n        raise ContractError(\n            f\"snapshot.numbers is missing number {number}\"\n        )\n\n    return row\n\n\ndef _read_numeric(\n    row: object,\n    field: str,\n    *,\n    number: int,\n) -> float:\n    try:\n        value = _read_attribute(row, field)\n    except ContractError as exc:\n        raise ContractError(\n            f\"number {number}: missing field {field}\"\n        ) from exc\n\n    return _finite_float(\n        value,\n        field=f\"number {number}.{field}\",\n    )\n\n\ndef _normalize_windows(value: object) -> tuple[int, int, int]:\n    if isinstance(value, Mapping):\n        short = value.get(\"short\", value.get(\"short_window\"))\n        mid = value.get(\"mid\", value.get(\"mid_window\"))\n        long = value.get(\"long\", value.get(\"long_window\"))\n        raw = (short, mid, long)\n    elif isinstance(value, Sequence) and not isinstance(\n        value,\n        (str, bytes, bytearray),\n    ):\n        raw = tuple(value)\n        if len(raw) < 3:\n            raise ContractError(\n                \"snapshot.windows must contain short, mid and long\"\n            )\n        raw = raw[:3]\n    else:\n        raise ContractError(\n            \"snapshot.windows must be a mapping or sequence\"\n        )\n\n    normalized: list[int] = []\n    for index, item in enumerate(raw):\n        if (\n            isinstance(item, bool)\n            or not isinstance(item, int)\n            or item <= 0\n        ):\n            raise ContractError(\n                f\"snapshot.windows[{index}] must be positive\"\n            )\n        normalized.append(item)\n\n    short, mid, long = normalized\n    if not short <= mid <= long:\n        raise ContractError(\n            \"snapshot windows must satisfy short <= mid <= long\"\n        )\n\n    return short, mid, long\n\n\ndef _weighted_degree(snapshot: object) -> Mapping[Any, Any]:\n    relationships = _read_attribute(snapshot, \"relationships\")\n    affinity_graph = _read_attribute(\n        relationships,\n        \"affinity_graph\",\n    )\n    values = _read_attribute(\n        affinity_graph,\n        \"weighted_degree\",\n    )\n\n    if not isinstance(values, Mapping):\n        raise ContractError(\n            \"affinity_graph.weighted_degree must be a mapping\"\n        )\n\n    return values\n\n\ndef _minmax(\n    values: Mapping[int, float],\n) -> dict[int, float]:\n    minimum = min(values.values())\n    maximum = max(values.values())\n\n    if math.isclose(minimum, maximum):\n        return {number: 0.5 for number in _REQUIRED_NUMBERS}\n\n    scale = maximum - minimum\n    return {\n        number: _unit_interval(\n            (values[number] - minimum) / scale\n        )\n        for number in _REQUIRED_NUMBERS\n    }\n\n\n@dataclass(frozen=True, slots=True)\nclass SignalBridgeConfig:\n    \"\"\"Weights used to combine Project C frequency windows.\"\"\"\n\n    short_weight: float = 0.50\n    mid_weight: float = 0.30\n    long_weight: float = 0.20\n\n    def __post_init__(self) -> None:\n        weights = (\n            self.short_weight,\n            self.mid_weight,\n            self.long_weight,\n        )\n\n        if any(\n            isinstance(value, bool)\n            or not isinstance(value, (int, float))\n            or not math.isfinite(float(value))\n            or float(value) < 0.0\n            for value in weights\n        ):\n            raise ContractError(\n                \"signal bridge weights must be finite and non-negative\"\n            )\n\n        total = sum(float(value) for value in weights)\n        if not math.isclose(total, 1.0, abs_tol=1e-12):\n            raise ContractError(\n                \"signal bridge weights must sum to 1.0\"\n            )\n\n\n@dataclass(frozen=True, slots=True)\nclass StatisticsSignalSnapshot:\n    \"\"\"Normalized Project C→D integration payload.\"\"\"\n\n    windows: tuple[int, int, int]\n    signals: Mapping[int, Mapping[str, float]]\n\n    def __post_init__(self) -> None:\n        missing = tuple(\n            number\n            for number in _REQUIRED_NUMBERS\n            if number not in self.signals\n        )\n        if missing:\n            raise ContractError(\n                f\"signals are missing numbers: {missing}\"\n            )\n\n        normalized: dict[int, dict[str, float]] = {}\n\n        for number in _REQUIRED_NUMBERS:\n            row = self.signals[number]\n            if not isinstance(row, Mapping):\n                raise ContractError(\n                    f\"signal row {number} must be a mapping\"\n                )\n\n            converted: dict[str, float] = {}\n            for field in _SIGNAL_FIELDS:\n                if field not in row:\n                    raise ContractError(\n                        f\"signal row {number} is missing {field}\"\n                    )\n\n                value = _finite_float(\n                    row[field],\n                    field=f\"signals[{number}].{field}\",\n                )\n                if not 0.0 <= value <= 1.0:\n                    raise ContractError(\n                        f\"signals[{number}].{field} \"\n                        \"must be between 0 and 1\"\n                    )\n                converted[field] = value\n\n            normalized[number] = converted\n\n        object.__setattr__(self, \"signals\", normalized)\n\n    def to_dict(self) -> dict[int, dict[str, float]]:\n        \"\"\"Return the exact mapping required by Project D.\"\"\"\n\n        return {\n            number: dict(self.signals[number])\n            for number in _REQUIRED_NUMBERS\n        }\n\n\ndef build_statistics_signals(\n    snapshot: object,\n    *,\n    config: SignalBridgeConfig | None = None,\n) -> StatisticsSignalSnapshot:\n    \"\"\"Build Project D-compatible signals from a Project C snapshot.\n\n    Formulas:\n\n    - recency:\n      ``1 - min(gap, long_window) / long_window``\n    - frequency:\n      weighted short/mid/long occurrence rates\n    - gap_reversion:\n      ``min(gap, long_window) / long_window``\n    - pair_graph:\n      min-max-normalized affinity weighted degree\n\n    The input snapshot must already have been produced with the correct\n    ``until_round`` boundary. The bridge never reads raw future draws.\n    \"\"\"\n\n    resolved = config or SignalBridgeConfig()\n    windows = _normalize_windows(\n        _read_attribute(snapshot, \"windows\")\n    )\n    short_window, mid_window, long_window = windows\n    numbers = _read_attribute(snapshot, \"numbers\")\n    degree_mapping = _weighted_degree(snapshot)\n\n    raw_pair_graph: dict[int, float] = {}\n    rows: dict[int, dict[str, float]] = {}\n\n    for number in _REQUIRED_NUMBERS:\n        row = _read_number_row(numbers, number)\n\n        short_frequency = _read_numeric(\n            row,\n            \"short_frequency\",\n            number=number,\n        )\n        mid_frequency = _read_numeric(\n            row,\n            \"mid_frequency\",\n            number=number,\n        )\n        long_frequency = _read_numeric(\n            row,\n            \"long_frequency\",\n            number=number,\n        )\n        gap = max(\n            0.0,\n            _read_numeric(row, \"gap\", number=number),\n        )\n\n        recency = 1.0 - min(gap, long_window) / long_window\n        gap_reversion = min(gap, long_window) / long_window\n\n        frequency = (\n            float(resolved.short_weight)\n            * _unit_interval(short_frequency / short_window)\n            + float(resolved.mid_weight)\n            * _unit_interval(mid_frequency / mid_window)\n            + float(resolved.long_weight)\n            * _unit_interval(long_frequency / long_window)\n        )\n\n        degree_value = degree_mapping.get(\n            number,\n            degree_mapping.get(str(number), 0.0),\n        )\n        raw_pair_graph[number] = max(\n            0.0,\n            _finite_float(\n                degree_value,\n                field=f\"weighted_degree[{number}]\",\n            ),\n        )\n\n        rows[number] = {\n            \"recency\": _unit_interval(recency),\n            \"frequency\": _unit_interval(frequency),\n            \"gap_reversion\": _unit_interval(gap_reversion),\n            \"pair_graph\": 0.0,\n        }\n\n    normalized_pair_graph = _minmax(raw_pair_graph)\n\n    for number in _REQUIRED_NUMBERS:\n        rows[number][\"pair_graph\"] = normalized_pair_graph[number]\n\n    return StatisticsSignalSnapshot(\n        windows=windows,\n        signals=rows,\n    )\n",
+    "lrp/pipelines/models.py": "\"\"\"Public request and result models for the prediction pipeline.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nimport math\nfrom typing import Any, Mapping, Sequence\n\nfrom lrp.contracts import ContractError\n\n\n_DEFAULT_WEIGHTS = {\n    \"recency\": 0.35,\n    \"frequency\": 0.20,\n    \"gap_reversion\": 0.15,\n    \"pair_graph\": 0.10,\n    \"terminal_dispersion\": 0.08,\n    \"sum_band\": 0.07,\n    \"parity_balance\": 0.05,\n}\n\n\ndef _normalize_numbers(\n    values: Sequence[int] | frozenset[int],\n    *,\n    field_name: str,\n    allow_empty: bool = True,\n) -> frozenset[int]:\n    try:\n        normalized = frozenset(int(value) for value in values)\n    except (TypeError, ValueError) as exc:\n        raise ContractError(\n            f\"{field_name} must contain integers\"\n        ) from exc\n\n    if not allow_empty and not normalized:\n        raise ContractError(f\"{field_name} must not be empty\")\n\n    invalid = tuple(\n        sorted(number for number in normalized if not 1 <= number <= 45)\n    )\n    if invalid:\n        raise ContractError(\n            f\"{field_name} contains invalid lotto numbers: {invalid}\"\n        )\n\n    return normalized\n\n\n@dataclass(frozen=True, slots=True)\nclass PredictionRequest:\n    \"\"\"Immutable Project A candidate-generation request.\"\"\"\n\n    round_no: int\n    seed: int\n    temperature: float = 0.85\n    candidate_count: int = 10_000\n    max_attempts_multiplier: int = 50\n    top_k: int = 10\n    previous_numbers: frozenset[int] = field(\n        default_factory=frozenset\n    )\n    long_gap_numbers: frozenset[int] = field(\n        default_factory=frozenset\n    )\n    weights: Mapping[str, float] = field(\n        default_factory=lambda: dict(_DEFAULT_WEIGHTS)\n    )\n\n    def __post_init__(self) -> None:\n        if (\n            isinstance(self.round_no, bool)\n            or not isinstance(self.round_no, int)\n            or self.round_no <= 0\n        ):\n            raise ContractError(\"round_no must be a positive integer\")\n\n        if isinstance(self.seed, bool) or not isinstance(self.seed, int):\n            raise ContractError(\"seed must be an integer\")\n\n        if (\n            isinstance(self.temperature, bool)\n            or not isinstance(self.temperature, (int, float))\n            or not math.isfinite(float(self.temperature))\n            or self.temperature <= 0\n        ):\n            raise ContractError(\n                \"temperature must be a finite positive number\"\n            )\n\n        for name, value in (\n            (\"candidate_count\", self.candidate_count),\n            (\"max_attempts_multiplier\", self.max_attempts_multiplier),\n            (\"top_k\", self.top_k),\n        ):\n            if (\n                isinstance(value, bool)\n                or not isinstance(value, int)\n                or value <= 0\n            ):\n                raise ContractError(\n                    f\"{name} must be a positive integer\"\n                )\n\n        previous = _normalize_numbers(\n            self.previous_numbers,\n            field_name=\"previous_numbers\",\n        )\n        if previous and len(previous) != 6:\n            raise ContractError(\n                \"previous_numbers must contain exactly six numbers\"\n            )\n\n        long_gap = _normalize_numbers(\n            self.long_gap_numbers,\n            field_name=\"long_gap_numbers\",\n        )\n\n        if not isinstance(self.weights, Mapping):\n            raise ContractError(\"weights must be a mapping\")\n\n        missing = tuple(\n            name for name in _DEFAULT_WEIGHTS\n            if name not in self.weights\n        )\n        if missing:\n            raise ContractError(\n                f\"weights are missing fields: {missing}\"\n            )\n\n        normalized_weights: dict[str, float] = {}\n        for name in _DEFAULT_WEIGHTS:\n            value = self.weights[name]\n\n            if (\n                isinstance(value, bool)\n                or not isinstance(value, (int, float))\n                or not math.isfinite(float(value))\n                or float(value) < 0.0\n            ):\n                raise ContractError(\n                    f\"weight {name} must be finite and non-negative\"\n                )\n\n            normalized_weights[name] = float(value)\n\n        total = sum(normalized_weights.values())\n        if total <= 0.0:\n            raise ContractError(\n                \"at least one probability weight must be positive\"\n            )\n\n        object.__setattr__(\n            self,\n            \"temperature\",\n            float(self.temperature),\n        )\n        object.__setattr__(self, \"previous_numbers\", previous)\n        object.__setattr__(self, \"long_gap_numbers\", long_gap)\n        object.__setattr__(self, \"weights\", normalized_weights)\n\n    def to_dict(self) -> dict[str, Any]:\n        return {\n            \"round_no\": self.round_no,\n            \"seed\": self.seed,\n            \"temperature\": self.temperature,\n            \"candidate_count\": self.candidate_count,\n            \"max_attempts_multiplier\": self.max_attempts_multiplier,\n            \"top_k\": self.top_k,\n            \"previous_numbers\": sorted(self.previous_numbers),\n            \"long_gap_numbers\": sorted(self.long_gap_numbers),\n            \"weights\": dict(self.weights),\n        }\n\n\n@dataclass(frozen=True, slots=True)\nclass PredictionGenerationResult:\n    \"\"\"Output of the Project A generation stage.\"\"\"\n\n    request: PredictionRequest\n    windows: tuple[int, int, int]\n    probabilities: Mapping[int, float]\n    statistics_contract: object\n    number_signals: Mapping[int, object]\n    candidates: tuple[object, ...]\n    statistics_version: str\n    candidate_version: str\n\n    @property\n    def generated_count(self) -> int:\n        return len(self.candidates)\n\n    @property\n    def complete(self) -> bool:\n        return self.generated_count >= self.request.candidate_count\n\n    def candidate_numbers(self) -> tuple[tuple[int, ...], ...]:\n        result: list[tuple[int, ...]] = []\n\n        for candidate in self.candidates:\n            numbers = getattr(candidate, \"numbers\", None)\n            if numbers is None:\n                raise ContractError(\n                    \"candidate does not expose numbers\"\n                )\n            result.append(tuple(int(number) for number in numbers))\n\n        return tuple(result)\n",
+    "lrp/pipelines/probability.py": "\"\"\"Probability-vector construction for the prediction pipeline.\"\"\"\n\nfrom __future__ import annotations\n\nimport math\nfrom typing import Any, Mapping\n\nfrom lrp.contracts import ContractError\n\n\n_NUMBER_RANGE = tuple(range(1, 46))\n\n\ndef _read_signal(\n    value: object,\n    name: str,\n    *,\n    number: int,\n) -> float:\n    if isinstance(value, Mapping):\n        raw = value.get(name)\n    else:\n        raw = getattr(value, name, None)\n\n    if (\n        isinstance(raw, bool)\n        or not isinstance(raw, (int, float))\n        or not math.isfinite(float(raw))\n    ):\n        raise ContractError(\n            f\"number signal {number}.{name} must be finite numeric\"\n        )\n\n    result = float(raw)\n    if not 0.0 <= result <= 1.0:\n        raise ContractError(\n            f\"number signal {number}.{name} must be within 0..1\"\n        )\n\n    return result\n\n\ndef _structural_prior(number: int) -> tuple[float, float, float]:\n    \"\"\"Return neutral terminal, sum-band and parity priors.\n\n    These components cannot be fully evaluated before a six-number set is\n    formed. At number-probability stage, bounded neutral priors prevent those\n    score weights from being incorrectly discarded.\n\n    - terminal dispersion: neutral 0.5\n    - sum-band fit: preference for central lotto range\n    - parity balance: neutral 0.5\n    \"\"\"\n\n    terminal_dispersion = 0.5\n\n    center = 23.0\n    scale = 22.0\n    sum_band = max(0.0, 1.0 - abs(number - center) / scale)\n\n    parity_balance = 0.5\n\n    return terminal_dispersion, sum_band, parity_balance\n\n\ndef build_probability_vector(\n    number_signals: Mapping[int, object],\n    *,\n    weights: Mapping[str, float],\n) -> dict[int, float]:\n    \"\"\"Build a normalized 1..45 probability vector.\n\n    Number-level Project D signals contribute directly. Set-level components\n    use bounded neutral priors and are evaluated fully during candidate\n    scoring in the next pipeline stage.\n    \"\"\"\n\n    missing = tuple(\n        number for number in _NUMBER_RANGE\n        if number not in number_signals\n    )\n    if missing:\n        raise ContractError(\n            f\"number signals are missing numbers: {missing}\"\n        )\n\n    required_weights = (\n        \"recency\",\n        \"frequency\",\n        \"gap_reversion\",\n        \"pair_graph\",\n        \"terminal_dispersion\",\n        \"sum_band\",\n        \"parity_balance\",\n    )\n\n    missing_weights = tuple(\n        name for name in required_weights\n        if name not in weights\n    )\n    if missing_weights:\n        raise ContractError(\n            f\"probability weights are missing: {missing_weights}\"\n        )\n\n    raw: dict[int, float] = {}\n\n    for number in _NUMBER_RANGE:\n        signal = number_signals[number]\n        terminal, sum_band, parity = _structural_prior(number)\n\n        raw[number] = (\n            float(weights[\"recency\"])\n            * _read_signal(signal, \"recency\", number=number)\n            + float(weights[\"frequency\"])\n            * _read_signal(signal, \"frequency\", number=number)\n            + float(weights[\"gap_reversion\"])\n            * _read_signal(signal, \"gap_reversion\", number=number)\n            + float(weights[\"pair_graph\"])\n            * _read_signal(signal, \"pair_graph\", number=number)\n            + float(weights[\"terminal_dispersion\"]) * terminal\n            + float(weights[\"sum_band\"]) * sum_band\n            + float(weights[\"parity_balance\"]) * parity\n        )\n\n    floor = 1e-12\n    adjusted = {\n        number: max(floor, value)\n        for number, value in raw.items()\n    }\n\n    total = sum(adjusted.values())\n    if not math.isfinite(total) or total <= 0.0:\n        raise ContractError(\n            \"probability-vector total must be finite and positive\"\n        )\n\n    normalized = {\n        number: adjusted[number] / total\n        for number in _NUMBER_RANGE\n    }\n\n    normalized_total = sum(normalized.values())\n    if not math.isclose(\n        normalized_total,\n        1.0,\n        rel_tol=0.0,\n        abs_tol=1e-12,\n    ):\n        raise ContractError(\n            \"probability vector failed normalization\"\n        )\n\n    return normalized\n",
+    "lrp/pipelines/prediction.py": "\"\"\"Project A prediction generation pipeline.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom typing import Any, Iterable\n\nfrom lrp.adapters import (\n    CandidateAdapter,\n    StatisticsAdapter,\n    build_statistics_signals,\n)\nfrom lrp.contracts import CompatibilityError, ContractError\nfrom lrp.core import RuntimeContext\n\nfrom .models import (\n    PredictionGenerationResult,\n    PredictionRequest,\n)\nfrom .probability import build_probability_vector\n\n\ndef _analysis_snapshot(report: object) -> object:\n    \"\"\"Extract the stable StatisticsSnapshot from Project C output.\"\"\"\n\n    snapshot = getattr(report, \"snapshot\", None)\n    if snapshot is not None:\n        return snapshot\n\n    statistics = getattr(report, \"statistics\", None)\n    if statistics is not None:\n        return statistics\n\n    required = (\n        \"windows\",\n        \"numbers\",\n        \"relationships\",\n    )\n    if all(hasattr(report, name) for name in required):\n        return report\n\n    raise ContractError(\n        \"Project C analysis output does not expose a stable snapshot\"\n    )\n\n\n@dataclass(slots=True)\nclass PredictionPipeline:\n    \"\"\"Orchestrate Project C analysis and Project D generation.\"\"\"\n\n    statistics: StatisticsAdapter\n    candidate: CandidateAdapter\n\n    @classmethod\n    def load(cls) -> \"PredictionPipeline\":\n        \"\"\"Load the installed Project C and D adapters.\"\"\"\n\n        return cls(\n            statistics=StatisticsAdapter.load(),\n            candidate=CandidateAdapter.load(),\n        )\n\n    def analyze(\n        self,\n        draws: Iterable[object],\n        *,\n        analysis_config: object | None = None,\n    ) -> object:\n        \"\"\"Run Project C unified analysis.\"\"\"\n\n        return self.statistics.analyze_all(\n            draws,\n            config=analysis_config,\n        )\n\n    def generate_from_snapshot(\n        self,\n        snapshot: object,\n        request: PredictionRequest,\n    ) -> PredictionGenerationResult:\n        \"\"\"Generate risk-filtered candidates from a stable snapshot.\"\"\"\n\n        if not isinstance(request, PredictionRequest):\n            raise ContractError(\n                \"request must be a PredictionRequest\"\n            )\n\n        bridge = build_statistics_signals(snapshot)\n        statistics_payload = bridge.to_dict()\n\n        contract_report = self.candidate.validate_statistics(\n            statistics_payload\n        )\n        compatible = getattr(contract_report, \"compatible\", False)\n\n        if not compatible:\n            reasons = getattr(contract_report, \"reasons\", ())\n            raise CompatibilityError(\n                \"Project C→D statistics contract failed: \"\n                + \", \".join(str(reason) for reason in reasons)\n            )\n\n        number_signals = self.candidate.number_signals(\n            statistics_payload\n        )\n        probabilities = build_probability_vector(\n            number_signals,\n            weights=request.weights,\n        )\n\n        module = self.candidate.module\n\n        candidate_config_type = getattr(\n            module,\n            \"CandidateConfig\",\n            None,\n        )\n        risk_config_type = getattr(\n            module,\n            \"RiskFilterConfig\",\n            None,\n        )\n\n        if candidate_config_type is None:\n            raise CompatibilityError(\n                \"CandidateConfig is missing from Project D\"\n            )\n        if risk_config_type is None:\n            raise CompatibilityError(\n                \"RiskFilterConfig is missing from Project D\"\n            )\n\n        candidate_config = candidate_config_type(\n            seed=request.seed,\n            temperature=request.temperature,\n            candidate_count=request.candidate_count,\n            max_attempts_multiplier=(\n                request.max_attempts_multiplier\n            ),\n        )\n\n        risk_config = risk_config_type(\n            sum_min=90,\n            sum_max=200,\n            min_odd=2,\n            max_odd=4,\n            low_high_min_each=1,\n            max_consecutive_run=2,\n            max_same_ending=2,\n            max_overlap_previous=1,\n            min_long_gap_inclusion=1,\n            max_same_decade=3,\n        )\n\n        candidates = self.candidate.generate_candidates(\n            probabilities,\n            candidate_config=candidate_config,\n            risk_config=risk_config,\n            previous_numbers=request.previous_numbers,\n            long_gap_numbers=request.long_gap_numbers,\n        )\n\n        return PredictionGenerationResult(\n            request=request,\n            windows=bridge.windows,\n            probabilities=probabilities,\n            statistics_contract=contract_report,\n            number_signals=number_signals,\n            candidates=tuple(candidates),\n            statistics_version=self.statistics.version,\n            candidate_version=self.candidate.version,\n        )\n\n    def run(\n        self,\n        draws: Iterable[object],\n        request: PredictionRequest,\n        *,\n        analysis_config: object | None = None,\n    ) -> PredictionGenerationResult:\n        \"\"\"Run analysis, signal conversion and candidate generation.\"\"\"\n\n        report = self.analyze(\n            draws,\n            analysis_config=analysis_config,\n        )\n        snapshot = _analysis_snapshot(report)\n\n        return self.generate_from_snapshot(\n            snapshot,\n            request,\n        )\n\n    def runtime_context(\n        self,\n        request: PredictionRequest,\n    ) -> RuntimeContext:\n        \"\"\"Create reproducible Project A runtime metadata.\"\"\"\n\n        return RuntimeContext.create(\n            seed=request.seed,\n            execution_id=(\n                f\"lrp-prediction-round-{request.round_no}\"\n            ),\n            parameters=request.to_dict(),\n        )\n"
+  },
+  "candidate_types": {
+    "CandidateSet": {
+      "module": "lotto645_candidates.models",
+      "signature": "(numbers: 'tuple[int, int, int, int, int, int]', generation_index: 'int', sampling_weight: 'float', risk: 'RiskEvaluation') -> None",
+      "dataclass_fields": [
+        {
+          "name": "numbers",
+          "type": "tuple[int, int, int, int, int, int]",
+          "default": "MISSING"
+        },
+        {
+          "name": "generation_index",
+          "type": "int",
+          "default": "MISSING"
+        },
+        {
+          "name": "sampling_weight",
+          "type": "float",
+          "default": "MISSING"
+        },
+        {
+          "name": "risk",
+          "type": "RiskEvaluation",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "numbers": "tuple[int, int, int, int, int, int]",
+        "generation_index": "int",
+        "sampling_weight": "float",
+        "risk": "RiskEvaluation"
+      }
+    },
+    "ScoredCandidate": {
+      "module": "lotto645_candidates.models",
+      "signature": "(candidate: 'CandidateSet', breakdown: 'CandidateScoreBreakdown', normalized_score: 'float') -> None",
+      "dataclass_fields": [
+        {
+          "name": "candidate",
+          "type": "CandidateSet",
+          "default": "MISSING"
+        },
+        {
+          "name": "breakdown",
+          "type": "CandidateScoreBreakdown",
+          "default": "MISSING"
+        },
+        {
+          "name": "normalized_score",
+          "type": "float",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "candidate": "CandidateSet",
+        "breakdown": "CandidateScoreBreakdown",
+        "normalized_score": "float"
+      }
+    },
+    "RankingSnapshot": {
+      "module": "lotto645_candidates.models",
+      "signature": "(ranked: 'tuple[RankedCandidate, ...]', candidate_count: 'int', top_score: 'float', bottom_score: 'float') -> None",
+      "dataclass_fields": [
+        {
+          "name": "ranked",
+          "type": "tuple[RankedCandidate, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "candidate_count",
+          "type": "int",
+          "default": "MISSING"
+        },
+        {
+          "name": "top_score",
+          "type": "float",
+          "default": "MISSING"
+        },
+        {
+          "name": "bottom_score",
+          "type": "float",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "ranked": "tuple[RankedCandidate, ...]",
+        "candidate_count": "int",
+        "top_score": "float",
+        "bottom_score": "float"
+      }
+    },
+    "DiversitySelection": {
+      "module": "lotto645_candidates.models",
+      "signature": "(selected: 'tuple[ScoredCandidate, ...]', metrics: 'DiversityMetrics') -> None",
+      "dataclass_fields": [
+        {
+          "name": "selected",
+          "type": "tuple[ScoredCandidate, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "metrics",
+          "type": "DiversityMetrics",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "selected": "tuple[ScoredCandidate, ...]",
+        "metrics": "DiversityMetrics"
+      }
+    },
+    "PracticalSelection": {
+      "module": "lotto645_candidates.models",
+      "signature": "(selected: 'tuple[PracticalSelectionItem, ...]', requested_count: 'int', selected_count: 'int', complete: 'bool') -> None",
+      "dataclass_fields": [
+        {
+          "name": "selected",
+          "type": "tuple[PracticalSelectionItem, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "requested_count",
+          "type": "int",
+          "default": "MISSING"
+        },
+        {
+          "name": "selected_count",
+          "type": "int",
+          "default": "MISSING"
+        },
+        {
+          "name": "complete",
+          "type": "bool",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "selected": "tuple[PracticalSelectionItem, ...]",
+        "requested_count": "int",
+        "selected_count": "int",
+        "complete": "bool"
+      }
+    },
+    "NumberSignals": {
+      "module": "lotto645_candidates.models",
+      "signature": "(recency: 'float', frequency: 'float', gap_reversion: 'float', pair_graph: 'float') -> None",
+      "dataclass_fields": [
+        {
+          "name": "recency",
+          "type": "float",
+          "default": "MISSING"
+        },
+        {
+          "name": "frequency",
+          "type": "float",
+          "default": "MISSING"
+        },
+        {
+          "name": "gap_reversion",
+          "type": "float",
+          "default": "MISSING"
+        },
+        {
+          "name": "pair_graph",
+          "type": "float",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "recency": "float",
+        "frequency": "float",
+        "gap_reversion": "float",
+        "pair_graph": "float"
+      }
+    },
+    "StatisticsContractReport": {
+      "module": "lotto645_candidates.integration",
+      "signature": "(compatible: 'bool', missing_numbers: 'tuple[int, ...]', invalid_numbers: 'tuple[int, ...]', missing_fields: 'tuple[str, ...]', reasons: 'tuple[str, ...]') -> None",
+      "dataclass_fields": [
+        {
+          "name": "compatible",
+          "type": "bool",
+          "default": "MISSING"
+        },
+        {
+          "name": "missing_numbers",
+          "type": "tuple[int, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "invalid_numbers",
+          "type": "tuple[int, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "missing_fields",
+          "type": "tuple[str, ...]",
+          "default": "MISSING"
+        },
+        {
+          "name": "reasons",
+          "type": "tuple[str, ...]",
+          "default": "MISSING"
+        }
+      ],
+      "annotations": {
+        "compatible": "bool",
+        "missing_numbers": "tuple[int, ...]",
+        "invalid_numbers": "tuple[int, ...]",
+        "missing_fields": "tuple[str, ...]",
+        "reasons": "tuple[str, ...]"
+      }
+    }
+  }
+}

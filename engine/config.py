@@ -23,3 +23,19 @@ class Config:
     @classmethod
     def filters(cls):
         return cls._load("filters.json")
+
+    @classmethod
+    def candidate_size(cls):
+        return cls.settings().get("candidate_size", 18)
+
+    @classmethod
+    def generator_samples(cls):
+        return cls.settings().get("generator_samples", 10000)
+
+    @classmethod
+    def predict_count(cls):
+        return cls.settings().get("predict_count", 5)
+
+    @classmethod
+    def random_seed(cls):
+        return cls.settings().get("random_seed", None)

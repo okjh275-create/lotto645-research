@@ -2,5 +2,13 @@
     "candidate_size": 18,
     "generator_samples": 10000,
     "predict_count": 5,
-    "random_seed": 20260717
+    "random_seed": 20260717,
+
+    "backtest_start": 1200,
+    "backtest_end": 1231,
+
+    "pair_window": 50,
+    "triple_window": 50,
+
+    "max_overlap": 3
 }

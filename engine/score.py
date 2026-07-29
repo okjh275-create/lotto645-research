@@ -18,9 +18,8 @@ class ScoreEngine:
     def __init__(self):
         self.weights = Config.weights()
         self.pair_engine = PairEngine()
-        self.pair_scores = self.pair_engine.number_scores(50)
 
-    def build(self, feature):
+    def build(self, feature, until_round=None):
 
         freq = (
             feature.freq10 * self.weights["freq10"]
@@ -30,7 +29,15 @@ class ScoreEngine:
 
         gap = feature.gap * self.weights["gap"]
 
-        pair = self.pair_scores.get(feature.number, 0)
+        pair_scores = self.pair_engine.number_scores(
+            last_n=50,
+            until_round=until_round,
+        )
+
+        pair = pair_scores.get(
+            feature.number,
+            0,
+        )
 
         return NumberScore(
             number=feature.number,

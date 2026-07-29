@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, Mapping
+from typing import Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from lrp.adapters import (
@@ -12,8 +12,15 @@ from lrp.adapters import (
     StatisticsAdapter,
     build_statistics_signals,
 )
-from lrp.contracts import CompatibilityError, ContractError
+from lrp.contracts import (
+    CompatibilityError,
+    ContractError,
+)
 from lrp.core import RuntimeContext
+from lrp.ensemble import (
+    PipelineRescoringBridge,
+    PipelineRescoringResult,
+)
 
 from .models import (
     PredictionGenerationResult,
@@ -26,12 +33,24 @@ from .probability import build_probability_vector
 _KST = ZoneInfo("Asia/Seoul")
 
 
-def _analysis_snapshot(report: object) -> object:
-    snapshot = getattr(report, "snapshot", None)
+def _analysis_snapshot(
+    report: object,
+) -> object:
+    snapshot = getattr(
+        report,
+        "snapshot",
+        None,
+    )
+
     if snapshot is not None:
         return snapshot
 
-    statistics = getattr(report, "statistics", None)
+    statistics = getattr(
+        report,
+        "statistics",
+        None,
+    )
+
     if statistics is not None:
         return statistics
 
@@ -40,30 +59,53 @@ def _analysis_snapshot(report: object) -> object:
         "numbers",
         "relationships",
     )
-    if all(hasattr(report, name) for name in required):
+
+    if all(
+        hasattr(report, name)
+        for name in required
+    ):
         return report
 
     raise ContractError(
-        "Project C analysis output does not expose a stable snapshot"
+        "Project C analysis output does not expose "
+        "a stable snapshot"
     )
 
 
 def _pair_affinities(
     snapshot: object,
 ) -> Mapping[tuple[int, int], float]:
-    relationships = getattr(snapshot, "relationships", None)
+    relationships = getattr(
+        snapshot,
+        "relationships",
+        None,
+    )
+
     if relationships is None:
         return {}
 
-    graph = getattr(relationships, "affinity_graph", None)
+    graph = getattr(
+        relationships,
+        "affinity_graph",
+        None,
+    )
+
     if graph is None:
         return {}
 
-    values = getattr(graph, "pair_affinity", None)
+    values = getattr(
+        graph,
+        "pair_affinity",
+        None,
+    )
+
     if not isinstance(values, Mapping):
         return {}
 
-    normalized: dict[tuple[int, int], float] = {}
+    normalized: dict[
+        tuple[int, int],
+        float,
+    ] = {}
 
     for key, value in values.items():
         if (
@@ -77,23 +119,47 @@ def _pair_affinities(
             except (TypeError, ValueError):
                 continue
 
-            normalized[(left, right)] = score
+            normalized[
+                (left, right)
+            ] = score
 
     return normalized
 
 
 @dataclass(slots=True)
 class PredictionPipeline:
-    """Orchestrate Project C analysis and Project D prediction."""
+    """Orchestrate Projects C, D, and optional Project E."""
 
     statistics: StatisticsAdapter
     candidate: CandidateAdapter
+    ensemble: PipelineRescoringBridge | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            self.ensemble is not None
+            and not isinstance(
+                self.ensemble,
+                PipelineRescoringBridge,
+            )
+        ):
+            raise ContractError(
+                "ensemble must be a "
+                "PipelineRescoringBridge or None"
+            )
 
     @classmethod
-    def load(cls) -> "PredictionPipeline":
+    def load(
+        cls,
+        *,
+        ensemble: (
+            PipelineRescoringBridge
+            | None
+        ) = None,
+    ) -> "PredictionPipeline":
         return cls(
             statistics=StatisticsAdapter.load(),
             candidate=CandidateAdapter.load(),
+            ensemble=ensemble,
         )
 
     def analyze(
@@ -112,34 +178,58 @@ class PredictionPipeline:
         snapshot: object,
         request: PredictionRequest,
     ) -> PredictionGenerationResult:
-        if not isinstance(request, PredictionRequest):
+        if not isinstance(
+            request,
+            PredictionRequest,
+        ):
             raise ContractError(
                 "request must be a PredictionRequest"
             )
 
-        bridge = build_statistics_signals(snapshot)
+        bridge = build_statistics_signals(
+            snapshot
+        )
         statistics_payload = bridge.to_dict()
 
-        contract_report = self.candidate.validate_statistics(
-            statistics_payload
+        contract_report = (
+            self.candidate.validate_statistics(
+                statistics_payload
+            )
         )
 
         if not bool(
-            getattr(contract_report, "compatible", False)
+            getattr(
+                contract_report,
+                "compatible",
+                False,
+            )
         ):
-            reasons = getattr(contract_report, "reasons", ())
-            raise CompatibilityError(
-                "Project C to D statistics contract failed: "
-                + ", ".join(str(reason) for reason in reasons)
+            reasons = getattr(
+                contract_report,
+                "reasons",
+                (),
             )
 
-        number_signals = self.candidate.number_signals(
-            statistics_payload
+            raise CompatibilityError(
+                "Project C to D statistics contract "
+                "failed: "
+                + ", ".join(
+                    str(reason)
+                    for reason in reasons
+                )
+            )
+
+        number_signals = (
+            self.candidate.number_signals(
+                statistics_payload
+            )
         )
 
-        probabilities = build_probability_vector(
-            number_signals,
-            weights=request.weights,
+        probabilities = (
+            build_probability_vector(
+                number_signals,
+                weights=request.weights,
+            )
         )
 
         module = self.candidate.module
@@ -147,7 +237,9 @@ class PredictionPipeline:
         candidate_config = module.CandidateConfig(
             seed=request.seed,
             temperature=request.temperature,
-            candidate_count=request.candidate_count,
+            candidate_count=(
+                request.candidate_count
+            ),
             max_attempts_multiplier=(
                 request.max_attempts_multiplier
             ),
@@ -166,23 +258,51 @@ class PredictionPipeline:
             max_same_decade=3,
         )
 
-        candidates = self.candidate.generate_candidates(
-            probabilities,
-            candidate_config=candidate_config,
-            risk_config=risk_config,
-            previous_numbers=request.previous_numbers,
-            long_gap_numbers=request.long_gap_numbers,
+        candidates = (
+            self.candidate.generate_candidates(
+                probabilities,
+                candidate_config=(
+                    candidate_config
+                ),
+                risk_config=risk_config,
+                previous_numbers=(
+                    request.previous_numbers
+                ),
+                long_gap_numbers=(
+                    request.long_gap_numbers
+                ),
+            )
         )
 
         return PredictionGenerationResult(
             request=request,
             windows=bridge.windows,
             probabilities=probabilities,
-            statistics_contract=contract_report,
+            statistics_contract=(
+                contract_report
+            ),
             number_signals=number_signals,
             candidates=tuple(candidates),
-            statistics_version=self.statistics.version,
-            candidate_version=self.candidate.version,
+            statistics_version=(
+                self.statistics.version
+            ),
+            candidate_version=(
+                self.candidate.version
+            ),
+        )
+
+    def _apply_ensemble(
+        self,
+        scored: tuple[object, ...],
+        *,
+        round_no: int,
+    ) -> PipelineRescoringResult | None:
+        if self.ensemble is None:
+            return None
+
+        return self.ensemble.apply(
+            scored,
+            round_no=round_no,
         )
 
     def complete_from_snapshot(
@@ -190,30 +310,48 @@ class PredictionPipeline:
         snapshot: object,
         request: PredictionRequest,
     ) -> PredictionResult:
-        generation = self.generate_from_snapshot(
-            snapshot,
-            request,
+        generation = (
+            self.generate_from_snapshot(
+                snapshot,
+                request,
+            )
         )
 
         module = self.candidate.module
 
         score_weights = module.ScoreWeights(
             recency=request.weights["recency"],
-            frequency=request.weights["frequency"],
-            gap_reversion=request.weights["gap_reversion"],
-            pair_graph=request.weights["pair_graph"],
+            frequency=request.weights[
+                "frequency"
+            ],
+            gap_reversion=request.weights[
+                "gap_reversion"
+            ],
+            pair_graph=request.weights[
+                "pair_graph"
+            ],
             terminal_dispersion=(
-                request.weights["terminal_dispersion"]
+                request.weights[
+                    "terminal_dispersion"
+                ]
             ),
-            sum_band=request.weights["sum_band"],
-            parity_balance=request.weights["parity_balance"],
+            sum_band=request.weights[
+                "sum_band"
+            ],
+            parity_balance=request.weights[
+                "parity_balance"
+            ],
         )
 
         scored = self.candidate.score_candidates(
             generation.candidates,
-            signals=generation.number_signals,
+            signals=(
+                generation.number_signals
+            ),
             weights=score_weights,
-            pair_affinities=_pair_affinities(snapshot),
+            pair_affinities=(
+                _pair_affinities(snapshot)
+            ),
             sum_band_center=145.0,
             sum_band_scale=35.0,
         )
@@ -221,8 +359,23 @@ class PredictionPipeline:
 
         if not scored:
             raise ContractError(
-                "Project D produced no scored candidates"
+                "Project D produced no "
+                "scored candidates"
             )
+
+        ensemble_result = (
+            self._apply_ensemble(
+                scored,
+                round_no=request.round_no,
+            )
+        )
+
+        effective_scored = (
+            ensemble_result
+            .effective_candidates
+            if ensemble_result is not None
+            else scored
+        )
 
         ranking_config = module.RankingConfig(
             score_weight=0.70,
@@ -232,49 +385,76 @@ class PredictionPipeline:
         )
 
         ranking = self.candidate.rank_candidates(
-            scored,
+            effective_scored,
             config=ranking_config,
         )
 
-        diversity_config = module.DiversityConfig(
-            k=request.top_k,
-            mmr_lambda=request.mmr_lambda,
-            jaccard_max=request.jaccard_max,
-            max_overlap_between_sets=(
-                request.max_overlap_between_sets
-            ),
+        diversity_config = (
+            module.DiversityConfig(
+                k=request.top_k,
+                mmr_lambda=request.mmr_lambda,
+                jaccard_max=(
+                    request.jaccard_max
+                ),
+                max_overlap_between_sets=(
+                    request
+                    .max_overlap_between_sets
+                ),
+            )
         )
 
-        diversity = self.candidate.select_diverse_candidates(
-            scored,
-            config=diversity_config,
+        diversity = (
+            self.candidate
+            .select_diverse_candidates(
+                effective_scored,
+                config=diversity_config,
+            )
         )
 
-        practical_config = module.PracticalSelectionConfig(
-            k=request.practical_k,
-            preferred_sum_min=request.preferred_sum_min,
-            preferred_sum_max=request.preferred_sum_max,
-            max_overlap_previous_draw=1,
-            require_no_risk_flags=True,
-            jaccard_max=request.jaccard_max,
-            max_overlap_between_sets=(
-                request.max_overlap_between_sets
-            ),
+        practical_config = (
+            module.PracticalSelectionConfig(
+                k=request.practical_k,
+                preferred_sum_min=(
+                    request.preferred_sum_min
+                ),
+                preferred_sum_max=(
+                    request.preferred_sum_max
+                ),
+                max_overlap_previous_draw=1,
+                require_no_risk_flags=True,
+                jaccard_max=(
+                    request.jaccard_max
+                ),
+                max_overlap_between_sets=(
+                    request
+                    .max_overlap_between_sets
+                ),
+            )
         )
 
-        practical = self.candidate.select_practical_sets(
-            ranking,
-            config=practical_config,
-            previous_numbers=request.previous_numbers,
+        practical = (
+            self.candidate
+            .select_practical_sets(
+                ranking,
+                config=practical_config,
+                previous_numbers=(
+                    request.previous_numbers
+                ),
+            )
         )
 
         return PredictionResult(
             generation=generation,
-            scored_candidates=scored,
+            scored_candidates=tuple(
+                effective_scored
+            ),
             ranking=ranking,
             diversity=diversity,
             practical=practical,
-            generated_at_kst=datetime.now(_KST),
+            generated_at_kst=(
+                datetime.now(_KST)
+            ),
+            ensemble=ensemble_result,
         )
 
     def run(
@@ -302,7 +482,8 @@ class PredictionPipeline:
         return RuntimeContext.create(
             seed=request.seed,
             execution_id=(
-                f"lrp-prediction-round-{request.round_no}"
+                "lrp-prediction-round-"
+                f"{request.round_no}"
             ),
             parameters=request.to_dict(),
         )

@@ -1,0 +1,7 @@
+{
+  "error": "script regression test failed: tests/test_prediction_orchestrator.py (exit code 1)",
+  "error_type": "RuntimeError",
+  "generated_at_utc": "2026-07-24T17:36:04Z",
+  "mode": "full",
+  "success": false
+}

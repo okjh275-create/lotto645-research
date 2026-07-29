@@ -1,0 +1,378 @@
+{
+  "file_count": 74,
+  "files": [
+    {
+      "path": "build.ps1",
+      "sha256": "e83bf3e7d642eed912d8fc3b408619fdb9b60e682e9e7c38a913e2d62b3830a0",
+      "size": 539
+    },
+    {
+      "path": "lrp/__init__.py",
+      "sha256": "487401016041f41bbef47fb25364f97f34fe1381d1dd009b9d8fbf30cf2e8702",
+      "size": 801
+    },
+    {
+      "path": "lrp/__main__.py",
+      "sha256": "58f6b60a999794baaeca41acb80f32754895456b7d5fed621aadc1390b83ffcb",
+      "size": 176
+    },
+    {
+      "path": "lrp/adapters/__init__.py",
+      "sha256": "80a71669b2f841b8b8c6981671ff2ff0a684a95400425aa6e4c2b5702ce115ac",
+      "size": 482
+    },
+    {
+      "path": "lrp/adapters/candidate.py",
+      "sha256": "b68242f4a3b3261221b4e00506ba8c676a2eefd7d3aa69c43a8ae1efec37abf9",
+      "size": 2955
+    },
+    {
+      "path": "lrp/adapters/foundation.py",
+      "sha256": "3c64c5d21504ae5a898adc90466017cd28dd98bf0d617295fbf42797a2237552",
+      "size": 3618
+    },
+    {
+      "path": "lrp/adapters/signal_bridge.py",
+      "sha256": "a86102b22e05eb998b3a6eba1634af89acba51b2e54477def15d4acef95a27f2",
+      "size": 9843
+    },
+    {
+      "path": "lrp/adapters/statistics.py",
+      "sha256": "be2ab435cd0223a72a241497007808a6f7f7b5dafbed1d715526170437d13ea7",
+      "size": 4399
+    },
+    {
+      "path": "lrp/cli/__init__.py",
+      "sha256": "cd2cf1644e7c18aaf46bc7f168afc946d3caf820d80ffa3591919db33769011a",
+      "size": 2027
+    },
+    {
+      "path": "lrp/cli/backup.py",
+      "sha256": "4a2ff748c967f95a1e988a27332b650800f078bfe2f30093e45ee2b7292d3810",
+      "size": 684
+    },
+    {
+      "path": "lrp/cli/doctor.py",
+      "sha256": "611ec4f3aad98201c48ac0c3d88cbe496720770e65759c1a1b58c75c894eae7f",
+      "size": 928
+    },
+    {
+      "path": "lrp/cli/predict.py",
+      "sha256": "7966c18ca48ab4004e5d96b4826da6517b0cce584bf902c10aaa44ab9e9c8a68",
+      "size": 5738
+    },
+    {
+      "path": "lrp/cli/restore.py",
+      "sha256": "13db6a153ffef8d92db15c402fc8f82ee20a65bbbfef58dc8dee2c4095aef250",
+      "size": 950
+    },
+    {
+      "path": "lrp/cli/review.py",
+      "sha256": "74395a271cfb552ddd9de2498eca76e73e2884855d68873b0fbb54eeacf76778",
+      "size": 1399
+    },
+    {
+      "path": "lrp/cli/status.py",
+      "sha256": "a24cef6089a5317917198c22c2c6c862e02e9e663b0ec2ac67ac91d1a916e22d",
+      "size": 1171
+    },
+    {
+      "path": "lrp/cli/verify.py",
+      "sha256": "a342e15960b6a898474786eb136d288c00f93d8ec0c9c5e9d6a41733360480bc",
+      "size": 546
+    },
+    {
+      "path": "lrp/cli/weekly.py",
+      "sha256": "59d25af2014074123ebe5020a973979ed85733c0e7fb884d6121d52a79d0e5b0",
+      "size": 2565
+    },
+    {
+      "path": "lrp/contracts/__init__.py",
+      "sha256": "8fcadb4f8d07dd28d0c97c132f298441d3bfe49bb81efd72b78eda2c9561ce0f",
+      "size": 796
+    },
+    {
+      "path": "lrp/contracts/component.py",
+      "sha256": "4daf13b34f438188450bc3ea5174197cd0d3a3c0424c62145e75ba9771252047",
+      "size": 5016
+    },
+    {
+      "path": "lrp/contracts/exceptions.py",
+      "sha256": "f04ab471aac4e4ab88f8587b786763babdfbc9fdc43a23d0390548f63a7d515e",
+      "size": 777
+    },
+    {
+      "path": "lrp/contracts/versions.py",
+      "sha256": "c2f563aad4eafcbc066826119209879531325574d53803d49b984ac1cc24bf20",
+      "size": 6582
+    },
+    {
+      "path": "lrp/core/__init__.py",
+      "sha256": "efec40a43310af112878cbfd17c0438e5f0193b501a98a607164039958f773a7",
+      "size": 743
+    },
+    {
+      "path": "lrp/core/assembly.py",
+      "sha256": "9326a5ecff237b521d43f108bc23c8d0c9b7d3d4f4c7bc101bdf29aa7539e492",
+      "size": 10782
+    },
+    {
+      "path": "lrp/core/component_catalog.py",
+      "sha256": "bd6f694bc8dd2e9ac509e3bb9bd650cfec12bfa5888c0b55c8e7ffb027903b5d",
+      "size": 6071
+    },
+    {
+      "path": "lrp/core/runtime.py",
+      "sha256": "1eb3ca0f5264f94249b8521cdaf34a783cbfe5d08dde57a2332995718729d0b5",
+      "size": 4783
+    },
+    {
+      "path": "lrp/io/__init__.py",
+      "sha256": "bc2b72c86a37110b36dae8fb10a68d6b618a572459dea0539838b297c2d486e2",
+      "size": 615
+    },
+    {
+      "path": "lrp/io/artifacts.py",
+      "sha256": "40f6e96009a9af3b1f8891d58627e297b80605f3ce5dda720a4479aaaa7b69f5",
+      "size": 2846
+    },
+    {
+      "path": "lrp/io/draws.py",
+      "sha256": "545bc75c7d4661dd9ed724f1abcd5565e1e57cc19fbfa71459259574d81894e6",
+      "size": 8441
+    },
+    {
+      "path": "lrp/learning/__init__.py",
+      "sha256": "d5474e186f262fd093dbb0bd10e38e47a427dd675daca9cd76a50565fda77573",
+      "size": 1603
+    },
+    {
+      "path": "lrp/learning/adaptive_engine.py",
+      "sha256": "d192308672f69eeb7918b44ed99a528e2801eaca0cdc61adaceac449e5eafd03",
+      "size": 4883
+    },
+    {
+      "path": "lrp/learning/adaptive_models.py",
+      "sha256": "2a6e9395797e64e22fbf4f05f4fd1b461e2bf51336fbea615ffc29c31b181474",
+      "size": 2837
+    },
+    {
+      "path": "lrp/learning/adaptive_repository.py",
+      "sha256": "0b595a426eb6e81a04abb6f8ec307d676b6b6e961c64495f15636677ebd9e5ec",
+      "size": 3988
+    },
+    {
+      "path": "lrp/learning/aggregator.py",
+      "sha256": "a0d4e4e1767b88e7d1c2c0b018d57a960237165a628dd2dcd3086568d51c6555",
+      "size": 2817
+    },
+    {
+      "path": "lrp/learning/evaluator.py",
+      "sha256": "fe3dba7ad92c2f2831156431d849ee94b2236ab9afb71436d45a65af3ed33a1e",
+      "size": 2232
+    },
+    {
+      "path": "lrp/learning/learning_facade.py",
+      "sha256": "4222c4beda87c07e88c1095619d0d564ba17b6715145a8606b42ffe665130534",
+      "size": 2230
+    },
+    {
+      "path": "lrp/learning/models.py",
+      "sha256": "823b579720b1027ce9959f50b0332bb1f8d7d57324cd57cd7e706593a473c9c0",
+      "size": 5036
+    },
+    {
+      "path": "lrp/learning/ranking.py",
+      "sha256": "45198a9f46e52e4eb54c4d4b4cfd4a0699cb038f6dcc892b877466a739f571f4",
+      "size": 11310
+    },
+    {
+      "path": "lrp/learning/ranking_repository.py",
+      "sha256": "e2ef5c1c38c3dbaa1978fb0cb1cac4b40b91bb46fd7a58d425282b2e54b3c434",
+      "size": 7836
+    },
+    {
+      "path": "lrp/learning/ranking_repository.py.rc1_backup",
+      "sha256": "3d3d6c9203eb2c713c629c9c76df2cdf86d531a4c01e51f850da55a33753fcf0",
+      "size": 7398
+    },
+    {
+      "path": "lrp/learning/repository.py",
+      "sha256": "e01b9b8a222ad0805586afb2acb76083a0cd5a1111641247e3a09712bcd5f131",
+      "size": 21790
+    },
+    {
+      "path": "lrp/learning/service.py",
+      "sha256": "19b984dc2415dc8072ba7d52586b23a4916578a0ffc5945acfc29c6eca40c10a",
+      "size": 4820
+    },
+    {
+      "path": "lrp/learning/strategy_stats.py",
+      "sha256": "587019d8e5f650a1a4d2c9a993969e987f81f0b60bdb4fc436991f96dc3cc314",
+      "size": 2268
+    },
+    {
+      "path": "lrp/management/__init__.py",
+      "sha256": "db40e4806b065fcbd1ddf411a4256af71300ea1683367d3b5ca55f9fa90fe781",
+      "size": 198
+    },
+    {
+      "path": "lrp/management/doctor.py",
+      "sha256": "4cc8ceed5c3fbbe9dee092969760bb3286aad8f334ab2228ab53dd1ca4c39a0e",
+      "size": 3065
+    },
+    {
+      "path": "lrp/management/status.py",
+      "sha256": "9f8d46832a7c7bc726d4f72051ac7976f82e7af760c684942b2457c7c1a65e12",
+      "size": 3059
+    },
+    {
+      "path": "lrp/operations/__init__.py",
+      "sha256": "a97b11c30aa64931f9d3ecb3cac4b32beb64a66e3eca363a8ce20b96739da5bc",
+      "size": 509
+    },
+    {
+      "path": "lrp/operations/review.py",
+      "sha256": "056955f280cdb2ad4f84249b6463824c70aabad544da1fc511d8407fe3bf8b71",
+      "size": 4059
+    },
+    {
+      "path": "lrp/operations/runtime.py",
+      "sha256": "38b8a7de84b12983cdca74b893c4dfd31d74f8cdcc62ba0e6eb367825c530bb3",
+      "size": 6839
+    },
+    {
+      "path": "lrp/pipelines/__init__.py",
+      "sha256": "1082a56809238626bd58b3eb597aad10362f20cc01b8dcef6067ba2a8e616f5e",
+      "size": 542
+    },
+    {
+      "path": "lrp/pipelines/models.py",
+      "sha256": "8db4d68db5d644617fe576868958807ef618abd7c1a543e17abeefc14cfa71bf",
+      "size": 8070
+    },
+    {
+      "path": "lrp/pipelines/prediction.py",
+      "sha256": "40a5537aba3bf9d18dcfc12865adb50c354acf1b48b77f0d037db5e0f2d23ff1",
+      "size": 8667
+    },
+    {
+      "path": "lrp/pipelines/probability.py",
+      "sha256": "2ec89ce39ca3b6df42089f05c168568d20fe77ce735893d01f55604ff50003d5",
+      "size": 4078
+    },
+    {
+      "path": "lrp/pipelines/serializer.py",
+      "sha256": "67eaa13cdd3dd4815064a1d3b34ef40da8474c3d9214c3214c6992c70306b3fe",
+      "size": 8118
+    },
+    {
+      "path": "lrp/pipelines/serializer.py.bak",
+      "sha256": "42218b715204eac4e0028816f78e14bd821a20be61d8934aa261f2f2b32f3e01",
+      "size": 8074
+    },
+    {
+      "path": "README.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "981972c1431ebb1de44d6a691cf5cf9c66deaa177f6ea02fdc9dd512ba09f4b1",
+      "size": 31
+    },
+    {
+      "path": "tests/test_candidate.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "tests/test_m3_application.py",
+      "sha256": "6ea82fb2ae80ad6f368a78689066c5263b549eb4edff0ffbcb1d5ee1394fdf0e",
+      "size": 3368
+    },
+    {
+      "path": "tests/test_m4_operations.py",
+      "sha256": "93784fbcfcc5693e15eda2160a9fc253c4ba7d2106c819b1a449bedcaab0c43d",
+      "size": 2277
+    },
+    {
+      "path": "tests/test_m59_doctor.py",
+      "sha256": "4ace567ecc4c72436c0d09083e02443e1a45ba66e03c0295293b53f66d39bd09",
+      "size": 1014
+    },
+    {
+      "path": "tests/test_m59_status.py",
+      "sha256": "1cd7633b4d02e413b82f283e4a3eb5815819d1b50c0fbf3a6533bbc98f74ac2f",
+      "size": 1724
+    },
+    {
+      "path": "tests/test_m6_adaptive_weight.py",
+      "sha256": "f85a73967d5918c266e3f59be4c83e07b7212b8ddaa814dc3cbcce9adb17ff83",
+      "size": 3733
+    },
+    {
+      "path": "tests/test_m6_automatic_review.py",
+      "sha256": "4d505f4feaa2ef565f7bd1973b3995cbc825c4024899ee053faba5019a903dfc",
+      "size": 4142
+    },
+    {
+      "path": "tests/test_m6_build_runner.py",
+      "sha256": "1ff1e19e5b517f1c4025ea3b658467f351c28b5071b1d79344e5f4c9d87c1adc",
+      "size": 1162
+    },
+    {
+      "path": "tests/test_m6_learning_foundation.py",
+      "sha256": "47718f0e0ca17256e0eaef0689d5c5cde80b833738f5dd639fdc823c86ca3faa",
+      "size": 2469
+    },
+    {
+      "path": "tests/test_m6_strategy_ranking.py",
+      "sha256": "724eefb581c4d6fdfc37b37f8af356ff575e8e573f278eb07012d0e42bb04f59",
+      "size": 6799
+    },
+    {
+      "path": "tests/test_m6_strategy_statistics.py",
+      "sha256": "3faa47d972f8350c27ee299ade8aa4d96d355e2414cbd0c1f4f8100eb078d598",
+      "size": 9159
+    },
+    {
+      "path": "tests/test_prediction_orchestrator.py",
+      "sha256": "45300d0b49ce49711ec3d8d6031c3934bdbf73b5f103a9fb64aee9d41d1b4965",
+      "size": 3098
+    },
+    {
+      "path": "tests/test_score.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "tools/build_runner.py",
+      "sha256": "1f1659d9412ceeb81e3bd27e3b68a9bab2980b725861c215d78644616810e1e7",
+      "size": 2628
+    },
+    {
+      "path": "tools/dev_check.py",
+      "sha256": "e0a4aa27be22d4cdb2b691399bf917a3779525a846b39dcd54b1a9e16cdf73f4",
+      "size": 3075
+    },
+    {
+      "path": "tools/lrp_build.py",
+      "sha256": "6d16930012a4b54157b082a272f868f1961e529e46a3668914db9869b3b83ecf",
+      "size": 8019
+    },
+    {
+      "path": "tools/lrp_build.py.m6-005-rc1.bak",
+      "sha256": "c1fed3806d292f2d3e01c9c3611d35de1b7e34203747e3857b9839af838ac5e2",
+      "size": 13779
+    },
+    {
+      "path": "tools/lrp_contract_probe.py",
+      "sha256": "e1807a3bb10795e4e4e9b29f837c09e7c4fa3c0221c362ac9d65ac45084155a8",
+      "size": 6453
+    }
+  ],
+  "generated_at_utc": "2026-07-24T18:18:29Z",
+  "python_version": "3.13.5",
+  "schema_version": 1
+}

@@ -1,0 +1,59 @@
+--- a/lrp/learning/adaptive_report.py
++++ b/lrp/learning/adaptive_report.py
+@@ -260,6 +260,16 @@
+         )
+ 
+     @property
++    def normalized_total(self) -> float:
++        return round(
++            sum(
++                item.normalized_weight
++                for item in self.summaries
++            ),
++            6,
++        )
++
++    @property
+     def average_current_weight(self) -> float:
+         if not self.summaries:
+             return 0.0
+@@ -343,6 +353,7 @@
+             "raised_count": self.raised_count,
+             "lowered_count": self.lowered_count,
+             "unchanged_count": self.unchanged_count,
++            "normalized_total": self.normalized_total,
+             "average_current_weight": round(
+                 self.average_current_weight,
+                 6,
+@@ -455,6 +466,19 @@
+                 ),
+             )
+         )
++
++        if summaries:
++            normalized_total = round(
++                sum(
++                    item.normalized_weight
++                    for item in summaries
++                ),
++                6,
++            )
++            if abs(normalized_total - 1.0) > 1e-6:
++                raise ValueError(
++                    "normalized weights must sum to 1.0"
++                )
+ 
+         return AdaptiveWeightReport(
+             revision=revision,
+@@ -480,7 +504,10 @@
+         self,
+         weight: AdaptiveWeight,
+     ) -> AdaptiveWeightExplanation:
+-        delta = weight.current_weight - weight.previous_weight
++        delta = round(
++            weight.current_weight - weight.previous_weight,
++            6,
++        )
+         if abs(delta) <= self.unchanged_tolerance:
+             direction = "UNCHANGED"
+         elif delta > 0.0:

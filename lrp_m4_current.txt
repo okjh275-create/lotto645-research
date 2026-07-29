@@ -1,0 +1,2493 @@
+﻿=== GIT STATUS ===
+ M cli/experiment.py
+ M cli/replay.py
+ M config/settings.json
+ M engine/candidate.py
+ M engine/config.py
+ M engine/experiment.py
+ M engine/feature.py
+ M engine/generator.py
+ M engine/pair.py
+ M engine/predictor.py
+ M engine/ranking.py
+ M engine/replay.py
+ M engine/score.py
+ M engine/statistics.py
+?? SHA256SUMS.txt
+?? backups/
+?? build.ps1
+?? build/
+?? cli/backtest.py
+?? cli/ranking.py
+?? engine/backtest.py
+?? engine/benchmark.py
+?? logs/
+?? lrp/
+?? lrp_m4_current.txt
+?? tests/test_m3_application.py
+?? tests/test_m4_operations.py
+?? tests/test_prediction_orchestrator.py
+?? tools/
+
+=== PYTHON VERSION ===
+Python 3.13.5
+
+=== FILE TREE ===
+lrp\__init__.py
+lrp\__main__.py
+lrp\adapters\__init__.py
+lrp\adapters\candidate.py
+lrp\adapters\foundation.py
+lrp\adapters\signal_bridge.py
+lrp\adapters\statistics.py
+lrp\cli\__init__.py
+lrp\cli\backup.py
+lrp\cli\predict.py
+lrp\cli\restore.py
+lrp\cli\review.py
+lrp\cli\verify.py
+lrp\cli\weekly.py
+lrp\contracts\__init__.py
+lrp\contracts\component.py
+lrp\contracts\exceptions.py
+lrp\contracts\versions.py
+lrp\core\__init__.py
+lrp\core\assembly.py
+lrp\core\component_catalog.py
+lrp\core\runtime.py
+lrp\io\__init__.py
+lrp\io\artifacts.py
+lrp\io\draws.py
+lrp\operations\__init__.py
+lrp\operations\review.py
+lrp\operations\runtime.py
+lrp\pipelines\__init__.py
+lrp\pipelines\models.py
+lrp\pipelines\prediction.py
+lrp\pipelines\probability.py
+lrp\pipelines\serializer.py
+tools\lrp_build.py
+tools\lrp_contract_probe.py
+tests\test_candidate.py
+tests\test_m3_application.py
+tests\test_m4_operations.py
+tests\test_prediction_orchestrator.py
+tests\test_score.py
+config.yaml
+
+=== IMPORTANT FILE CONTENTS ===
+
+============================================================
+FILE: lrp\__init__.py
+============================================================
+"""Public package boundary for Lotto645 Research Platform.
+
+Project A is the orchestration and application layer of the Lotto645
+Research Platform. Statistical calculations and candidate generation
+remain delegated to independently versioned components through adapters.
+"""
+
+from __future__ import annotations
+
+PROJECT_NAME = "Lotto645 Research Platform"
+PROJECT_ROLE = "Project A"
+PLATFORM_VERSION = (4, 0, 0)
+__version__ = ".".join(str(part) for part in PLATFORM_VERSION)
+
+FOUNDATION_REQUIRED_VERSION = "1.0.0"
+STATISTICS_REQUIRED_API_VERSION = "1.0"
+CANDIDATE_REQUIRED_VERSION = "0.8.0"
+
+__all__ = [
+    "CANDIDATE_REQUIRED_VERSION",
+    "FOUNDATION_REQUIRED_VERSION",
+    "PLATFORM_VERSION",
+    "PROJECT_NAME",
+    "PROJECT_ROLE",
+    "STATISTICS_REQUIRED_API_VERSION",
+    "__version__",
+]
+
+
+============================================================
+FILE: lrp\__main__.py
+============================================================
+"""Executable entry point for ``python -m lrp``."""
+
+from __future__ import annotations
+
+from lrp.cli import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+============================================================
+FILE: lrp\cli\__init__.py
+============================================================
+"""LRP command-line dispatcher."""
+
+from __future__ import annotations
+
+import argparse
+from typing import Sequence
+
+from .backup import main as backup_main
+from .predict import main as predict_main
+from .restore import main as restore_main
+from .review import main as review_main
+from .verify import main as verify_main
+from .weekly import main as weekly_main
+
+_COMMANDS = {
+    "predict": predict_main,
+    "weekly": weekly_main,
+    "review": review_main,
+    "verify": verify_main,
+    "backup": backup_main,
+    "restore": restore_main,
+}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m lrp",
+        description="Lotto645 Research Platform",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+    for name, help_text in (
+        ("predict", "Generate prediction artifacts"),
+        ("weekly", "Run the weekly prediction workflow"),
+        ("review", "Review a saved prediction"),
+        ("verify", "Verify an artifact manifest"),
+        ("backup", "Create a repository ZIP backup"),
+        ("restore", "Restore a repository ZIP backup"),
+    ):
+        subparsers.add_parser(name, help=help_text, add_help=False)
+    namespace, remaining = parser.parse_known_args(argv)
+    command = _COMMANDS.get(namespace.command)
+    if command is None:
+        parser.print_help()
+        return 0
+    return command(remaining)
+
+
+============================================================
+FILE: lrp\cli\main.py
+============================================================
+[MISSING]
+
+============================================================
+FILE: lrp\pipelines\__init__.py
+============================================================
+"""Prediction pipelines for Lotto645 Research Platform."""
+
+from .models import (
+    PredictionGenerationResult,
+    PredictionRequest,
+    PredictionResult,
+)
+from .prediction import PredictionPipeline
+from .probability import build_probability_vector
+from .serializer import (
+    prediction_to_dict,
+    prediction_to_json,
+)
+
+__all__ = [
+    "PredictionGenerationResult",
+    "PredictionPipeline",
+    "PredictionRequest",
+    "PredictionResult",
+    "build_probability_vector",
+    "prediction_to_dict",
+    "prediction_to_json",
+]
+
+
+============================================================
+FILE: lrp\pipelines\models.py
+============================================================
+"""Public request and result models for the prediction pipeline."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+import math
+from typing import Any, Mapping, Sequence
+
+from lrp.contracts import ContractError
+
+
+_DEFAULT_WEIGHTS = {
+    "recency": 0.35,
+    "frequency": 0.20,
+    "gap_reversion": 0.15,
+    "pair_graph": 0.10,
+    "terminal_dispersion": 0.08,
+    "sum_band": 0.07,
+    "parity_balance": 0.05,
+}
+
+
+def _normalize_numbers(
+    values: Sequence[int] | frozenset[int],
+    *,
+    field_name: str,
+) -> frozenset[int]:
+    try:
+        normalized = frozenset(int(value) for value in values)
+    except (TypeError, ValueError) as exc:
+        raise ContractError(
+            f"{field_name} must contain integers"
+        ) from exc
+
+    invalid = tuple(
+        sorted(
+            number
+            for number in normalized
+            if not 1 <= number <= 45
+        )
+    )
+    if invalid:
+        raise ContractError(
+            f"{field_name} contains invalid lotto numbers: {invalid}"
+        )
+
+    return normalized
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionRequest:
+    """Immutable Project A prediction request."""
+
+    round_no: int
+    seed: int
+    temperature: float = 0.85
+    candidate_count: int = 10_000
+    max_attempts_multiplier: int = 50
+    top_k: int = 10
+    practical_k: int = 5
+
+    previous_numbers: frozenset[int] = field(
+        default_factory=frozenset
+    )
+    long_gap_numbers: frozenset[int] = field(
+        default_factory=frozenset
+    )
+
+    weights: Mapping[str, float] = field(
+        default_factory=lambda: dict(_DEFAULT_WEIGHTS)
+    )
+
+    sum_min: int = 90
+    sum_max: int = 200
+    preferred_sum_min: int = 110
+    preferred_sum_max: int = 180
+
+    jaccard_max: float = 0.33
+    max_overlap_between_sets: int = 3
+    mmr_lambda: float = 0.75
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.round_no, bool)
+            or not isinstance(self.round_no, int)
+            or self.round_no <= 0
+        ):
+            raise ContractError(
+                "round_no must be a positive integer"
+            )
+
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise ContractError("seed must be an integer")
+
+        if (
+            isinstance(self.temperature, bool)
+            or not isinstance(self.temperature, (int, float))
+            or not math.isfinite(float(self.temperature))
+            or self.temperature <= 0.0
+        ):
+            raise ContractError(
+                "temperature must be a finite positive number"
+            )
+
+        for name, value in (
+            ("candidate_count", self.candidate_count),
+            (
+                "max_attempts_multiplier",
+                self.max_attempts_multiplier,
+            ),
+            ("top_k", self.top_k),
+            ("practical_k", self.practical_k),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+            ):
+                raise ContractError(
+                    f"{name} must be a positive integer"
+                )
+
+        if self.practical_k > self.top_k:
+            raise ContractError(
+                "practical_k must not exceed top_k"
+            )
+
+        previous = _normalize_numbers(
+            self.previous_numbers,
+            field_name="previous_numbers",
+        )
+        if previous and len(previous) != 6:
+            raise ContractError(
+                "previous_numbers must contain exactly six numbers"
+            )
+
+        long_gap = _normalize_numbers(
+            self.long_gap_numbers,
+            field_name="long_gap_numbers",
+        )
+
+        if not long_gap:
+            raise ContractError(
+                "long_gap_numbers must contain at least one number"
+            )
+
+        if not isinstance(self.weights, Mapping):
+            raise ContractError("weights must be a mapping")
+
+        missing = tuple(
+            name
+            for name in _DEFAULT_WEIGHTS
+            if name not in self.weights
+        )
+        if missing:
+            raise ContractError(
+                f"weights are missing fields: {missing}"
+            )
+
+        normalized_weights: dict[str, float] = {}
+
+        for name in _DEFAULT_WEIGHTS:
+            value = self.weights[name]
+
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) < 0.0
+            ):
+                raise ContractError(
+                    f"weight {name} must be finite and non-negative"
+                )
+
+            normalized_weights[name] = float(value)
+
+        if sum(normalized_weights.values()) <= 0.0:
+            raise ContractError(
+                "at least one weight must be positive"
+            )
+
+        if self.sum_min > self.sum_max:
+            raise ContractError(
+                "sum_min must not exceed sum_max"
+            )
+
+        if self.preferred_sum_min > self.preferred_sum_max:
+            raise ContractError(
+                "preferred_sum_min must not exceed preferred_sum_max"
+            )
+
+        if not 0.0 <= float(self.jaccard_max) <= 1.0:
+            raise ContractError(
+                "jaccard_max must be between 0 and 1"
+            )
+
+        if not 0.0 <= float(self.mmr_lambda) <= 1.0:
+            raise ContractError(
+                "mmr_lambda must be between 0 and 1"
+            )
+
+        object.__setattr__(
+            self,
+            "temperature",
+            float(self.temperature),
+        )
+        object.__setattr__(
+            self,
+            "previous_numbers",
+            previous,
+        )
+        object.__setattr__(
+            self,
+            "long_gap_numbers",
+            long_gap,
+        )
+        object.__setattr__(
+            self,
+            "weights",
+            normalized_weights,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "round_no": self.round_no,
+            "seed": self.seed,
+            "temperature": self.temperature,
+            "candidate_count": self.candidate_count,
+            "max_attempts_multiplier": (
+                self.max_attempts_multiplier
+            ),
+            "top_k": self.top_k,
+            "practical_k": self.practical_k,
+            "previous_numbers": sorted(self.previous_numbers),
+            "long_gap_numbers": sorted(self.long_gap_numbers),
+            "weights": dict(self.weights),
+            "sum_min": self.sum_min,
+            "sum_max": self.sum_max,
+            "preferred_sum_min": self.preferred_sum_min,
+            "preferred_sum_max": self.preferred_sum_max,
+            "jaccard_max": self.jaccard_max,
+            "max_overlap_between_sets": (
+                self.max_overlap_between_sets
+            ),
+            "mmr_lambda": self.mmr_lambda,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionGenerationResult:
+    """Output of candidate generation."""
+
+    request: PredictionRequest
+    windows: tuple[int, int, int]
+    probabilities: Mapping[int, float]
+    statistics_contract: object
+    number_signals: Mapping[int, object]
+    candidates: tuple[object, ...]
+    statistics_version: str
+    candidate_version: str
+
+    @property
+    def generated_count(self) -> int:
+        return len(self.candidates)
+
+    @property
+    def complete(self) -> bool:
+        return self.generated_count >= self.request.candidate_count
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionResult:
+    """Complete Project A prediction output."""
+
+    generation: PredictionGenerationResult
+    scored_candidates: tuple[object, ...]
+    ranking: object
+    diversity: object
+    practical: object
+    generated_at_kst: datetime
+
+    @property
+    def request(self) -> PredictionRequest:
+        return self.generation.request
+
+    @property
+    def generated_count(self) -> int:
+        return self.generation.generated_count
+
+
+============================================================
+FILE: lrp\pipelines\prediction.py
+============================================================
+"""Project A complete prediction pipeline."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Iterable, Mapping
+from zoneinfo import ZoneInfo
+
+from lrp.adapters import (
+    CandidateAdapter,
+    StatisticsAdapter,
+    build_statistics_signals,
+)
+from lrp.contracts import CompatibilityError, ContractError
+from lrp.core import RuntimeContext
+
+from .models import (
+    PredictionGenerationResult,
+    PredictionRequest,
+    PredictionResult,
+)
+from .probability import build_probability_vector
+
+
+_KST = ZoneInfo("Asia/Seoul")
+
+
+def _analysis_snapshot(report: object) -> object:
+    snapshot = getattr(report, "snapshot", None)
+    if snapshot is not None:
+        return snapshot
+
+    statistics = getattr(report, "statistics", None)
+    if statistics is not None:
+        return statistics
+
+    required = (
+        "windows",
+        "numbers",
+        "relationships",
+    )
+    if all(hasattr(report, name) for name in required):
+        return report
+
+    raise ContractError(
+        "Project C analysis output does not expose a stable snapshot"
+    )
+
+
+def _pair_affinities(
+    snapshot: object,
+) -> Mapping[tuple[int, int], float]:
+    relationships = getattr(snapshot, "relationships", None)
+    if relationships is None:
+        return {}
+
+    graph = getattr(relationships, "affinity_graph", None)
+    if graph is None:
+        return {}
+
+    values = getattr(graph, "pair_affinity", None)
+    if not isinstance(values, Mapping):
+        return {}
+
+    normalized: dict[tuple[int, int], float] = {}
+
+    for key, value in values.items():
+        if (
+            isinstance(key, tuple)
+            and len(key) == 2
+        ):
+            try:
+                left = int(key[0])
+                right = int(key[1])
+                score = float(value)
+            except (TypeError, ValueError):
+                continue
+
+            normalized[(left, right)] = score
+
+    return normalized
+
+
+@dataclass(slots=True)
+class PredictionPipeline:
+    """Orchestrate Project C analysis and Project D prediction."""
+
+    statistics: StatisticsAdapter
+    candidate: CandidateAdapter
+
+    @classmethod
+    def load(cls) -> "PredictionPipeline":
+        return cls(
+            statistics=StatisticsAdapter.load(),
+            candidate=CandidateAdapter.load(),
+        )
+
+    def analyze(
+        self,
+        draws: Iterable[object],
+        *,
+        analysis_config: object | None = None,
+    ) -> object:
+        return self.statistics.analyze_all(
+            draws,
+            config=analysis_config,
+        )
+
+    def generate_from_snapshot(
+        self,
+        snapshot: object,
+        request: PredictionRequest,
+    ) -> PredictionGenerationResult:
+        if not isinstance(request, PredictionRequest):
+            raise ContractError(
+                "request must be a PredictionRequest"
+            )
+
+        bridge = build_statistics_signals(snapshot)
+        statistics_payload = bridge.to_dict()
+
+        contract_report = self.candidate.validate_statistics(
+            statistics_payload
+        )
+
+        if not bool(
+            getattr(contract_report, "compatible", False)
+        ):
+            reasons = getattr(contract_report, "reasons", ())
+            raise CompatibilityError(
+                "Project C to D statistics contract failed: "
+                + ", ".join(str(reason) for reason in reasons)
+            )
+
+        number_signals = self.candidate.number_signals(
+            statistics_payload
+        )
+
+        probabilities = build_probability_vector(
+            number_signals,
+            weights=request.weights,
+        )
+
+        module = self.candidate.module
+
+        candidate_config = module.CandidateConfig(
+            seed=request.seed,
+            temperature=request.temperature,
+            candidate_count=request.candidate_count,
+            max_attempts_multiplier=(
+                request.max_attempts_multiplier
+            ),
+        )
+
+        risk_config = module.RiskFilterConfig(
+            sum_min=request.sum_min,
+            sum_max=request.sum_max,
+            min_odd=2,
+            max_odd=4,
+            low_high_min_each=1,
+            max_consecutive_run=2,
+            max_same_ending=2,
+            max_overlap_previous=1,
+            min_long_gap_inclusion=1,
+            max_same_decade=3,
+        )
+
+        candidates = self.candidate.generate_candidates(
+            probabilities,
+            candidate_config=candidate_config,
+            risk_config=risk_config,
+            previous_numbers=request.previous_numbers,
+            long_gap_numbers=request.long_gap_numbers,
+        )
+
+        return PredictionGenerationResult(
+            request=request,
+            windows=bridge.windows,
+            probabilities=probabilities,
+            statistics_contract=contract_report,
+            number_signals=number_signals,
+            candidates=tuple(candidates),
+            statistics_version=self.statistics.version,
+            candidate_version=self.candidate.version,
+        )
+
+    def complete_from_snapshot(
+        self,
+        snapshot: object,
+        request: PredictionRequest,
+    ) -> PredictionResult:
+        generation = self.generate_from_snapshot(
+            snapshot,
+            request,
+        )
+
+        module = self.candidate.module
+
+        score_weights = module.ScoreWeights(
+            recency=request.weights["recency"],
+            frequency=request.weights["frequency"],
+            gap_reversion=request.weights["gap_reversion"],
+            pair_graph=request.weights["pair_graph"],
+            terminal_dispersion=(
+                request.weights["terminal_dispersion"]
+            ),
+            sum_band=request.weights["sum_band"],
+            parity_balance=request.weights["parity_balance"],
+        )
+
+        scored = self.candidate.score_candidates(
+            generation.candidates,
+            signals=generation.number_signals,
+            weights=score_weights,
+            pair_affinities=_pair_affinities(snapshot),
+            sum_band_center=145.0,
+            sum_band_scale=35.0,
+        )
+        scored = tuple(scored)
+
+        if not scored:
+            raise ContractError(
+                "Project D produced no scored candidates"
+            )
+
+        ranking_config = module.RankingConfig(
+            score_weight=0.70,
+            robustness_weight=0.15,
+            diversity_weight=0.15,
+            pareto_penalty=0.05,
+        )
+
+        ranking = self.candidate.rank_candidates(
+            scored,
+            config=ranking_config,
+        )
+
+        diversity_config = module.DiversityConfig(
+            k=request.top_k,
+            mmr_lambda=request.mmr_lambda,
+            jaccard_max=request.jaccard_max,
+            max_overlap_between_sets=(
+                request.max_overlap_between_sets
+            ),
+        )
+
+        diversity = self.candidate.select_diverse_candidates(
+            scored,
+            config=diversity_config,
+        )
+
+        practical_config = module.PracticalSelectionConfig(
+            k=request.practical_k,
+            preferred_sum_min=request.preferred_sum_min,
+            preferred_sum_max=request.preferred_sum_max,
+            max_overlap_previous_draw=1,
+            require_no_risk_flags=True,
+            jaccard_max=request.jaccard_max,
+            max_overlap_between_sets=(
+                request.max_overlap_between_sets
+            ),
+        )
+
+        practical = self.candidate.select_practical_sets(
+            ranking,
+            config=practical_config,
+            previous_numbers=request.previous_numbers,
+        )
+
+        return PredictionResult(
+            generation=generation,
+            scored_candidates=scored,
+            ranking=ranking,
+            diversity=diversity,
+            practical=practical,
+            generated_at_kst=datetime.now(_KST),
+        )
+
+    def run(
+        self,
+        draws: Iterable[object],
+        request: PredictionRequest,
+        *,
+        analysis_config: object | None = None,
+    ) -> PredictionResult:
+        report = self.analyze(
+            draws,
+            analysis_config=analysis_config,
+        )
+        snapshot = _analysis_snapshot(report)
+
+        return self.complete_from_snapshot(
+            snapshot,
+            request,
+        )
+
+    def runtime_context(
+        self,
+        request: PredictionRequest,
+    ) -> RuntimeContext:
+        return RuntimeContext.create(
+            seed=request.seed,
+            execution_id=(
+                f"lrp-prediction-round-{request.round_no}"
+            ),
+            parameters=request.to_dict(),
+        )
+
+
+============================================================
+FILE: lrp\pipelines\serializer.py
+============================================================
+"""Final prediction JSON serializer."""
+
+from __future__ import annotations
+
+from dataclasses import asdict, is_dataclass
+import json
+from typing import Any, Iterable, Mapping
+
+from lrp.contracts import ContractError
+
+from .models import PredictionResult
+
+
+def _read(value: object, *names: str) -> Any:
+    for name in names:
+        if isinstance(value, Mapping) and name in value:
+            return value[name]
+
+        if hasattr(value, name):
+            return getattr(value, name)
+
+    return None
+
+
+def _candidate_object(value: object) -> object:
+    current = value
+
+    for _ in range(5):
+        numbers = _read(current, "numbers")
+        if numbers is not None:
+            return current
+
+        nested = _read(
+            current,
+            "candidate",
+            "scored_candidate",
+            "scored",
+            "item",
+        )
+        if nested is None or nested is current:
+            break
+
+        current = nested
+
+    raise ContractError(
+        "unable to locate candidate numbers"
+    )
+
+
+def _numbers(value: object) -> tuple[int, ...]:
+    candidate = _candidate_object(value)
+    raw = _read(candidate, "numbers")
+
+    try:
+        numbers = tuple(sorted(int(number) for number in raw))
+    except (TypeError, ValueError) as exc:
+        raise ContractError(
+            "candidate numbers are invalid"
+        ) from exc
+
+    if len(numbers) != 6:
+        raise ContractError(
+            "candidate must contain six numbers"
+        )
+
+    return numbers
+
+
+def _normalized_score(value: object) -> float:
+    current = value
+
+    for _ in range(5):
+        score = _read(
+            current,
+            "normalized_score",
+            "score",
+            "ranking_score",
+            "final_score",
+        )
+        if isinstance(score, (int, float)) and not isinstance(
+            score,
+            bool,
+        ):
+            return min(1.0, max(0.0, float(score)))
+
+        nested = _read(
+            current,
+            "candidate",
+            "scored_candidate",
+            "scored",
+            "item",
+        )
+        if nested is None or nested is current:
+            break
+
+        current = nested
+
+    return 0.0
+
+
+def _consecutive_runs(
+    numbers: tuple[int, ...],
+) -> list[list[int]]:
+    runs: list[list[int]] = []
+    current: list[int] = [numbers[0]]
+
+    for previous, number in zip(numbers, numbers[1:]):
+        if number == previous + 1:
+            current.append(number)
+        else:
+            if len(current) >= 2:
+                runs.append(current)
+            current = [number]
+
+    if len(current) >= 2:
+        runs.append(current)
+
+    return runs
+
+
+def _risk_flags(value: object) -> list[str]:
+    candidate = _candidate_object(value)
+    risk = _read(candidate, "risk")
+
+    if risk is None:
+        return []
+
+    flags = _read(
+        risk,
+        "risk_flags",
+        "flags",
+        "reasons",
+        "violations",
+    )
+
+    if flags is None:
+        passed = _read(risk, "passed", "accepted", "valid")
+        return [] if passed is not False else ["risk_rejected"]
+
+    if isinstance(flags, str):
+        return [flags]
+
+    try:
+        return [str(flag) for flag in flags]
+    except TypeError:
+        return [str(flags)]
+
+
+def _features(numbers: tuple[int, ...]) -> dict[str, Any]:
+    odd = sum(number % 2 for number in numbers)
+    low = sum(number <= 22 for number in numbers)
+
+    return {
+        "sum": sum(numbers),
+        "odd_even": f"{odd}:{6 - odd}",
+        "low_high": f"{low}:{6 - low}",
+        "consecutives": _consecutive_runs(numbers),
+        "end_digits": [number % 10 for number in numbers],
+    }
+
+
+def _jaccard(
+    left: Iterable[int],
+    right: Iterable[int],
+) -> float:
+    left_set = set(left)
+    right_set = set(right)
+    union = left_set | right_set
+
+    if not union:
+        return 0.0
+
+    return len(left_set & right_set) / len(union)
+
+
+def _diversity_metrics(
+    number_sets: list[tuple[int, ...]],
+) -> dict[str, Any]:
+    similarities: list[float] = []
+
+    for index, left in enumerate(number_sets):
+        for right in number_sets[index + 1:]:
+            similarities.append(_jaccard(left, right))
+
+    average = (
+        sum(similarities) / len(similarities)
+        if similarities
+        else 0.0
+    )
+
+    unique = len(
+        {
+            number
+            for numbers in number_sets
+            for number in numbers
+        }
+    )
+
+    return {
+        "avg_jaccard": round(average, 8),
+        "unique_numbers": unique,
+    }
+
+
+def _selected_items(value: object) -> tuple[object, ...]:
+    selected = _read(value, "selected", "items", "candidates")
+
+    if selected is None:
+        return ()
+
+    return tuple(selected)
+
+
+def prediction_to_dict(
+    result: PredictionResult,
+) -> dict[str, Any]:
+    if not isinstance(result, PredictionResult):
+        raise ContractError(
+            "result must be a PredictionResult"
+        )
+
+    request = result.request
+    diversity_items = _selected_items(result.diversity)
+
+    sets: list[dict[str, Any]] = []
+    id_by_numbers: dict[tuple[int, ...], str] = {}
+
+    for index, item in enumerate(diversity_items, start=1):
+        numbers = _numbers(item)
+        set_id = f"S{index}"
+
+        id_by_numbers[numbers] = set_id
+
+        sets.append(
+            {
+                "id": set_id,
+                "numbers": list(numbers),
+                "score": round(_normalized_score(item), 8),
+                "risk_flags": _risk_flags(item),
+                "features": _features(numbers),
+            }
+        )
+
+    practical_ids: list[str] = []
+
+    for item in _selected_items(result.practical):
+        numbers = _numbers(item)
+        set_id = id_by_numbers.get(numbers)
+
+        if set_id is not None and set_id not in practical_ids:
+            practical_ids.append(set_id)
+
+    if len(practical_ids) < request.practical_k:
+        fallback = sorted(
+            sets,
+            key=lambda item: item["score"],
+            reverse=True,
+        )
+
+        for item in fallback:
+            if item["id"] not in practical_ids:
+                practical_ids.append(item["id"])
+
+            if len(practical_ids) >= request.practical_k:
+                break
+
+    filters = {
+        "sum_range": [request.sum_min, request.sum_max],
+        "odd_even": "2:4~4:2",
+        "low_high_min_each": 1,
+        "max_consecutives": 2,
+        "max_same_ending": 2,
+        "max_overlap_prev_round": 1,
+        "min_long_gap_inclusion": 1,
+        "max_same_decade": 3,
+        "jaccard_max": request.jaccard_max,
+        "max_overlap_between_sets": (
+            request.max_overlap_between_sets
+        ),
+    }
+
+    return {
+        "round": request.round_no,
+        "generated_at_kst": result.generated_at_kst.strftime(
+            "%Y-%m-%d %H:%M"
+        ),
+        "seed": request.seed,
+        "params": {
+            "temperature": request.temperature,
+            "weights": dict(request.weights),
+            "filters": filters,
+            "windows": {
+                "short": result.generation.windows[0],
+                "mid": result.generation.windows[1],
+                "long": result.generation.windows[2],
+            },
+            "K": request.top_k,
+        },
+        "sets": sets,
+        "diversity": _diversity_metrics(
+            [
+                tuple(item["numbers"])
+                for item in sets
+            ]
+        ),
+        "top5_practical": practical_ids[:request.practical_k],
+        "metadata": {
+            "generated_candidates": result.generated_count,
+            "statistics_version": (
+                result.generation.statistics_version
+            ),
+            "candidate_version": (
+                result.generation.candidate_version
+            ),
+            "practical_complete": bool(
+                _read(result.practical, "complete")
+            ),
+        },
+    }
+
+
+def prediction_to_json(
+    result: PredictionResult,
+    *,
+    indent: int | None = 2,
+) -> str:
+    return json.dumps(
+        prediction_to_dict(result),
+        ensure_ascii=False,
+        indent=indent,
+    )
+
+
+============================================================
+FILE: lrp\io\__init__.py
+============================================================
+"""Input and artifact APIs."""
+
+from .artifacts import (
+    atomic_write_bytes,
+    sha256_file,
+    write_prediction_artifacts,
+)
+from .draws import (
+    HistoryRow,
+    history_until_round,
+    load_history,
+    load_history_csv,
+    load_history_json,
+    long_gap_numbers,
+    previous_numbers,
+    to_statistics_draws,
+)
+
+__all__ = [
+    "HistoryRow",
+    "atomic_write_bytes",
+    "history_until_round",
+    "load_history",
+    "load_history_csv",
+    "load_history_json",
+    "long_gap_numbers",
+    "previous_numbers",
+    "sha256_file",
+    "to_statistics_draws",
+    "write_prediction_artifacts",
+]
+
+
+============================================================
+FILE: lrp\io\draws.py
+============================================================
+"""Draw-history input and derived prediction context."""
+
+from __future__ import annotations
+
+import csv
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+from lrp.contracts import ContractError
+
+
+_NUMBER_COLUMNS = (
+    ("n1", "n2", "n3", "n4", "n5", "n6"),
+    (
+        "number1",
+        "number2",
+        "number3",
+        "number4",
+        "number5",
+        "number6",
+    ),
+    ("num1", "num2", "num3", "num4", "num5", "num6"),
+)
+
+
+def _integer(value: object, *, field: str) -> int:
+    if isinstance(value, bool):
+        raise ContractError(f"{field} must be an integer")
+
+    try:
+        result = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ContractError(
+            f"{field} must be an integer"
+        ) from exc
+
+    return result
+
+
+def _normalize_numbers(
+    values: Iterable[object],
+    *,
+    field: str,
+) -> tuple[int, int, int, int, int, int]:
+    converted = tuple(
+        sorted(_integer(value, field=field) for value in values)
+    )
+
+    if len(converted) != 6:
+        raise ContractError(
+            f"{field} must contain exactly six numbers"
+        )
+
+    if len(set(converted)) != 6:
+        raise ContractError(
+            f"{field} contains duplicate numbers"
+        )
+
+    invalid = tuple(
+        number for number in converted if not 1 <= number <= 45
+    )
+    if invalid:
+        raise ContractError(
+            f"{field} contains invalid numbers: {invalid}"
+        )
+
+    return converted  # type: ignore[return-value]
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryRow:
+    round_no: int
+    numbers: tuple[int, int, int, int, int, int]
+    bonus: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.round_no <= 0:
+            raise ContractError(
+                "round number must be positive"
+            )
+
+        if self.bonus is not None:
+            if not 1 <= self.bonus <= 45:
+                raise ContractError(
+                    "bonus number must be between 1 and 45"
+                )
+            if self.bonus in self.numbers:
+                raise ContractError(
+                    "bonus number must not duplicate main numbers"
+                )
+
+
+def _mapping_value(
+    row: Mapping[str, Any],
+    *names: str,
+) -> Any:
+    normalized = {
+        str(key).strip().lower(): value
+        for key, value in row.items()
+    }
+
+    for name in names:
+        key = name.lower()
+        if key in normalized:
+            return normalized[key]
+
+    return None
+
+
+def _numbers_from_mapping(
+    row: Mapping[str, Any],
+) -> tuple[int, int, int, int, int, int]:
+    direct = _mapping_value(
+        row,
+        "numbers",
+        "nums",
+        "winning_numbers",
+    )
+
+    if direct is not None:
+        if isinstance(direct, str):
+            cleaned = (
+                direct.replace(",", " ")
+                .replace("|", " ")
+                .replace("-", " ")
+            )
+            values: Sequence[object] = cleaned.split()
+        elif isinstance(direct, Sequence):
+            values = direct
+        else:
+            raise ContractError(
+                "numbers must be a sequence or delimited string"
+            )
+
+        return _normalize_numbers(values, field="numbers")
+
+    normalized_keys = {
+        str(key).strip().lower()
+        for key in row
+    }
+
+    for columns in _NUMBER_COLUMNS:
+        if all(column in normalized_keys for column in columns):
+            normalized_row = {
+                str(key).strip().lower(): value
+                for key, value in row.items()
+            }
+            return _normalize_numbers(
+                (normalized_row[column] for column in columns),
+                field="numbers",
+            )
+
+    raise ContractError(
+        "draw row does not contain six number columns"
+    )
+
+
+def _history_row_from_mapping(
+    row: Mapping[str, Any],
+) -> HistoryRow:
+    raw_round = _mapping_value(
+        row,
+        "round",
+        "round_no",
+        "draw",
+        "draw_no",
+    )
+    if raw_round is None:
+        raise ContractError(
+            "draw row is missing round"
+        )
+
+    raw_bonus = _mapping_value(
+        row,
+        "bonus",
+        "bonus_number",
+    )
+
+    bonus = None
+    if raw_bonus not in (None, ""):
+        bonus = _integer(raw_bonus, field="bonus")
+
+    return HistoryRow(
+        round_no=_integer(raw_round, field="round"),
+        numbers=_numbers_from_mapping(row),
+        bonus=bonus,
+    )
+
+
+def _validate_history(
+    rows: Iterable[HistoryRow],
+) -> tuple[HistoryRow, ...]:
+    ordered = tuple(
+        sorted(rows, key=lambda item: item.round_no)
+    )
+
+    if not ordered:
+        raise ContractError(
+            "history must contain at least one draw"
+        )
+
+    rounds = [row.round_no for row in ordered]
+    if len(rounds) != len(set(rounds)):
+        raise ContractError(
+            "history contains duplicate rounds"
+        )
+
+    return ordered
+
+
+def load_history_csv(path: str | Path) -> tuple[HistoryRow, ...]:
+    source = Path(path)
+
+    if not source.is_file():
+        raise FileNotFoundError(source)
+
+    with source.open(
+        "r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as stream:
+        reader = csv.DictReader(stream)
+
+        if reader.fieldnames is None:
+            raise ContractError(
+                "CSV file has no header"
+            )
+
+        rows = tuple(
+            _history_row_from_mapping(row)
+            for row in reader
+        )
+
+    return _validate_history(rows)
+
+
+def load_history_json(path: str | Path) -> tuple[HistoryRow, ...]:
+    source = Path(path)
+
+    if not source.is_file():
+        raise FileNotFoundError(source)
+
+    with source.open("r", encoding="utf-8-sig") as stream:
+        payload = json.load(stream)
+
+    if isinstance(payload, Mapping):
+        payload = payload.get(
+            "draws",
+            payload.get("history"),
+        )
+
+    if not isinstance(payload, list):
+        raise ContractError(
+            "JSON history must be a list or contain a draws list"
+        )
+
+    rows = tuple(
+        _history_row_from_mapping(row)
+        for row in payload
+        if isinstance(row, Mapping)
+    )
+
+    if len(rows) != len(payload):
+        raise ContractError(
+            "every JSON draw must be an object"
+        )
+
+    return _validate_history(rows)
+
+
+def load_history(path: str | Path) -> tuple[HistoryRow, ...]:
+    source = Path(path)
+    suffix = source.suffix.lower()
+
+    if suffix == ".csv":
+        return load_history_csv(source)
+
+    if suffix == ".json":
+        return load_history_json(source)
+
+    raise ContractError(
+        "history file must use .csv or .json"
+    )
+
+
+def history_until_round(
+    rows: Iterable[HistoryRow],
+    *,
+    target_round: int,
+) -> tuple[HistoryRow, ...]:
+    if target_round <= 1:
+        raise ContractError(
+            "target_round must be greater than one"
+        )
+
+    selected = tuple(
+        row for row in rows
+        if row.round_no < target_round
+    )
+
+    if not selected:
+        raise ContractError(
+            "history has no draws before target round"
+        )
+
+    return selected
+
+
+def previous_numbers(
+    rows: Sequence[HistoryRow],
+) -> frozenset[int]:
+    if not rows:
+        raise ContractError("history is empty")
+
+    latest = max(rows, key=lambda row: row.round_no)
+    return frozenset(latest.numbers)
+
+
+def long_gap_numbers(
+    rows: Sequence[HistoryRow],
+    *,
+    recent_draw_count: int = 5,
+) -> frozenset[int]:
+    if recent_draw_count <= 0:
+        raise ContractError(
+            "recent_draw_count must be positive"
+        )
+
+    recent = tuple(
+        sorted(
+            rows,
+            key=lambda row: row.round_no,
+            reverse=True,
+        )[:recent_draw_count]
+    )
+
+    appeared = {
+        number
+        for row in recent
+        for number in row.numbers
+    }
+
+    result = frozenset(
+        number for number in range(1, 46)
+        if number not in appeared
+    )
+
+    if not result:
+        raise ContractError(
+            "no long-gap numbers were derived"
+        )
+
+    return result
+
+
+def to_statistics_draws(
+    rows: Iterable[HistoryRow],
+    *,
+    draw_type: type,
+) -> tuple[object, ...]:
+    return tuple(
+        draw_type(
+            round=row.round_no,
+            numbers=row.numbers,
+            bonus=row.bonus,
+        )
+        for row in rows
+    )
+
+
+============================================================
+FILE: lrp\io\artifacts.py
+============================================================
+"""Atomic prediction artifact and manifest storage."""
+
+from __future__ import annotations
+
+from datetime import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import tempfile
+from typing import Any, Mapping
+from zoneinfo import ZoneInfo
+
+
+_KST = ZoneInfo("Asia/Seoul")
+
+
+def _json_bytes(
+    payload: Mapping[str, Any],
+) -> bytes:
+    text = json.dumps(
+        payload,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=False,
+    )
+    return (text + "\n").encode("utf-8")
+
+
+def atomic_write_bytes(
+    path: str | Path,
+    content: bytes,
+) -> Path:
+    destination = Path(path)
+    destination.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
+    )
+
+    temporary = Path(temporary_name)
+
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        temporary.replace(destination)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+    return destination
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+
+    with Path(path).open("rb") as stream:
+        for block in iter(
+            lambda: stream.read(1024 * 1024),
+            b"",
+        ):
+            digest.update(block)
+
+    return digest.hexdigest()
+
+
+def write_prediction_artifacts(
+    payload: Mapping[str, Any],
+    *,
+    output_root: str | Path,
+) -> dict[str, Any]:
+    round_no = int(payload["round"])
+    seed = int(payload["seed"])
+
+    directory = (
+        Path(output_root)
+        / f"round_{round_no:04d}"
+        / f"seed_{seed}"
+    )
+
+    prediction_path = atomic_write_bytes(
+        directory / "prediction.json",
+        _json_bytes(payload),
+    )
+
+    manifest = {
+        "schema_version": "1.0",
+        "artifact_type": "lotto645_prediction",
+        "round": round_no,
+        "seed": seed,
+        "created_at_kst": datetime.now(_KST).isoformat(
+            timespec="seconds"
+        ),
+        "files": {
+            "prediction.json": {
+                "sha256": sha256_file(prediction_path),
+                "bytes": prediction_path.stat().st_size,
+            }
+        },
+        "metadata": dict(payload.get("metadata", {})),
+    }
+
+    manifest_path = atomic_write_bytes(
+        directory / "manifest.json",
+        _json_bytes(manifest),
+    )
+
+    return {
+        "directory": str(directory.resolve()),
+        "prediction_path": str(
+            prediction_path.resolve()
+        ),
+        "manifest_path": str(
+            manifest_path.resolve()
+        ),
+        "prediction_sha256": (
+            manifest["files"]["prediction.json"]["sha256"]
+        ),
+    }
+
+
+============================================================
+FILE: lrp\core\runtime.py
+============================================================
+"""Runtime context management for Lotto645 Research Platform."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+import hashlib
+import json
+from typing import Any, Mapping
+from uuid import uuid4
+
+from lrp.contracts import ContractError
+
+
+def _canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+
+
+def _derive_seed(seed: int, namespace: str) -> int:
+    digest = hashlib.sha256(
+        _canonical_json_bytes(
+            {
+                "seed": seed,
+                "namespace": namespace,
+            }
+        )
+    ).hexdigest()
+    return int(digest[:16], 16)
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeContext:
+    """Dependency-light Project A execution metadata.
+
+    This model is used before Foundation is imported. Once Project B is
+    available, ``to_foundation_context`` converts it to Foundation's stable
+    ``ExecutionContext``.
+    """
+
+    execution_id: str
+    seed: int
+    parameters: Mapping[str, Any] = field(default_factory=dict)
+    created_at_utc: str = field(
+        default_factory=lambda: (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+    )
+
+    def __post_init__(self) -> None:
+        execution_id = (
+            self.execution_id.strip()
+            if isinstance(self.execution_id, str)
+            else ""
+        )
+
+        if not execution_id:
+            raise ContractError(
+                "execution_id must be a non-empty string"
+            )
+
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise ContractError("seed must be an integer")
+
+        if not isinstance(self.parameters, Mapping):
+            raise ContractError("parameters must be a mapping")
+
+        try:
+            datetime.fromisoformat(
+                self.created_at_utc.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError) as exc:
+            raise ContractError(
+                "created_at_utc must be an ISO-8601 timestamp"
+            ) from exc
+
+        object.__setattr__(self, "execution_id", execution_id)
+        object.__setattr__(
+            self,
+            "parameters",
+            dict(sorted(self.parameters.items())),
+        )
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        seed: int,
+        execution_id: str | None = None,
+        parameters: Mapping[str, Any] | None = None,
+    ) -> "RuntimeContext":
+        """Create one reproducible platform execution context."""
+
+        resolved_id = execution_id or (
+            "lrp-" + uuid4().hex
+        )
+
+        return cls(
+            execution_id=resolved_id,
+            seed=seed,
+            parameters={} if parameters is None else parameters,
+        )
+
+    def child(
+        self,
+        namespace: str,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+    ) -> "RuntimeContext":
+        """Create a deterministic child context."""
+
+        normalized = (
+            namespace.strip()
+            if isinstance(namespace, str)
+            else ""
+        )
+
+        if not normalized:
+            raise ContractError(
+                "child namespace must be a non-empty string"
+            )
+
+        return RuntimeContext(
+            execution_id=f"{self.execution_id}/{normalized}",
+            seed=_derive_seed(self.seed, normalized),
+            parameters=(
+                self.parameters
+                if parameters is None
+                else parameters
+            ),
+            created_at_utc=self.created_at_utc,
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return serializable runtime metadata."""
+
+        return {
+            "execution_id": self.execution_id,
+            "seed": self.seed,
+            "parameters": dict(self.parameters),
+            "created_at_utc": self.created_at_utc,
+        }
+
+    def to_foundation_context(self) -> object:
+        """Convert to Project B's stable ExecutionContext.
+
+        Importing Foundation is deliberately delayed so the LRP package can
+        still perform installation diagnostics when Project B is unavailable.
+        """
+
+        try:
+            from foundation import ExecutionContext
+        except ImportError as exc:
+            raise ContractError(
+                "Project B Foundation is not importable"
+            ) from exc
+
+        return ExecutionContext(
+            execution_id=self.execution_id,
+            seed=self.seed,
+            parameters=dict(self.parameters),
+            created_at_utc=self.created_at_utc,
+        )
+
+
+============================================================
+FILE: tools\lrp_build.py
+============================================================
+"""Fast and reproducible build system for Lotto645 Research Platform.
+
+Modes
+-----
+quick:
+    Compile recently changed Python files and run import smoke tests.
+
+full:
+    Compile all project Python files, run available tests, create a
+    SHA-256 manifest and produce a reproducible ZIP archive.
+
+Usage
+-----
+    python tools/lrp_build.py quick
+    python tools/lrp_build.py full
+"""
+
+from __future__ import annotations
+
+import argparse
+import compileall
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import hashlib
+import importlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+from typing import Iterable
+import zipfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+BUILD_DIR = ROOT / "build"
+CACHE_PATH = BUILD_DIR / ".lrp_build_cache.json"
+MANIFEST_PATH = BUILD_DIR / "lrp_build_manifest.json"
+LATEST_ZIP_PATH = BUILD_DIR / "lrp_latest.zip"
+
+PYTHON_DIRS = (
+    ROOT / "lrp",
+    ROOT / "tools",
+)
+
+OPTIONAL_TEST_DIRS = (
+    ROOT / "tests",
+    ROOT / "lrp" / "tests",
+)
+
+SMOKE_MODULES = (
+    "lrp",
+    "lrp.contracts",
+    "lrp.core",
+    "lrp.adapters",
+    "lrp.pipelines",
+)
+
+EXCLUDED_PARTS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+}
+
+ARCHIVE_ROOTS = (
+    "lrp",
+    "tools",
+    "tests",
+)
+
+ARCHIVE_FILES = (
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "README.md",
+    "build.ps1",
+)
+
+
+@dataclass(slots=True)
+class BuildResult:
+    mode: str
+    started_at_utc: str
+    elapsed_seconds: float
+    compiled_files: int
+    smoke_modules: int
+    tests_status: str
+    manifest_files: int
+    archive_path: str | None
+    archive_sha256: str | None
+    success: bool
+
+
+def utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def is_excluded(path: Path) -> bool:
+    try:
+        relative = path.relative_to(ROOT)
+    except ValueError:
+        return True
+
+    return any(part in EXCLUDED_PARTS for part in relative.parts)
+
+
+def discover_python_files() -> list[Path]:
+    files: list[Path] = []
+
+    for directory in PYTHON_DIRS:
+        if not directory.exists():
+            continue
+
+        for path in directory.rglob("*.py"):
+            if path.is_file() and not is_excluded(path):
+                files.append(path)
+
+    return sorted(set(files))
+
+
+def file_signature(path: Path) -> dict[str, int]:
+    stat = path.stat()
+    return {
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def load_cache() -> dict[str, dict[str, int]]:
+    if not CACHE_PATH.exists():
+        return {}
+
+    try:
+        value = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(value, dict):
+        return {}
+
+    files = value.get("files", {})
+    return files if isinstance(files, dict) else {}
+
+
+def save_cache(files: Iterable[Path]) -> None:
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "generated_at_utc": utc_now(),
+        "files": {
+            path.relative_to(ROOT).as_posix(): file_signature(path)
+            for path in files
+        },
+    }
+
+    CACHE_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def changed_python_files(
+    files: list[Path],
+    cache: dict[str, dict[str, int]],
+) -> list[Path]:
+    changed: list[Path] = []
+
+    for path in files:
+        key = path.relative_to(ROOT).as_posix()
+        if cache.get(key) != file_signature(path):
+            changed.append(path)
+
+    return changed
+
+
+def compile_file(path: Path) -> None:
+    import py_compile
+
+    py_compile.compile(
+        str(path),
+        doraise=True,
+    )
+
+
+def compile_quick(files: list[Path]) -> int:
+    cache = load_cache()
+    targets = changed_python_files(files, cache)
+
+    if not targets:
+        print("PASS: compile cache hit — 변경된 Python 파일 없음")
+        return 0
+
+    for path in targets:
+        compile_file(path)
+
+    print(f"PASS: quick compile — {len(targets)} files")
+    return len(targets)
+
+
+def compile_full() -> int:
+    compiled_count = 0
+
+    for directory in PYTHON_DIRS:
+        if not directory.exists():
+            continue
+
+        success = compileall.compile_dir(
+            str(directory),
+            force=True,
+            quiet=1,
+        )
+        if not success:
+            raise RuntimeError(
+                f"compileall failed: {directory.relative_to(ROOT)}"
+            )
+
+        compiled_count += sum(
+            1
+            for path in directory.rglob("*.py")
+            if path.is_file() and not is_excluded(path)
+        )
+
+    print(f"PASS: full compile — {compiled_count} files")
+    return compiled_count
+
+
+def run_smoke_imports() -> int:
+    imported = 0
+
+    for module_name in SMOKE_MODULES:
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError as exc:
+            if exc.name == module_name:
+                print(f"SKIP: optional smoke module unavailable — {module_name}")
+                continue
+            raise
+
+        imported += 1
+        print(f"PASS: import {module_name}")
+
+    if imported == 0:
+        raise RuntimeError("no LRP smoke modules could be imported")
+
+    return imported
+
+
+def command_exists(command: str) -> bool:
+    return shutil.which(command) is not None
+
+
+def run_subprocess(command: list[str]) -> int:
+    print("RUN:", " ".join(command))
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        check=False,
+    )
+    return completed.returncode
+
+
+def has_test_files() -> bool:
+    for directory in OPTIONAL_TEST_DIRS:
+        if not directory.exists():
+            continue
+
+        if any(directory.rglob("test_*.py")):
+            return True
+        if any(directory.rglob("*_test.py")):
+            return True
+
+    return False
+
+
+def run_tests() -> str:
+    if not has_test_files():
+        print("SKIP: 테스트 파일 없음")
+        return "skipped:no_tests"
+
+    pytest_available = (
+        importlib.util.find_spec("pytest") is not None
+        or command_exists("pytest")
+    )
+
+    if pytest_available:
+        code = run_subprocess(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--disable-warnings",
+                "--maxfail=1",
+            ]
+        )
+        if code != 0:
+            raise RuntimeError(f"pytest failed with exit code {code}")
+
+        print("PASS: pytest")
+        return "passed:pytest"
+
+    code = run_subprocess(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+        ]
+    )
+    if code != 0:
+        raise RuntimeError(f"unittest failed with exit code {code}")
+
+    print("PASS: unittest")
+    return "passed:unittest"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+
+    with path.open("rb") as stream:
+        while True:
+            chunk = stream.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def archive_candidates() -> list[Path]:
+    candidates: list[Path] = []
+
+    for root_name in ARCHIVE_ROOTS:
+        root = ROOT / root_name
+        if not root.exists():
+            continue
+
+        for path in root.rglob("*"):
+            if (
+                path.is_file()
+                and not is_excluded(path)
+                and path.suffix not in {".pyc", ".pyo"}
+            ):
+                candidates.append(path)
+
+    for file_name in ARCHIVE_FILES:
+        path = ROOT / file_name
+        if path.is_file():
+            candidates.append(path)
+
+    return sorted(set(candidates))
+
+
+def create_manifest(files: list[Path]) -> dict[str, object]:
+    entries = []
+
+    for path in files:
+        relative = path.relative_to(ROOT).as_posix()
+        entries.append(
+            {
+                "path": relative,
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        )
+
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "generated_at_utc": utc_now(),
+        "python_version": sys.version.split()[0],
+        "file_count": len(entries),
+        "files": entries,
+    }
+
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFEST_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    print(
+        "PASS: manifest — "
+        f"{MANIFEST_PATH.relative_to(ROOT)} "
+        f"({len(entries)} files)"
+    )
+    return payload
+
+
+def create_reproducible_zip(files: list[Path]) -> tuple[Path, str]:
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+    temporary = BUILD_DIR / ".lrp_latest.tmp.zip"
+    if temporary.exists():
+        temporary.unlink()
+
+    fixed_timestamp = (2020, 1, 1, 0, 0, 0)
+
+    with zipfile.ZipFile(
+        temporary,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as archive:
+        for path in files:
+            relative = path.relative_to(ROOT).as_posix()
+            data = path.read_bytes()
+
+            info = zipfile.ZipInfo(
+                filename=relative,
+                date_time=fixed_timestamp,
+            )
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+
+            archive.writestr(info, data)
+
+        manifest_data = MANIFEST_PATH.read_bytes()
+        manifest_info = zipfile.ZipInfo(
+            filename="build/lrp_build_manifest.json",
+            date_time=fixed_timestamp,
+        )
+        manifest_info.compress_type = zipfile.ZIP_DEFLATED
+        manifest_info.external_attr = 0o644 << 16
+        archive.writestr(manifest_info, manifest_data)
+
+    temporary.replace(LATEST_ZIP_PATH)
+    digest = sha256_file(LATEST_ZIP_PATH)
+
+    print(
+        "PASS: archive — "
+        f"{LATEST_ZIP_PATH.relative_to(ROOT)}"
+    )
+    print(f"PASS: archive SHA-256 — {digest}")
+
+    return LATEST_ZIP_PATH, digest
+
+
+def write_result(result: BuildResult) -> None:
+    path = BUILD_DIR / "lrp_build_result.json"
+    path.write_text(
+        json.dumps(
+            asdict(result),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
+def clean() -> None:
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+
+    removed = 0
+    for path in ROOT.rglob("__pycache__"):
+        if path.is_dir() and not is_excluded(path.parent):
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+
+    print(f"PASS: clean — removed {removed} cache directories")
+
+
+def build(mode: str) -> BuildResult:
+    started = time.perf_counter()
+    started_at = utc_now()
+
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    python_files = discover_python_files()
+
+    if not python_files:
+        raise RuntimeError("no Python files found under lrp/ or tools/")
+
+    if mode == "quick":
+        compiled = compile_quick(python_files)
+        smoke_count = run_smoke_imports()
+        tests_status = "skipped:quick_mode"
+        manifest_count = 0
+        archive_path = None
+        archive_sha256 = None
+
+    elif mode == "full":
+        compiled = compile_full()
+        smoke_count = run_smoke_imports()
+        tests_status = run_tests()
+
+        files = archive_candidates()
+        manifest = create_manifest(files)
+        archive, archive_sha256 = create_reproducible_zip(files)
+
+        manifest_count = int(manifest["file_count"])
+        archive_path = str(archive.relative_to(ROOT))
+
+    else:
+        raise ValueError(f"unsupported build mode: {mode}")
+
+    save_cache(python_files)
+
+    result = BuildResult(
+        mode=mode,
+        started_at_utc=started_at,
+        elapsed_seconds=round(time.perf_counter() - started, 3),
+        compiled_files=compiled,
+        smoke_modules=smoke_count,
+        tests_status=tests_status,
+        manifest_files=manifest_count,
+        archive_path=archive_path,
+        archive_sha256=archive_sha256,
+        success=True,
+    )
+
+    write_result(result)
+
+    print("")
+    print("BUILD SUCCESS")
+    print(f"mode: {result.mode}")
+    print(f"elapsed: {result.elapsed_seconds:.3f}s")
+
+    return result
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="LRP fast build and release utility"
+    )
+    parser.add_argument(
+        "mode",
+        choices=("quick", "full", "clean"),
+        nargs="?",
+        default="quick",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+
+    try:
+        if args.mode == "clean":
+            clean()
+            return 0
+
+        build(args.mode)
+        return 0
+
+    except Exception as exc:
+        BUILD_DIR.mkdir(parents=True, exist_ok=True)
+
+        failure = {
+            "generated_at_utc": utc_now(),
+            "mode": args.mode,
+            "success": False,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }
+
+        (BUILD_DIR / "lrp_build_failure.json").write_text(
+            json.dumps(
+                failure,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
+        print("")
+        print("BUILD FAILED")
+        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+=== CURRENT QUICK BUILD ===
+
+=== CURRENT QUICK BUILD ===
+PASS: compile cache hit ??蹂寃쎈맂 Python ?뚯씪 ?놁쓬
+PASS: import lrp
+PASS: import lrp.contracts
+PASS: import lrp.core
+PASS: import lrp.adapters
+PASS: import lrp.pipelines
+
+BUILD SUCCESS
+mode: quick
+elapsed: 0.236s
+
+
+=== CURRENT QUICK BUILD RETRY UTF-8 ===
+PASS: compile cache hit ??蹂寃쎈맂 Python ?뚯씪 ?놁쓬
+PASS: import lrp
+PASS: import lrp.contracts
+PASS: import lrp.core
+PASS: import lrp.adapters
+PASS: import lrp.pipelines
+
+BUILD SUCCESS
+mode: quick
+elapsed: 0.195s
+

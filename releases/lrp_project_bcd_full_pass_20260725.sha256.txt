@@ -1,0 +1,8 @@
+﻿LRP Project B+C+D Integration Baseline
+Created: 2026-07-25 KST
+Regression: 13 / 13 PASSED
+Build mode: full
+Build elapsed: 15.113s
+Archive SHA-256: 48f89aa88fa26ecb532cbb1ba85b3f2449a60fbc67fd9036430779ddaa536575
+Statistics Engine: 1.0.0
+Candidate Engine: 0.8.0.dev0

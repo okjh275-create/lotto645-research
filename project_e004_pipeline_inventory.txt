@@ -1,0 +1,2593 @@
+==============================================================================
+LRP Project E-004 Pipeline Inventory
+==============================================================================
+
+project_root: C:\Users\PC2303\Documents\GitHub\lotto645-research
+python_version: 3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]
+python_files_scanned: 77
+relevant_files: 60
+relevant_classes: 45
+relevant_functions: 72
+relevant_assignments: 143
+
+------------------------------------------------------------------------------
+1. Parse Status
+------------------------------------------------------------------------------
+PASS: all scanned files parsed
+
+------------------------------------------------------------------------------
+2. Relevant Files
+------------------------------------------------------------------------------
+lrp\__init__.py
+lrp\adapters\__init__.py
+lrp\adapters\candidate.py
+lrp\cli\__init__.py
+lrp\cli\predict.py
+lrp\cli\review.py
+lrp\cli\status.py
+lrp\cli\weekly.py
+lrp\contracts\component.py
+lrp\core\__init__.py
+lrp\core\assembly.py
+lrp\core\component_catalog.py
+lrp\ensemble\__init__.py
+lrp\ensemble\adapters.py
+lrp\ensemble\engine.py
+lrp\ensemble\explain.py
+lrp\ensemble\features.py
+lrp\ensemble\models.py
+lrp\ensemble\repository.py
+lrp\ensemble\rescoring.py
+lrp\ensemble\snapshot.py
+lrp\io\__init__.py
+lrp\io\artifacts.py
+lrp\io\draws.py
+lrp\learning\__init__.py
+lrp\learning\adaptive_engine.py
+lrp\learning\adaptive_models.py
+lrp\learning\adaptive_repository.py
+lrp\learning\aggregator.py
+lrp\learning\evaluator.py
+lrp\learning\learning_facade.py
+lrp\learning\models.py
+lrp\learning\ranking.py
+lrp\learning\ranking_repository.py
+lrp\learning\repository.py
+lrp\learning\service.py
+lrp\learning\strategy_stats.py
+lrp\management\doctor.py
+lrp\management\status.py
+lrp\operations\__init__.py
+lrp\operations\review.py
+lrp\pipelines\__init__.py
+lrp\pipelines\models.py
+lrp\pipelines\prediction.py
+lrp\pipelines\probability.py
+lrp\pipelines\serializer.py
+tests\test_candidate.py
+tests\test_e001_ensemble_foundation.py
+tests\test_e002_learning_snapshot.py
+tests\test_e003_feature_rescoring.py
+tests\test_m3_application.py
+tests\test_m4_operations.py
+tests\test_m59_status.py
+tests\test_m6_adaptive_weight.py
+tests\test_m6_automatic_review.py
+tests\test_m6_learning_foundation.py
+tests\test_m6_strategy_ranking.py
+tests\test_m6_strategy_statistics.py
+tests\test_prediction_orchestrator.py
+tests\test_score.py
+
+------------------------------------------------------------------------------
+3. Candidate / Ranking / Pipeline Classes
+------------------------------------------------------------------------------
+lrp\adapters\candidate.py:25 class CandidateAdapter
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: module
+  methods: load, version, validate_statistics, number_signals, generate_candidates, score_candidates, rank_candidates, select_diverse_candidates, select_practical_sets
+
+lrp\contracts\component.py:13 class ComponentKind
+  bases: str, Enum
+  decorators: (none)
+  fields: CANDIDATE, FOUNDATION, OPTIMIZER, REPORTING, RESEARCH, STATISTICS
+  methods: (none)
+
+lrp\contracts\component.py:24 class ReleaseChannel
+  bases: str, Enum
+  decorators: (none)
+  fields: CANDIDATE, DEVELOPMENT, STABLE
+  methods: (none)
+
+lrp\ensemble\features.py:67 class StrategyFeatureVector
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: adaptive_weight, average_match_score, average_prediction_score, confidence, evidence_count, metadata, prize_rate, rank_score, sample_confidence, stability, strategy_name, strategy_type, trend_score
+  methods: __post_init__, key, to_dict
+
+lrp\ensemble\models.py:254 class EnsembleConfig
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: adaptive_weight, base_score_weight, confidence_weight, stability_weight, top_k, trend_weight
+  methods: __post_init__, total_weight, to_dict
+
+lrp\ensemble\models.py:332 class EnsembleCandidateScore
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: base_score, contributions, ensemble_score, source, source_index
+  methods: __post_init__, to_dict
+
+lrp\ensemble\repository.py:130 class M6LearningSnapshotRepository
+  bases: (none)
+  decorators: dataclass(slots=True)
+  fields: _cache_key, _cache_value, history_limit, service, strategy_types
+  methods: __post_init__, _ranking_repository, _revision, _statistics, _rankings, _adaptive_weights, load_snapshot, invalidate_cache
+
+lrp\ensemble\rescoring.py:176 class RescoringConfig
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: adaptive_weight, base_score_weight, confidence_weight, performance_weight, preserve_without_evidence, ranking_weight, sample_weight, stability_weight, trend_weight
+  methods: __post_init__
+
+lrp\ensemble\rescoring.py:231 class ScoreContribution
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: adaptive, base, confidence, performance, ranking, sample, stability, trend
+  methods: total, to_dict
+
+lrp\ensemble\rescoring.py:269 class RescoredCandidate
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: base_score, contributions, ensemble_score, feature_vectors, rank_after, rank_before, source, strategy_keys
+  methods: rank_change, to_dict
+
+lrp\ensemble\rescoring.py:308 class RescoringResult
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: items, metadata, round_no, snapshot_revision
+  methods: count, changed_rank_count, to_dict
+
+lrp\ensemble\rescoring.py:381 class CandidateRescorer
+  bases: (none)
+  decorators: (none)
+  fields: self.config, self.score_reader, self.strategy_resolver
+  methods: __init__, evaluate
+
+lrp\ensemble\snapshot.py:93 class StrategyStatisticSnapshot
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: average_match_count, average_prediction_score, hit3_plus_rate, metadata, prize_rate, sample_count, strategy_name, strategy_type, updated_at_kst
+  methods: __post_init__, key, to_dict
+
+lrp\ensemble\snapshot.py:229 class StrategyRankingSnapshot
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: average_match_count, average_prediction_score, confidence, prize_rate, rank_position, rank_score, recent_gain, rolling_matches, rolling_prize_rates, sample_count, stability, strategy_name, strategy_type, trend
+  methods: __post_init__, key, to_dict
+
+lrp\ensemble\snapshot.py:455 class LearningSnapshot
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: metadata, rankings, revision, round_no, source, statistics, strategy_weights
+  methods: __post_init__, strategy_count, statistic, ranking, weight, to_dict
+
+lrp\learning\adaptive_engine.py:17 class AdaptiveWeightFactors
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: confidence, rank_score, stability
+  methods: __post_init__
+
+lrp\learning\adaptive_models.py:16 class AdaptiveWeightDataset
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: previous_weights, rankings, revision
+  methods: strategy_count
+
+lrp\learning\adaptive_models.py:29 class AdaptiveWeight
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: confidence, current_weight, normalized_weight, previous_weight, rank_position, rank_score, revision, sample_count, stability, strategy_name, strategy_type, target_weight, trend
+  methods: __post_init__, strategy_key, as_dict
+
+lrp\learning\adaptive_repository.py:12 class AdaptiveWeightRepository
+  bases: (none)
+  decorators: (none)
+  fields: self._dataset_cache_key, self._dataset_cache_value, self._latest_weights, self.ranking_repository
+  methods: __init__, build_dataset, remember, latest, invalidate_cache, _previous_weight_map, _required_text
+
+lrp\learning\learning_facade.py:12 class LearningFacade
+  bases: (none)
+  decorators: (none)
+  fields: self.adaptive_engine, self.adaptive_repository, self.ranking_engine, self.ranking_repository
+  methods: __init__, rank_strategies, get_adaptive_weights, invalidate_derived_caches
+
+lrp\learning\models.py:52 class PredictionRecord
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: features, generated_at_kst, model_name, numbers, parameters, prediction_id, round_no, score, seed, set_id
+  methods: __post_init__
+
+lrp\learning\models.py:140 class ReviewRecord
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: bonus_matched, match_count, matched_numbers, metrics, prediction_id, prize_rank, reviewed_at_kst, round_no
+  methods: __post_init__
+
+lrp\learning\ranking.py:32 class StrategyPerformancePoint
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: match_count, prediction_id, prediction_score, prize_rank, round_no
+  methods: __post_init__
+
+lrp\learning\ranking.py:55 class RankingWeights
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: confidence, performance, prediction_quality, prize_rate, recent_gain, stability
+  methods: __post_init__
+
+lrp\learning\ranking.py:81 class RankingConfig
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: confidence_scale, trend_long_window, trend_short_window, trend_threshold, weights, windows
+  methods: __post_init__
+
+lrp\learning\ranking.py:112 class StrategyRanking
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: average_match_count, average_prediction_score, confidence, prize_rate, rank_position, rank_score, recent_gain, rolling_matches, rolling_prize_rates, sample_count, stability, strategy_name, strategy_type, trend
+  methods: __post_init__, as_dict
+
+lrp\learning\ranking.py:170 class StrategyRankingEngine
+  bases: (none)
+  decorators: (none)
+  fields: self.config
+  methods: __init__, rank, _calculate_one, _confidence, _stability, _trend
+
+lrp\learning\ranking_repository.py:27 class RankingDataset
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: histories, revision, statistics
+  methods: strategy_count, history_point_count
+
+lrp\learning\ranking_repository.py:49 class RankingRepository
+  bases: (none)
+  decorators: (none)
+  fields: self._cache_key, self._cache_value, self.repository
+  methods: __init__, repository_revision, get_strategy_history, build_dataset, invalidate_cache, _read_connection, _required_text
+
+lrp\learning\repository.py:139 class LearningRepository
+  bases: (none)
+  decorators: (none)
+  fields: self._initialized, self.database_path
+  methods: __init__, _connect, initialize, add_prediction, add_result, add_review, get_prediction, get_result, pending_predictions_with_results, pending_strategy_reviews, apply_strategy_stat_event, get_strategy_statistics, counts, pending_prediction_ids
+
+lrp\learning\service.py:36 class LearningService
+  bases: (none)
+  decorators: (none)
+  fields: self.adaptive_engine, self.adaptive_repository, self.learning_facade, self.ranking_engine, self.ranking_repository, self.repository, self.strategy_aggregator
+  methods: __init__, run_incremental_review, run_strategy_aggregation, get_strategy_statistics, rank_strategies, get_adaptive_weights
+
+lrp\learning\strategy_stats.py:9 class StrategyStatistics
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: hit3_count, hit4_count, hit5_count, hit6_count, prize_count, sample_count, strategy_name, strategy_type, total_matches, total_prediction_score, updated_at_kst
+  methods: average_match_count, average_prediction_score, hit3_plus_rate, prize_rate, as_dict
+
+lrp\pipelines\models.py:52 class PredictionRequest
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: candidate_count, jaccard_max, long_gap_numbers, max_attempts_multiplier, max_overlap_between_sets, mmr_lambda, practical_k, preferred_sum_max, preferred_sum_min, previous_numbers, round_no, seed, sum_max, sum_min, temperature, top_k, weights
+  methods: __post_init__, to_dict
+
+lrp\pipelines\models.py:251 class PredictionGenerationResult
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: candidate_version, candidates, number_signals, probabilities, request, statistics_contract, statistics_version, windows
+  methods: generated_count, complete
+
+lrp\pipelines\models.py:273 class PredictionResult
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: diversity, generated_at_kst, generation, practical, ranking, scored_candidates
+  methods: request, generated_count
+
+lrp\pipelines\prediction.py:86 class PredictionPipeline
+  bases: (none)
+  decorators: dataclass(slots=True)
+  fields: candidate, statistics
+  methods: load, analyze, generate_from_snapshot, complete_from_snapshot, run, runtime_context
+
+tests\test_e001_ensemble_foundation.py:18 class CandidateFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: name, normalized_score
+  methods: (none)
+
+tests\test_e002_learning_snapshot.py:16 class StatisticFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: average_match_count, average_prediction_score, hit3_count, hit3_plus_rate, hit4_count, hit5_count, hit6_count, prize_count, prize_rate, sample_count, strategy_name, strategy_type, updated_at_kst
+  methods: (none)
+
+tests\test_e002_learning_snapshot.py:33 class RankingFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: average_match_count, average_prediction_score, confidence, prize_rate, rank_position, rank_score, recent_gain, rolling_matches, rolling_prize_rates, sample_count, stability, strategy_name, strategy_type, trend
+  methods: (none)
+
+tests\test_e002_learning_snapshot.py:51 class WeightFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: confidence, current_weight, normalized_weight, previous_weight, rank_position, rank_score, revision, sample_count, stability, strategy_name, strategy_type, target_weight, trend
+  methods: (none)
+
+tests\test_e002_learning_snapshot.py:68 class CandidateFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: name, normalized_score
+  methods: (none)
+
+tests\test_e002_learning_snapshot.py:73 class RankingRepositoryFixture
+  bases: (none)
+  decorators: (none)
+  fields: self.revision
+  methods: __init__, repository_revision
+
+tests\test_e002_learning_snapshot.py:83 class ServiceFixture
+  bases: (none)
+  decorators: (none)
+  fields: self.ranking_repository
+  methods: __init__, get_strategy_statistics, rank_strategies, adaptive_weights
+
+tests\test_e002_learning_snapshot.py:274 class RankingOnlyServiceFixture
+  bases: ServiceFixture
+  decorators: (none)
+  fields: adaptive_weights
+  methods: (none)
+
+tests\test_e003_feature_rescoring.py:22 class CandidateFixture
+  bases: (none)
+  decorators: dataclass(frozen=True, slots=True)
+  fields: model_name, name, normalized_score, scenario_name
+  methods: (none)
+
+------------------------------------------------------------------------------
+4. Candidate / Ranking / Pipeline Functions
+------------------------------------------------------------------------------
+lrp\adapters\candidate.py:31 def load
+  arguments: cls
+  returns: 'CandidateAdapter'
+  decorators: classmethod
+
+lrp\adapters\candidate.py:80 def generate_candidates
+  arguments: self, *args, **kwargs
+  returns: object
+  decorators: (none)
+
+lrp\adapters\candidate.py:87 def score_candidates
+  arguments: self, *args, **kwargs
+  returns: object
+  decorators: (none)
+
+lrp\adapters\candidate.py:94 def rank_candidates
+  arguments: self, *args, **kwargs
+  returns: object
+  decorators: (none)
+
+lrp\adapters\candidate.py:101 def select_diverse_candidates
+  arguments: self, *args, **kwargs
+  returns: object
+  decorators: (none)
+
+lrp\adapters\candidate.py:108 def select_practical_sets
+  arguments: self, *args, **kwargs
+  returns: object
+  decorators: (none)
+
+lrp\cli\predict.py:101 def _analysis_config
+  arguments: pipeline: PredictionPipeline, mode: str, draw_count: int
+  returns: object
+  decorators: (none)
+
+lrp\core\assembly.py:211 def _check_candidate
+  arguments: descriptor: ComponentDescriptor, module: ModuleType
+  returns: ComponentCheck
+  decorators: (none)
+
+lrp\ensemble\adapters.py:208 def ranking_from_m6
+  arguments: value: object
+  returns: StrategyRankingSnapshot
+  decorators: (none)
+
+lrp\ensemble\adapters.py:455 def weights_from_rankings
+  arguments: rankings: Sequence[StrategyRankingSnapshot]
+  returns: tuple[StrategyWeight, ...]
+  decorators: (none)
+
+lrp\ensemble\adapters.py:552 def rankings_from_m6
+  arguments: values: Iterable[object]
+  returns: tuple[StrategyRankingSnapshot, ...]
+  decorators: (none)
+
+lrp\ensemble\engine.py:37 def _default_score_reader
+  arguments: value: object
+  returns: float
+  decorators: (none)
+
+lrp\ensemble\engine.py:114 def evaluate
+  arguments: self, candidates: Iterable[object], round_no: int, config: EnsembleConfig | None, score_reader: ScoreReader | None
+  returns: EnsembleResult
+  decorators: (none)
+
+lrp\ensemble\explain.py:13 def explain_candidate
+  arguments: item: RescoredCandidate
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\ensemble\repository.py:196 def _ranking_repository
+  arguments: self
+  returns: object | None
+  decorators: (none)
+
+lrp\ensemble\repository.py:273 def _rankings
+  arguments: self, strategy_type: str
+  returns: tuple[object, ...]
+  decorators: (none)
+
+lrp\ensemble\rescoring.py:37 def default_base_score_reader
+  arguments: candidate: object
+  returns: float
+  decorators: (none)
+
+lrp\ensemble\rescoring.py:65 def default_strategy_resolver
+  arguments: candidate: object
+  returns: tuple[StrategyKey, ...]
+  decorators: (none)
+
+lrp\ensemble\rescoring.py:283 def rank_change
+  arguments: self
+  returns: int
+  decorators: property
+
+lrp\ensemble\rescoring.py:321 def changed_rank_count
+  arguments: self
+  returns: int
+  decorators: property
+
+lrp\ensemble\rescoring.py:362 def _performance_score
+  arguments: vectors: Sequence[StrategyFeatureVector]
+  returns: float
+  decorators: (none)
+
+lrp\ensemble\rescoring.py:384 def __init__
+  arguments: self, config: RescoringConfig | None, score_reader: BaseScoreReader, strategy_resolver: StrategyResolver
+  returns: None
+  decorators: (none)
+
+lrp\ensemble\rescoring.py:405 def evaluate
+  arguments: self, candidates: Sequence[object], snapshot: LearningSnapshot
+  returns: RescoringResult
+  decorators: (none)
+
+lrp\ensemble\snapshot.py:646 def ranking
+  arguments: self, strategy_type: str, strategy_name: str
+  returns: StrategyRankingSnapshot | None
+  decorators: (none)
+
+lrp\ensemble\snapshot.py:725 def ordered_rankings
+  arguments: values: Sequence[StrategyRankingSnapshot]
+  returns: tuple[StrategyRankingSnapshot, ...]
+  decorators: (none)
+
+lrp\io\artifacts.py:75 def write_prediction_artifacts
+  arguments: payload: Mapping[str, Any], output_root: str | Path
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\learning\adaptive_engine.py:93 def _calculate_one
+  arguments: self, ranking: StrategyRanking, dataset: AdaptiveWeightDataset
+  returns: dict[str, object]
+  decorators: (none)
+
+lrp\learning\adaptive_repository.py:19 def __init__
+  arguments: self, ranking_repository: RankingRepository
+  returns: None
+  decorators: (none)
+
+lrp\learning\adaptive_repository.py:32 def build_dataset
+  arguments: self, rankings: Sequence[StrategyRanking], strategy_type: str | None, history_limit: int
+  returns: AdaptiveWeightDataset
+  decorators: (none)
+
+lrp\learning\evaluator.py:18 def determine_prize_rank
+  arguments: match_count: int, bonus_matched: bool
+  returns: int | None
+  decorators: (none)
+
+lrp\learning\evaluator.py:43 def evaluate_prediction
+  arguments: prediction: PredictionRecord, result: ResultRecord, reviewed_at_kst: str | None
+  returns: ReviewRecord
+  decorators: (none)
+
+lrp\learning\learning_facade.py:15 def __init__
+  arguments: self, ranking_repository: RankingRepository, ranking_engine: StrategyRankingEngine, adaptive_repository: AdaptiveWeightRepository, adaptive_engine: AdaptiveWeightEngine
+  returns: None
+  decorators: (none)
+
+lrp\learning\learning_facade.py:28 def rank_strategies
+  arguments: self, strategy_type: str | None, history_limit: int
+  returns: tuple[StrategyRanking, ...]
+  decorators: (none)
+
+lrp\learning\ranking.py:173 def __init__
+  arguments: self, config: RankingConfig | None
+  returns: None
+  decorators: (none)
+
+lrp\learning\ranking.py:179 def rank
+  arguments: self, statistics: Sequence[StrategyStatistics], histories: Mapping[tuple[str, str], Sequence[StrategyPerformancePoint]]
+  returns: tuple[StrategyRanking, ...]
+  decorators: (none)
+
+lrp\learning\ranking_repository.py:161 def build_dataset
+  arguments: self, strategy_type: str | None, history_limit: int
+  returns: RankingDataset
+  decorators: (none)
+
+lrp\learning\repository.py:115 def _prediction_from_row
+  arguments: row: sqlite3.Row
+  returns: PredictionRecord
+  decorators: (none)
+
+lrp\learning\repository.py:181 def add_prediction
+  arguments: self, record: PredictionRecord
+  returns: bool
+  decorators: (none)
+
+lrp\learning\repository.py:361 def get_prediction
+  arguments: self, prediction_id: str
+  returns: PredictionRecord | None
+  decorators: (none)
+
+lrp\learning\repository.py:415 def pending_predictions_with_results
+  arguments: self, round_no: int | None, limit: int | None
+  returns: tuple[PredictionRecord, ...]
+  decorators: (none)
+
+lrp\learning\repository.py:462 def pending_strategy_reviews
+  arguments: self, limit: int | None
+  returns: tuple[tuple[PredictionRecord, ReviewRecord], ...]
+  decorators: (none)
+
+lrp\learning\repository.py:538 def apply_strategy_stat_event
+  arguments: self, prediction_id: str, strategy_type: str, strategy_name: str, match_count: int, prediction_score: float, prize_rank: int | None, aggregated_at_kst: str
+  returns: bool
+  decorators: (none)
+
+lrp\learning\repository.py:731 def pending_prediction_ids
+  arguments: self, round_no: int | None
+  returns: tuple[str, ...]
+  decorators: (none)
+
+lrp\learning\service.py:39 def __init__
+  arguments: self, repository: LearningRepository, ranking_config: RankingConfig | None, adaptive_config: AdaptiveWeightConfig | None
+  returns: None
+  decorators: (none)
+
+lrp\learning\service.py:127 def rank_strategies
+  arguments: self, strategy_type: str | None, history_limit: int
+  returns: tuple[StrategyRanking, ...]
+  decorators: (none)
+
+lrp\learning\strategy_stats.py:32 def average_prediction_score
+  arguments: self
+  returns: float
+  decorators: property
+
+lrp\management\status.py:35 def collect_platform_status
+  arguments: project_root: str | Path, predictions_root: str | Path, snapshots_root: str | Path, backups_root: str | Path
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\operations\review.py:29 def _load_prediction
+  arguments: source: str | Path | Mapping[str, Any]
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\operations\review.py:41 def prize_rank
+  arguments: main_hits: int, bonus_hit: bool
+  returns: str
+  decorators: (none)
+
+lrp\operations\review.py:55 def review_prediction
+  arguments: prediction: str | Path | Mapping[str, Any], winning_numbers: Sequence[int], bonus: int | None
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\pipelines\models.py:284 def request
+  arguments: self
+  returns: PredictionRequest
+  decorators: property
+
+lrp\pipelines\prediction.py:93 def load
+  arguments: cls
+  returns: 'PredictionPipeline'
+  decorators: classmethod
+
+lrp\pipelines\prediction.py:110 def generate_from_snapshot
+  arguments: self, snapshot: object, request: PredictionRequest
+  returns: PredictionGenerationResult
+  decorators: (none)
+
+lrp\pipelines\prediction.py:188 def complete_from_snapshot
+  arguments: self, snapshot: object, request: PredictionRequest
+  returns: PredictionResult
+  decorators: (none)
+
+lrp\pipelines\prediction.py:280 def run
+  arguments: self, draws: Iterable[object], request: PredictionRequest, analysis_config: object | None
+  returns: PredictionResult
+  decorators: (none)
+
+lrp\pipelines\prediction.py:298 def runtime_context
+  arguments: self, request: PredictionRequest
+  returns: RuntimeContext
+  decorators: (none)
+
+lrp\pipelines\serializer.py:25 def _candidate_object
+  arguments: value: object
+  returns: object
+  decorators: (none)
+
+lrp\pipelines\serializer.py:70 def _normalized_score
+  arguments: value: object
+  returns: float
+  decorators: (none)
+
+lrp\pipelines\serializer.py:178 def _diversity_metrics
+  arguments: number_sets: list[tuple[int, ...]]
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\pipelines\serializer.py:216 def prediction_to_dict
+  arguments: result: PredictionResult
+  returns: dict[str, Any]
+  decorators: (none)
+
+lrp\pipelines\serializer.py:324 def prediction_to_json
+  arguments: result: PredictionResult, indent: int | None
+  returns: str
+  decorators: (none)
+
+tests\test_e001_ensemble_foundation.py:71 def test_base_score_ordering
+  arguments: (none)
+  returns: None
+  decorators: (none)
+
+tests\test_e002_learning_snapshot.py:157 def rank_strategies
+  arguments: self, strategy_type: str, history_limit: int
+  returns: tuple[RankingFixture, ...]
+  decorators: (none)
+
+tests\test_e002_learning_snapshot.py:336 def test_ranking_fallback
+  arguments: (none)
+  returns: None
+  decorators: (none)
+
+tests\test_e003_feature_rescoring.py:118 def item_map
+  arguments: items: tuple[RescoredCandidate, ...]
+  returns: dict[str, RescoredCandidate]
+  decorators: (none)
+
+tests\test_e003_feature_rescoring.py:249 def test_candidate_specific_rescoring
+  arguments: (none)
+  returns: None
+  decorators: (none)
+
+tests\test_m6_adaptive_weight.py:23 def make_prediction
+  arguments: prediction_id: str, round_no: int, model_name: str, numbers: tuple[int, ...], score: float
+  returns: PredictionRecord
+  decorators: (none)
+
+tests\test_m6_automatic_review.py:18 def make_prediction
+  arguments: prediction_id: str, set_id: str, numbers: tuple[int, ...]
+  returns: PredictionRecord
+  decorators: (none)
+
+tests\test_m6_strategy_ranking.py:22 def make_prediction
+  arguments: prediction_id: str, round_no: int, model_name: str, numbers: tuple[int, ...], score: float, scenario: str
+  returns: PredictionRecord
+  decorators: (none)
+
+tests\test_m6_strategy_ranking.py:51 def add_round
+  arguments: repository: LearningRepository, round_no: int, winning_numbers: tuple[int, ...], bonus: int, predictions: tuple[PredictionRecord, ...]
+  returns: None
+  decorators: (none)
+
+tests\test_m6_strategy_statistics.py:25 def make_prediction
+  arguments: prediction_id: str, set_id: str, model_name: str, numbers: tuple[int, ...], score: float, scenario: str
+  returns: PredictionRecord
+  decorators: (none)
+
+tests\test_m6_strategy_statistics.py:75 def assert_repository_counts
+  arguments: repository: LearningRepository, predictions: int, results: int, reviews: int, strategy_stats: int, strategy_events: int
+  returns: None
+  decorators: (none)
+
+------------------------------------------------------------------------------
+5. Relevant Imports
+------------------------------------------------------------------------------
+lrp\adapters\__init__.py:3 from .candidate import CandidateAdapter
+lrp\cli\predict.py:12 from lrp.io import history_until_round, load_history, long_gap_numbers, previous_numbers, to_statistics_draws, write_prediction_artifacts
+lrp\cli\predict.py:20 from lrp.pipelines import PredictionPipeline, PredictionRequest, prediction_to_dict
+lrp\cli\review.py:10 from lrp.operations import review_prediction, write_operation_artifact
+lrp\core\__init__.py:11 from .component_catalog import CANDIDATE_COMPONENT_ID, FOUNDATION_COMPONENT_ID, STATISTICS_COMPONENT_ID, ComponentCatalog, build_builtin_descriptors
+lrp\core\assembly.py:10 from lrp import CANDIDATE_REQUIRED_VERSION, FOUNDATION_REQUIRED_VERSION, STATISTICS_REQUIRED_API_VERSION
+lrp\core\component_catalog.py:8 from lrp import CANDIDATE_REQUIRED_VERSION, FOUNDATION_REQUIRED_VERSION, STATISTICS_REQUIRED_API_VERSION
+lrp\ensemble\__init__.py:5 from .adapters import ranking_from_m6, rankings_from_m6, statistic_from_m6, statistics_from_m6, weight_from_m6, weights_from_m6, weights_from_rankings
+lrp\ensemble\__init__.py:14 from .engine import EnsembleEngine, ScoreReader
+lrp\ensemble\__init__.py:15 from .explain import explain_candidate, explain_result
+lrp\ensemble\__init__.py:25 from .models import EnsembleCandidateScore, EnsembleConfig, EnsembleResult, StrategyWeight, normalize_strategy_weights
+lrp\ensemble\__init__.py:40 from .rescoring import BaseScoreReader, CandidateRescorer, RescoredCandidate, RescoringConfig, RescoringResult, ScoreContribution, StrategyKey, StrategyResolver, default_base_score_reader, default_strategy_resolver
+lrp\ensemble\__init__.py:52 from .snapshot import LearningSnapshot, StrategyRankingSnapshot, StrategyStatisticSnapshot, ordered_rankings, ordered_statistics
+lrp\ensemble\adapters.py:14 from .snapshot import StrategyRankingSnapshot, StrategyStatisticSnapshot, ordered_rankings, ordered_statistics
+lrp\ensemble\engine.py:11 from .models import EnsembleCandidateScore, EnsembleConfig, EnsembleResult
+lrp\ensemble\explain.py:7 from .rescoring import RescoredCandidate, RescoringResult
+lrp\ensemble\repository.py:10 from .adapters import rankings_from_m6, statistics_from_m6, weights_from_m6, weights_from_rankings
+lrp\io\__init__.py:3 from .artifacts import atomic_write_bytes, sha256_file, write_prediction_artifacts
+lrp\learning\__init__.py:15 from .evaluator import determine_prize_rank, evaluate_prediction
+lrp\learning\__init__.py:17 from .models import PredictionRecord, ResultRecord, ReviewRecord
+lrp\learning\__init__.py:18 from .ranking import RankingConfig, RankingWeights, StrategyPerformancePoint, StrategyRanking, StrategyRankingEngine
+lrp\learning\__init__.py:25 from .ranking_repository import RankingDataset, RankingRepository
+lrp\learning\adaptive_engine.py:9 from .ranking import StrategyRanking
+lrp\learning\adaptive_models.py:8 from .ranking import StrategyRanking
+lrp\learning\adaptive_repository.py:8 from .ranking import StrategyRanking
+lrp\learning\adaptive_repository.py:9 from .ranking_repository import RankingRepository
+lrp\learning\evaluator.py:8 from .models import PredictionRecord, ResultRecord, ReviewRecord
+lrp\learning\learning_facade.py:8 from .ranking import StrategyRanking, StrategyRankingEngine
+lrp\learning\learning_facade.py:9 from .ranking_repository import RankingRepository
+lrp\learning\ranking_repository.py:18 from .ranking import StrategyPerformancePoint
+lrp\learning\repository.py:11 from .models import PredictionRecord, ResultRecord, ReviewRecord
+lrp\learning\service.py:12 from .evaluator import evaluate_prediction
+lrp\learning\service.py:14 from .ranking import RankingConfig, StrategyRanking, StrategyRankingEngine
+lrp\learning\service.py:15 from .ranking_repository import RankingRepository
+lrp\operations\__init__.py:3 from .review import prize_rank, review_prediction
+lrp\pipelines\__init__.py:3 from .models import PredictionGenerationResult, PredictionRequest, PredictionResult
+lrp\pipelines\__init__.py:8 from .prediction import PredictionPipeline
+lrp\pipelines\__init__.py:10 from .serializer import prediction_to_dict, prediction_to_json
+lrp\pipelines\prediction.py:10 from lrp.adapters import CandidateAdapter, StatisticsAdapter, build_statistics_signals
+lrp\pipelines\prediction.py:18 from .models import PredictionGenerationResult, PredictionRequest, PredictionResult
+lrp\pipelines\serializer.py:11 from .models import PredictionResult
+tests\test_e003_feature_rescoring.py:8 from lrp.ensemble import CandidateRescorer, LearningSnapshot, RescoredCandidate, RescoringConfig, StrategyRankingSnapshot, StrategyStatisticSnapshot, StrategyWeight, build_feature_catalog, explain_result
+tests\test_m3_application.py:10 from lrp.io import history_until_round, load_history_csv, long_gap_numbers, previous_numbers, sha256_file, write_prediction_artifacts
+tests\test_m4_operations.py:10 from lrp.operations import create_backup, restore_backup, review_prediction, verify_manifest, write_operation_artifact
+tests\test_m6_adaptive_weight.py:9 from lrp.learning import LearningRepository, LearningService, PredictionRecord, ResultRecord
+tests\test_m6_automatic_review.py:8 from lrp.learning import LearningRepository, LearningService, PredictionRecord, ResultRecord, determine_prize_rank, evaluate_prediction
+tests\test_m6_learning_foundation.py:8 from lrp.learning import LearningRepository, PredictionRecord, ResultRecord, ReviewRecord
+tests\test_m6_strategy_ranking.py:8 from lrp.learning import LearningRepository, LearningService, PredictionRecord, ResultRecord
+tests\test_m6_strategy_statistics.py:9 from lrp.learning import LearningRepository, LearningService, PredictionRecord, ResultRecord, StrategyStatistics
+tests\test_prediction_orchestrator.py:7 from lrp.pipelines import PredictionPipeline, PredictionRequest, prediction_to_dict
+
+------------------------------------------------------------------------------
+6. Score / Ranking / Selection Assignments
+------------------------------------------------------------------------------
+lrp\__init__.py:17 CANDIDATE_REQUIRED_VERSION
+  expression: '0.8.0'
+lrp\cli\predict.py:139 pipeline
+  expression: PredictionPipeline.load()
+lrp\contracts\component.py:18 CANDIDATE
+  expression: 'candidate'
+lrp\contracts\component.py:28 CANDIDATE
+  expression: 'candidate'
+lrp\core\component_catalog.py:25 CANDIDATE_COMPONENT_ID
+  expression: 'project-d.candidate'
+lrp\core\component_catalog.py:43 CANDIDATE_CAPABILITIES
+  expression: (CapabilityRequirement('candidate.diversity'), CapabilityRequirement('candidate.generation'), CapabilityRequirement('candidate.practical_selection'), CapabilityRequirement('candidate.ranking'), CapabilityRequirement('candidate.replay'), CapabilityRequirement('candidate.risk'), CapabilityRequirement('candidate.scoring'), CapabilityRequirement('candidate.statistics_adapter'))
+lrp\ensemble\adapters.py:476 positive_scores
+  expression: [max(0.0, item.rank_score) for item in items]
+lrp\ensemble\engine.py:23 ScoreReader
+  expression: Callable[[object], float]
+lrp\ensemble\engine.py:43 score
+  expression: _read(current, 'normalized_score', 'ranking_score', 'final_score', 'score')
+lrp\ensemble\engine.py:197 base_score
+  expression: float(reader(source))
+lrp\ensemble\engine.py:210 base_score
+  expression: min(1.0, max(0.0, base_score))
+lrp\ensemble\engine.py:238 ensemble_score
+  expression: sum(contributions.values()) / effective_config.total_weight
+lrp\ensemble\engine.py:242 ensemble_score
+  expression: min(1.0, max(0.0, ensemble_score))
+lrp\ensemble\features.py:74 rank_score
+  expression: (none)
+lrp\ensemble\features.py:77 trend_score
+  expression: (none)
+lrp\ensemble\features.py:79 average_match_score
+  expression: (none)
+lrp\ensemble\features.py:80 average_prediction_score
+  expression: (none)
+lrp\ensemble\features.py:212 ranking
+  expression: snapshot.ranking(strategy_type, strategy_name)
+lrp\ensemble\features.py:249 rank_score
+  expression: ranking.rank_score if ranking is not None else 0.0
+lrp\ensemble\features.py:293 average_prediction_score
+  expression: statistic.average_prediction_score if statistic is not None else ranking.average_prediction_score if ranking is not None else 0.0
+lrp\ensemble\models.py:257 base_score_weight
+  expression: 1.0
+lrp\ensemble\models.py:337 base_score
+  expression: (none)
+lrp\ensemble\models.py:338 ensemble_score
+  expression: (none)
+lrp\ensemble\models.py:353 base_score
+  expression: _unit_interval(self.base_score, field_name='base_score')
+lrp\ensemble\models.py:357 ensemble_score
+  expression: _unit_interval(self.ensemble_score, field_name='ensemble_score')
+lrp\ensemble\repository.py:300 candidate_names
+  expression: ('adaptive_weights', 'calculate_adaptive_weights', 'build_adaptive_weights', 'get_adaptive_weights', 'update_adaptive_weights')
+lrp\ensemble\repository.py:370 raw_rankings
+  expression: []
+lrp\ensemble\repository.py:401 rankings
+  expression: rankings_from_m6(raw_rankings)
+lrp\ensemble\rescoring.py:23 BaseScoreReader
+  expression: Callable[[object], float]
+lrp\ensemble\rescoring.py:91 model_name
+  expression: _read(candidate, 'model_name', None)
+lrp\ensemble\rescoring.py:105 scenario_name
+  expression: _read(candidate, 'scenario_name', None)
+lrp\ensemble\rescoring.py:119 scenario_names
+  expression: _read(candidate, 'scenario_names', ())
+lrp\ensemble\rescoring.py:179 base_score_weight
+  expression: 0.75
+lrp\ensemble\rescoring.py:181 ranking_weight
+  expression: 0.05
+lrp\ensemble\rescoring.py:234 ranking
+  expression: (none)
+lrp\ensemble\rescoring.py:271 base_score
+  expression: (none)
+lrp\ensemble\rescoring.py:272 ensemble_score
+  expression: (none)
+lrp\ensemble\rescoring.py:273 rank_before
+  expression: (none)
+lrp\ensemble\rescoring.py:274 rank_after
+  expression: (none)
+lrp\ensemble\rescoring.py:400 self.score_reader
+  expression: score_reader
+lrp\ensemble\rescoring.py:442 base_rank
+  expression: {original_index: rank for rank, (original_index, _, _) in enumerate(base_rows, start=1)}
+lrp\ensemble\rescoring.py:503 final_score
+  expression: base_score
+lrp\ensemble\rescoring.py:570 final_score
+  expression: max(0.0, min(1.0, contributions.total))
+lrp\ensemble\snapshot.py:100 average_prediction_score
+  expression: (none)
+lrp\ensemble\snapshot.py:134 average_prediction_score
+  expression: _unit_interval(self.average_prediction_score, field_name='average_prediction_score')
+lrp\ensemble\snapshot.py:234 rank_position
+  expression: (none)
+lrp\ensemble\snapshot.py:235 rank_score
+  expression: (none)
+lrp\ensemble\snapshot.py:242 average_prediction_score
+  expression: (none)
+lrp\ensemble\snapshot.py:271 rank_score
+  expression: _unit_interval(self.rank_score, field_name='rank_score')
+lrp\ensemble\snapshot.py:316 average_prediction_score
+  expression: _unit_interval(self.average_prediction_score, field_name='average_prediction_score')
+lrp\ensemble\snapshot.py:464 rankings
+  expression: (none)
+lrp\ensemble\snapshot.py:504 rankings
+  expression: tuple(self.rankings)
+lrp\ensemble\snapshot.py:553 ranking_keys
+  expression: [item.key for item in rankings]
+lrp\io\artifacts.py:89 prediction_path
+  expression: atomic_write_bytes(directory / 'prediction.json', _json_bytes(payload))
+lrp\learning\adaptive_engine.py:20 rank_score
+  expression: 0.6
+lrp\learning\adaptive_models.py:20 rankings
+  expression: (none)
+lrp\learning\adaptive_models.py:34 rank_position
+  expression: (none)
+lrp\learning\adaptive_models.py:35 rank_score
+  expression: (none)
+lrp\learning\adaptive_repository.py:20 self.ranking_repository
+  expression: ranking_repository
+lrp\learning\evaluator.py:56 prediction_numbers
+  expression: set(prediction.numbers)
+lrp\learning\learning_facade.py:23 self.ranking_repository
+  expression: ranking_repository
+lrp\learning\learning_facade.py:24 self.ranking_engine
+  expression: ranking_engine
+lrp\learning\learning_facade.py:49 rankings
+  expression: self.rank_strategies(strategy_type=strategy_type, history_limit=history_limit)
+lrp\learning\models.py:55 prediction_id
+  expression: (none)
+lrp\learning\models.py:59 score
+  expression: (none)
+lrp\learning\models.py:60 model_name
+  expression: (none)
+lrp\learning\models.py:143 prediction_id
+  expression: (none)
+lrp\learning\models.py:148 prize_rank
+  expression: (none)
+lrp\learning\ranking.py:35 prediction_id
+  expression: (none)
+lrp\learning\ranking.py:38 prediction_score
+  expression: (none)
+lrp\learning\ranking.py:39 prize_rank
+  expression: (none)
+lrp\learning\ranking.py:63 prediction_quality
+  expression: 0.08
+lrp\learning\ranking.py:117 rank_position
+  expression: (none)
+lrp\learning\ranking.py:118 rank_score
+  expression: (none)
+lrp\learning\ranking.py:125 average_prediction_score
+  expression: (none)
+lrp\learning\ranking.py:264 prediction_quality_component
+  expression: _clamp(statistics.average_prediction_score)
+lrp\learning\ranking.py:269 rank_score
+  expression: _clamp(weights.performance * performance_component + weights.recent_gain * recent_component + weights.prize_rate * prize_component + weights.stability * stability + weights.confidence * confidence + weights.prediction_quality * prediction_quality_component)
+lrp\learning\repository.py:510 prediction
+  expression: _prediction_from_row(row)
+lrp\learning\service.py:48 self.ranking_repository
+  expression: RankingRepository(repository)
+lrp\learning\service.py:49 self.ranking_engine
+  expression: StrategyRankingEngine(ranking_config)
+lrp\learning\service.py:85 result_cache[prediction.round_no]
+  expression: result
+lrp\learning\strategy_stats.py:16 total_prediction_score
+  expression: (none)
+lrp\management\status.py:48 predictions
+  expression: root / predictions_root
+lrp\management\status.py:52 prediction_files
+  expression: _files(predictions, 'prediction.json')
+lrp\management\status.py:64 prediction_manifests
+  expression: _files(predictions, 'manifest.json')
+lrp\operations\review.py:91 practical
+  expression: set((str(value) for value in payload.get('top5_practical', [])))
+lrp\operations\review.py:92 practical_rows
+  expression: [row for row in rows if row['id'] in practical]
+lrp\pipelines\models.py:58 candidate_count
+  expression: 10000
+lrp\pipelines\models.py:61 practical_k
+  expression: 5
+lrp\pipelines\models.py:259 candidates
+  expression: (none)
+lrp\pipelines\models.py:261 candidate_version
+  expression: (none)
+lrp\pipelines\models.py:277 scored_candidates
+  expression: (none)
+lrp\pipelines\models.py:278 ranking
+  expression: (none)
+lrp\pipelines\models.py:279 diversity
+  expression: (none)
+lrp\pipelines\models.py:280 practical
+  expression: (none)
+lrp\pipelines\prediction.py:76 score
+  expression: float(value)
+lrp\pipelines\prediction.py:90 candidate
+  expression: (none)
+lrp\pipelines\prediction.py:147 candidate_config
+  expression: module.CandidateConfig(seed=request.seed, temperature=request.temperature, candidate_count=request.candidate_count, max_attempts_multiplier=request.max_attempts_multiplier)
+lrp\pipelines\prediction.py:169 candidates
+  expression: self.candidate.generate_candidates(probabilities, candidate_config=candidate_config, risk_config=risk_config, previous_numbers=request.previous_numbers, long_gap_numbers=request.long_gap_numbers)
+lrp\pipelines\prediction.py:200 score_weights
+  expression: module.ScoreWeights(recency=request.weights['recency'], frequency=request.weights['frequency'], gap_reversion=request.weights['gap_reversion'], pair_graph=request.weights['pair_graph'], terminal_dispersion=request.weights['terminal_dispersion'], sum_band=request.weights['sum_band'], parity_balance=request.weights['parity_balance'])
+lrp\pipelines\prediction.py:212 scored
+  expression: self.candidate.score_candidates(generation.candidates, signals=generation.number_signals, weights=score_weights, pair_affinities=_pair_affinities(snapshot), sum_band_center=145.0, sum_band_scale=35.0)
+lrp\pipelines\prediction.py:220 scored
+  expression: tuple(scored)
+lrp\pipelines\prediction.py:227 ranking_config
+  expression: module.RankingConfig(score_weight=0.7, robustness_weight=0.15, diversity_weight=0.15, pareto_penalty=0.05)
+lrp\pipelines\prediction.py:234 ranking
+  expression: self.candidate.rank_candidates(scored, config=ranking_config)
+lrp\pipelines\prediction.py:239 diversity_config
+  expression: module.DiversityConfig(k=request.top_k, mmr_lambda=request.mmr_lambda, jaccard_max=request.jaccard_max, max_overlap_between_sets=request.max_overlap_between_sets)
+lrp\pipelines\prediction.py:248 diversity
+  expression: self.candidate.select_diverse_candidates(scored, config=diversity_config)
+lrp\pipelines\prediction.py:253 practical_config
+  expression: module.PracticalSelectionConfig(k=request.practical_k, preferred_sum_min=request.preferred_sum_min, preferred_sum_max=request.preferred_sum_max, max_overlap_previous_draw=1, require_no_risk_flags=True, jaccard_max=request.jaccard_max, max_overlap_between_sets=request.max_overlap_between_sets)
+lrp\pipelines\prediction.py:265 practical
+  expression: self.candidate.select_practical_sets(ranking, config=practical_config, previous_numbers=request.previous_numbers)
+lrp\pipelines\serializer.py:52 candidate
+  expression: _candidate_object(value)
+lrp\pipelines\serializer.py:74 score
+  expression: _read(current, 'normalized_score', 'score', 'ranking_score', 'final_score')
+lrp\pipelines\serializer.py:124 candidate
+  expression: _candidate_object(value)
+lrp\pipelines\serializer.py:225 diversity_items
+  expression: _selected_items(result.diversity)
+lrp\pipelines\serializer.py:246 practical_ids
+  expression: []
+tests\test_e001_ensemble_foundation.py:20 normalized_score
+  expression: (none)
+tests\test_e001_ensemble_foundation.py:72 candidates
+  expression: (CandidateFixture('B', 0.72), CandidateFixture('A', 0.91), CandidateFixture('C', 0.83))
+tests\test_e002_learning_snapshot.py:21 average_prediction_score
+  expression: (none)
+tests\test_e002_learning_snapshot.py:36 rank_position
+  expression: (none)
+tests\test_e002_learning_snapshot.py:37 rank_score
+  expression: (none)
+tests\test_e002_learning_snapshot.py:44 average_prediction_score
+  expression: (none)
+tests\test_e002_learning_snapshot.py:54 rank_position
+  expression: (none)
+tests\test_e002_learning_snapshot.py:55 rank_score
+  expression: (none)
+tests\test_e002_learning_snapshot.py:70 normalized_score
+  expression: (none)
+tests\test_e002_learning_snapshot.py:85 self.ranking_repository
+  expression: RankingRepositoryFixture()
+tests\test_e003_feature_rescoring.py:26 normalized_score
+  expression: (none)
+tests\test_e003_feature_rescoring.py:27 model_name
+  expression: None
+tests\test_e003_feature_rescoring.py:28 scenario_name
+  expression: None
+tests\test_e003_feature_rescoring.py:190 candidates
+  expression: (CandidateFixture(name='A', normalized_score=0.9), CandidateFixture(name='B', normalized_score=0.8))
+tests\test_e003_feature_rescoring.py:250 candidates
+  expression: (CandidateFixture(name='weak-high-base', normalized_score=0.9, model_name='weak'), CandidateFixture(name='strong-lower-base', normalized_score=0.86, model_name='strong'), CandidateFixture(name='neutral', normalized_score=0.7))
+tests\test_e003_feature_rescoring.py:399 scores
+  expression: [item.ensemble_score for item in result.items]
+tests\test_e003_feature_rescoring.py:414 candidates
+  expression: (CandidateFixture(name='weak-high-base', normalized_score=0.9, model_name='weak'), CandidateFixture(name='strong-lower-base', normalized_score=0.86, model_name='strong'), CandidateFixture(name='neutral', normalized_score=0.7))
+tests\test_m3_application.py:89 prediction_path
+  expression: Path(artifacts['prediction_path'])
+tests\test_m4_operations.py:22 prediction
+  expression: {'round': 1234, 'seed': 20260721, 'sets': [{'id': 'S1', 'numbers': [1, 2, 3, 4, 5, 6], 'score': 1.0}, {'id': 'S2', 'numbers': [7, 8, 9, 10, 11, 12], 'score': 0.5}], 'top5_practical': ['S1'], 'metadata': {}}
+tests\test_m59_status.py:23 prediction
+  expression: root / 'predictions' / 'round_1234' / 'seed_1' / 'prediction.json'
+tests\test_m6_adaptive_weight.py:53 predictions
+  expression: (make_prediction(prediction_id='1220:GPT-v3.3:S1', round_no=1220, model_name='GPT-v3.3', numbers=(1, 2, 3, 4, 5, 6), score=0.92), make_prediction(prediction_id='1220:Gemini-v7.1:S1', round_no=1220, model_name='Gemini-v7.1', numbers=(1, 2, 20, 21, 22, 23), score=0.82))
+tests\test_m6_adaptive_weight.py:115 ranking_before
+  expression: service.rank_strategies(strategy_type='model', history_limit=100)
+tests\test_m6_adaptive_weight.py:119 ranking_after
+  expression: service.rank_strategies(strategy_type='model', history_limit=100)
+tests\test_m6_automatic_review.py:85 prediction_1
+  expression: make_prediction('1219:GPT-v3.3:S1', 'S1', (3, 8, 14, 21, 34, 42))
+tests\test_m6_automatic_review.py:90 prediction_2
+  expression: make_prediction('1219:GPT-v3.3:S2', 'S2', (3, 8, 14, 22, 35, 41))
+tests\test_m6_learning_foundation.py:26 prediction
+  expression: PredictionRecord(prediction_id='1219:GPT-v3.3:S1', round_no=1219, set_id='S1', numbers=(3, 8, 14, 21, 34, 42), score=0.91, model_name='GPT-v3.3', seed=20260721, generated_at_kst='2026-07-21T14:32:00+09:00', features={'gap_mix': 0.73, 'pair_affinity': 0.61}, parameters={'temperature': 0.82})
+tests\test_m6_strategy_ranking.py:142 model_rankings
+  expression: service.rank_strategies(strategy_type='model', history_limit=100)
+tests\test_m6_strategy_ranking.py:167 scenario_rankings
+  expression: service.rank_strategies(strategy_type='scenario', history_limit=100)
+tests\test_m6_strategy_ranking.py:202 rankings_again
+  expression: service.rank_strategies(strategy_type='model', history_limit=100)
+tests\test_prediction_orchestrator.py:47 pipeline
+  expression: PredictionPipeline.load()
+
+------------------------------------------------------------------------------
+7. Source Evidence by File
+------------------------------------------------------------------------------
+
+[lrp\__init__.py]
+    4: Research Platform. Statistical calculations and candidate generation
+   17: CANDIDATE_REQUIRED_VERSION = "0.8.0"
+   20: "CANDIDATE_REQUIRED_VERSION",
+
+[lrp\adapters\__init__.py]
+    3: from .candidate import CandidateAdapter
+   13: "CandidateAdapter",
+
+[lrp\adapters\candidate.py]
+   14: "generate_candidates",
+   16: "rank_candidates",
+   17: "score_candidates",
+   18: "select_diverse_candidates",
+   19: "select_practical_sets",
+   25: class CandidateAdapter:
+   31: def load(cls) -> "CandidateAdapter":
+   33: module = import_module("lotto645_candidates")
+   36: "Project D Candidate Engine is not importable"
+   46: "Candidate public API is incomplete: "
+   57: "Candidate package does not expose __version__"
+   80: def generate_candidates(
+   85: return self.module.generate_candidates(*args, **kwargs)
+   87: def score_candidates(
+   92: return self.module.score_candidates(*args, **kwargs)
+   94: def rank_candidates(
+   99: return self.module.rank_candidates(*args, **kwargs)
+  101: def select_diverse_candidates(
+  106: return self.module.select_diverse_candidates(*args, **kwargs)
+  108: def select_practical_sets(
+  113: return self.module.select_practical_sets(*args, **kwargs)
+
+[lrp\cli\__init__.py]
+   44: "Generate prediction artifacts",
+   48: "Run the weekly prediction workflow",
+   52: "Review a saved prediction",
+
+[lrp\cli\predict.py]
+    1: """Command-line prediction application."""
+   18: write_prediction_artifacts,
+   20: from lrp.pipelines import (
+   21: PredictionPipeline,
+   22: PredictionRequest,
+   23: prediction_to_dict,
+   31: "Generate reproducible Lotto645 prediction artifacts."
+   45: help="Target prediction round",
+   59: "--candidate-count",
+   69: "--practical-k",
+   89: default="predictions",
+   90: help="Prediction artifact root directory",
+   95: help="Print full prediction JSON",
+  102: pipeline: PredictionPipeline,
+  112: return pipeline.statistics.create_config(
+  139: pipeline = PredictionPipeline.load()
+  141: pipeline.statistics.module,
+  150: request = PredictionRequest(
+  154: candidate_count=arguments.candidate_count,
+  157: practical_k=arguments.practical_k,
+  170: pipeline,
+  175: result = pipeline.run(
+  181: payload = prediction_to_dict(result)
+  183: artifact = write_prediction_artifacts(
+  196: "generated_candidates": (
+  199: "selected_sets": len(payload["sets"]),
+  200: "top5_practical": payload[
+  201: "top5_practical"
+  203: "diversity": payload["diversity"],
+
+[lrp\cli\review.py]
+   10: from lrp.operations import review_prediction, write_operation_artifact
+   15: parser.add_argument("--prediction", required=True)
+   25: payload = review_prediction(
+   26: arguments.prediction,
+
+[lrp\cli\status.py]
+   19: parser.add_argument("--predictions", default="predictions")
+   28: predictions_root=arguments.predictions,
+
+[lrp\cli\weekly.py]
+    1: """Weekly prediction command with operation snapshot."""
+   20: parser.add_argument("--candidate-count", type=int, default=10000)
+   22: parser.add_argument("--practical-k", type=int, default=5)
+   25: parser.add_argument("--output", default="predictions")
+   42: "generated_candidates": summary["generated_candidates"],
+   43: "selected_sets": summary["selected_sets"],
+   44: "top5_practical": summary["top5_practical"],
+   45: "diversity": summary["diversity"],
+   47: "prediction_artifact": summary["artifact"],
+
+[lrp\contracts\component.py]
+   18: CANDIDATE = "candidate"
+   28: CANDIDATE = "candidate"
+
+[lrp\core\__init__.py]
+   12: CANDIDATE_COMPONENT_ID,
+   22: "CANDIDATE_COMPONENT_ID",
+
+[lrp\core\assembly.py]
+   11: CANDIDATE_REQUIRED_VERSION,
+  111: ComponentKind.CANDIDATE: "lotto645_candidates",
+  211: def _check_candidate(
+  220: elif descriptor.release_channel is ReleaseChannel.CANDIDATE:
+  223: CANDIDATE_REQUIRED_VERSION,
+  226: "Candidate release-line mismatch "
+  228: f"{CANDIDATE_REQUIRED_VERSION}"
+  232: "unsupported Candidate version "
+  237: "generate_candidates",
+  238: "rank_candidates",
+  239: "select_diverse_candidates",
+  240: "select_practical_sets",
+  313: elif descriptor.kind is ComponentKind.CANDIDATE:
+  314: check = _check_candidate(descriptor, module)
+
+[lrp\core\component_catalog.py]
+    9: CANDIDATE_REQUIRED_VERSION,
+   25: CANDIDATE_COMPONENT_ID = "project-d.candidate"
+   43: CANDIDATE_CAPABILITIES = (
+   44: CapabilityRequirement("candidate.diversity"),
+   45: CapabilityRequirement("candidate.generation"),
+   46: CapabilityRequirement("candidate.practical_selection"),
+   47: CapabilityRequirement("candidate.ranking"),
+   48: CapabilityRequirement("candidate.replay"),
+   49: CapabilityRequirement("candidate.risk"),
+   50: CapabilityRequirement("candidate.scoring"),
+   51: CapabilityRequirement("candidate.statistics_adapter"),
+   77: component_id=CANDIDATE_COMPONENT_ID,
+   78: display_name="Lotto645 Candidate Engine",
+   79: kind=ComponentKind.CANDIDATE,
+   81: release_channel=ReleaseChannel.CANDIDATE,
+   82: capabilities=CANDIDATE_CAPABILITIES,
+
+[lrp\ensemble\__init__.py]
+    6: ranking_from_m6,
+    7: rankings_from_m6,
+   12: weights_from_rankings,
+   14: from .engine import EnsembleEngine, ScoreReader
+   16: explain_candidate,
+   26: EnsembleCandidateScore,
+   41: BaseScoreReader,
+   42: CandidateRescorer,
+   43: RescoredCandidate,
+   46: ScoreContribution,
+   49: default_base_score_reader,
+   54: StrategyRankingSnapshot,
+   56: ordered_rankings,
+   63: "BaseScoreReader",
+   64: "CandidateRescorer",
+   66: "EnsembleCandidateScore",
+   74: "RescoredCandidate",
+   77: "ScoreContribution",
+   78: "ScoreReader",
+   82: "StrategyRankingSnapshot",
+   90: "default_base_score_reader",
+   92: "explain_candidate",
+   95: "ordered_rankings",
+   97: "ranking_from_m6",
+   98: "rankings_from_m6",
+  104: "weights_from_rankings",
+
+[lrp\ensemble\adapters.py]
+   15: StrategyRankingSnapshot,
+   17: ordered_rankings,
+  172: average_prediction_score=_number(
+  175: "average_prediction_score",
+  178: field_name="average_prediction_score",
+  208: def ranking_from_m6(
+  210: ) -> StrategyRankingSnapshot:
+  213: score,
+  218: for window, score
+  230: score,
+  235: for window, score
+  245: return StrategyRankingSnapshot(
+  254: rank_position=_integer(
+  257: "rank_position",
+  260: field_name="rank_position",
+  262: rank_score=_number(
+  265: "rank_score",
+  268: field_name="rank_score",
+  318: average_prediction_score=_number(
+  321: "average_prediction_score",
+  324: field_name="average_prediction_score",
+  347: "rank_position",
+  348: "rank_score",
+  353: "average_prediction_score",
+  455: def weights_from_rankings(
+  456: rankings: Sequence[
+  457: StrategyRankingSnapshot
+  460: """Build deterministic fallback weights from M6 rankings."""
+  464: list[StrategyRankingSnapshot],
+  467: for ranking in rankings:
+  469: ranking.strategy_type,
+  471: ).append(ranking)
+  476: positive_scores = [
+  477: max(0.0, item.rank_score)
+  480: total = sum(positive_scores)
+  489: score / total
+  490: for score in positive_scores
+  505: item.rank_score,
+  518: "ranking_fallback"
+  520: "rank_position": (
+  521: item.rank_position
+  523: "rank_score": (
+  524: item.rank_score
+  552: def rankings_from_m6(
+  555: StrategyRankingSnapshot,
+  558: return ordered_rankings(
+  560: ranking_from_m6(value)
+
+[lrp\ensemble\engine.py]
+   12: EnsembleCandidateScore,
+   23: ScoreReader = Callable[[object], float]
+   37: def _default_score_reader(value: object) -> float:
+   38: """Read a normalized Project D score from nested objects."""
+   43: score = _read(
+   45: "normalized_score",
+   46: "ranking_score",
+   47: "final_score",
+   48: "score",
+   52: isinstance(score, (int, float))
+   53: and not isinstance(score, bool)
+   55: normalized = float(score)
+   59: "candidate score must be finite"
+   69: "ranked",
+   70: "scored",
+   71: "scored_candidate",
+   72: "candidate",
+   82: "unable to locate candidate score"
+  116: candidates: Iterable[object],
+  120: score_reader: ScoreReader | None = None,
+  141: reader = score_reader or _default_score_reader
+  145: "score_reader must be callable"
+  148: sources = tuple(candidates)
+  193: items: list[EnsembleCandidateScore] = []
+  197: base_score = float(reader(source))
+  202: "score_reader returned an invalid score"
+  205: if not math.isfinite(base_score):
+  207: "score_reader returned a non-finite score"
+  210: base_score = min(
+  212: max(0.0, base_score),
+  217: effective_config.base_score_weight
+  218: * base_score
+  238: ensemble_score = (
+  242: ensemble_score = min(
+  244: max(0.0, ensemble_score),
+  248: EnsembleCandidateScore(
+  251: base_score=base_score,
+  252: ensemble_score=ensemble_score,
+  261: -item.ensemble_score,
+  262: -item.base_score,
+
+[lrp\ensemble\explain.py]
+    1: """Human- and machine-readable E-003 score explanations."""
+    8: RescoredCandidate,
+   13: def explain_candidate(
+   14: item: RescoredCandidate,
+   21: "base_score": round(
+   22: item.base_score,
+   25: "ensemble_score": round(
+   26: item.ensemble_score,
+   29: "rank_before": item.rank_before,
+   30: "rank_after": item.rank_after,
+   31: "rank_change": item.rank_change,
+   62: "candidate_count": result.count,
+   63: "changed_rank_count": (
+   64: result.changed_rank_count
+   67: explain_candidate(item)
+
+[lrp\ensemble\features.py]
+   74: rank_score: float
+   77: trend_score: float
+   79: average_match_score: float
+   80: average_prediction_score: float
+  108: "rank_score",
+  111: "trend_score",
+  112: "average_match_score",
+  113: "average_prediction_score",
+  168: "rank_score": self.rank_score,
+  171: "trend_score": self.trend_score,
+  172: "average_match_score": (
+  173: self.average_match_score
+  175: "average_prediction_score": (
+  176: self.average_prediction_score
+  194: """Merge M6 weight, ranking and statistic records."""
+  212: ranking = snapshot.ranking(
+  223: and ranking is None
+  232: ranking,
+  249: rank_score = (
+  250: ranking.rank_score
+  251: if ranking is not None
+  259: ranking,
+  268: ranking,
+  274: ranking.trend
+  275: if ranking is not None
+  287: ranking.average_match_count
+  288: if ranking is not None
+  293: average_prediction_score = (
+  294: statistic.average_prediction_score
+  297: ranking.average_prediction_score
+  298: if ranking is not None
+  307: ranking.prize_rate
+  308: if ranking is not None
+  320: rank_score=max(
+  322: min(1.0, rank_score),
+  348: trend_score=trend_value(trend),
+  349: average_match_score=max(
+  356: average_prediction_score=max(
+  360: float(average_prediction_score),
+  378: ranking,
+  389: "has_ranking": ranking is not None,
+  407: *snapshot.rankings,
+
+[lrp\ensemble\models.py]
+  255: """Configuration for Project E candidate re-evaluation."""
+  257: base_score_weight: float = 1.0
+  266: "base_score_weight": self.base_score_weight,
+  313: self.base_score_weight
+  322: "base_score_weight": self.base_score_weight,
+  332: class EnsembleCandidateScore:
+  333: """One Project E re-evaluated candidate."""
+  337: base_score: float
+  338: ensemble_score: float
+  353: base_score = _unit_interval(
+  354: self.base_score,
+  355: field_name="base_score",
+  357: ensemble_score = _unit_interval(
+  358: self.ensemble_score,
+  359: field_name="ensemble_score",
+  381: "base_score",
+  382: base_score,
+  386: "ensemble_score",
+  387: ensemble_score,
+  398: "base_score": self.base_score,
+  399: "ensemble_score": self.ensemble_score,
+  409: items: tuple[EnsembleCandidateScore, ...]
+  428: isinstance(item, EnsembleCandidateScore)
+  432: "items must contain EnsembleCandidateScore values"
+
+[lrp\ensemble\repository.py]
+   11: rankings_from_m6,
+   14: weights_from_rankings,
+  196: def _ranking_repository(self) -> object | None:
+  199: "ranking_repository",
+  204: repository = self._ranking_repository()
+  273: def _rankings(
+  279: "rank_strategies",
+  286: "rank_strategies"
+  300: candidate_names = (
+  308: for name in candidate_names:
+  370: raw_rankings: list[object] = []
+  381: raw_rankings.extend(
+  382: self._rankings(
+  401: rankings = rankings_from_m6(
+  402: raw_rankings
+  411: weights = weights_from_rankings(
+  412: rankings
+  415: "m6_ranking_fallback"
+  422: rankings=rankings,
+
+[lrp\ensemble\rescoring.py]
+    1: """Explainable candidate rescoring for Project E."""
+   23: BaseScoreReader = Callable[[object], float]
+   37: def default_base_score_reader(
+   38: candidate: object,
+   41: "normalized_score",
+   42: "score",
+   43: "base_score",
+   46: candidate,
+   61: "candidate does not expose a finite score"
+   66: candidate: object,
+   68: """Resolve optional model/scenario evidence from a candidate."""
+   73: candidate,
+   78: candidate,
+   91: model_name = _read(
+   92: candidate,
+   93: "model_name",
+   97: if model_name:
+  101: str(model_name).strip(),
+  105: scenario_name = _read(
+  106: candidate,
+  107: "scenario_name",
+  111: if scenario_name:
+  115: str(scenario_name).strip(),
+  119: scenario_names = _read(
+  120: candidate,
+  121: "scenario_names",
+  125: if scenario_names:
+  126: for name in scenario_names:
+  135: candidate,
+  142: "model_name"
+  154: "scenario_names",
+  177: """Weights for E-003 candidate rescoring."""
+  179: base_score_weight: float = 0.75
+  181: ranking_weight: float = 0.05
+  192: self.base_score_weight,
+  194: self.ranking_weight,
+  231: class ScoreContribution:
+  234: ranking: float
+  246: + self.ranking
+  258: "ranking": self.ranking,
+  269: class RescoredCandidate:
+  271: base_score: float
+  272: ensemble_score: float
+  273: rank_before: int
+  274: rank_after: int
+  276: contributions: ScoreContribution
+  283: def rank_change(self) -> int:
+  284: return self.rank_before - self.rank_after
+  288: "base_score": self.base_score,
+  289: "ensemble_score": self.ensemble_score,
+  290: "rank_before": self.rank_before,
+  291: "rank_after": self.rank_after,
+  292: "rank_change": self.rank_change,
+  310: items: tuple[RescoredCandidate, ...]
+  321: def changed_rank_count(self) -> int:
+  323: item.rank_change != 0
+  334: "changed_rank_count": (
+  335: self.changed_rank_count
+  362: def _performance_score(
+  372: vector.average_match_score
+  373: + vector.average_prediction_score
+  381: class CandidateRescorer:
+  382: """Apply candidate-specific M6 learning evidence."""
+  388: score_reader: BaseScoreReader = (
+  389: default_base_score_reader
+  400: self.score_reader = score_reader
+  407: candidates: Sequence[object],
+  418: candidate,
+  424: self.score_reader(
+  425: candidate
+  431: for index, candidate
+  432: in enumerate(candidates)
+  442: base_rank = {
+  443: original_index: rank
+  444: for rank, (
+  464: ScoreContribution,
+  471: candidate,
+  472: base_score,
+  476: candidate
+  492: ScoreContribution(
+  493: base=base_score,
+  495: ranking=0.0,
+  503: final_score = base_score
+  506: ScoreContribution(
+  508: base_score
+  510: .base_score_weight
+  520: ranking=(
+  523: "rank_score",
+  526: .ranking_weight
+  547: "trend_score",
+  553: _performance_score(
+  570: final_score = max(
+  581: candidate,
+  582: base_score,
+  586: final_score,
+  599: RescoredCandidate(
+  600: source=candidate,
+  601: base_score=base_score,
+  602: ensemble_score=final_score,
+  603: rank_before=base_rank[
+  606: rank_after=rank_after,
+  611: for rank_after, (
+  613: candidate,
+  614: base_score,
+  618: final_score,
+  633: "candidate_count": len(
+  634: candidates
+  636: "evidence_candidate_count": (
+
+[lrp\ensemble\snapshot.py]
+  100: average_prediction_score: float
+  134: average_prediction_score = _unit_interval(
+  135: self.average_prediction_score,
+  136: field_name="average_prediction_score",
+  181: "average_prediction_score",
+  182: average_prediction_score,
+  218: "average_prediction_score": (
+  219: self.average_prediction_score
+  229: class StrategyRankingSnapshot:
+  230: """Serializable Project E view of one M6 ranking."""
+  234: rank_position: int
+  235: rank_score: float
+  242: average_prediction_score: float
+  263: isinstance(self.rank_position, bool)
+  264: or not isinstance(self.rank_position, int)
+  265: or self.rank_position <= 0
+  268: "rank_position must be a positive integer"
+  271: rank_score = _unit_interval(
+  272: self.rank_score,
+  273: field_name="rank_score",
+  316: average_prediction_score = _unit_interval(
+  317: self.average_prediction_score,
+  318: field_name="average_prediction_score",
+  360: "rank_score",
+  361: rank_score,
+  395: "average_prediction_score",
+  396: average_prediction_score,
+  425: "rank_position": self.rank_position,
+  426: "rank_score": self.rank_score,
+  435: "average_prediction_score": (
+  436: self.average_prediction_score
+  464: rankings: tuple[
+  465: StrategyRankingSnapshot,
+  504: rankings = tuple(self.rankings)
+  523: StrategyRankingSnapshot,
+  525: for item in rankings
+  528: "rankings contains invalid items"
+  553: ranking_keys = [
+  555: for item in rankings
+  569: if len(ranking_keys) != len(
+  570: set(ranking_keys)
+  573: "rankings contains duplicate strategies"
+  595: "rankings",
+  596: rankings,
+  621: *self.rankings,
+  646: def ranking(
+  650: ) -> StrategyRankingSnapshot | None:
+  659: for item in self.rankings
+  694: "rankings": [
+  696: for item in self.rankings
+  725: def ordered_rankings(
+  727: StrategyRankingSnapshot
+  730: StrategyRankingSnapshot,
+  738: item.rank_position,
+
+[lrp\io\__init__.py]
+    6: write_prediction_artifacts,
+   30: "write_prediction_artifacts",
+
+[lrp\io\artifacts.py]
+    1: """Atomic prediction artifact and manifest storage."""
+   75: def write_prediction_artifacts(
+   89: prediction_path = atomic_write_bytes(
+   90: directory / "prediction.json",
+   96: "artifact_type": "lotto645_prediction",
+  103: "prediction.json": {
+  104: "sha256": sha256_file(prediction_path),
+  105: "bytes": prediction_path.stat().st_size,
+  118: "prediction_path": str(
+  119: prediction_path.resolve()
+  124: "prediction_sha256": (
+  125: manifest["files"]["prediction.json"]["sha256"]
+
+[lrp\io\draws.py]
+    1: """Draw-history input and derived prediction context."""
+
+[lrp\learning\__init__.py]
+   15: from .evaluator import determine_prize_rank, evaluate_prediction
+   17: from .models import PredictionRecord, ResultRecord, ReviewRecord
+   18: from .ranking import (
+   19: RankingConfig,
+   20: RankingWeights,
+   22: StrategyRanking,
+   23: StrategyRankingEngine,
+   25: from .ranking_repository import RankingDataset, RankingRepository
+   42: "PredictionRecord",
+   43: "RankingConfig",
+   44: "RankingDataset",
+   45: "RankingRepository",
+   46: "RankingWeights",
+   52: "StrategyRanking",
+   53: "StrategyRankingEngine",
+   55: "determine_prize_rank",
+   56: "evaluate_prediction",
+
+[lrp\learning\adaptive_engine.py]
+    9: from .ranking import StrategyRanking
+   20: rank_score: float = 0.60
+   25: values = (self.rank_score, self.confidence, self.stability)
+   54: """Convert rankings into bounded, normalized adaptive weights."""
+   63: if not dataset.rankings:
+   67: self._calculate_one(ranking=item, dataset=dataset)
+   68: for item in dataset.rankings
+   86: item.rank_position,
+   96: ranking: StrategyRanking,
+  101: factors.rank_score * ranking.rank_score
+  102: + factors.confidence * ranking.confidence
+  103: + factors.stability * ranking.stability
+  114: key = (ranking.strategy_type, ranking.strategy_name)
+  134: "strategy_type": ranking.strategy_type,
+  135: "strategy_name": ranking.strategy_name,
+  136: "rank_position": ranking.rank_position,
+  137: "rank_score": ranking.rank_score,
+  141: "confidence": ranking.confidence,
+  142: "stability": ranking.stability,
+  143: "trend": ranking.trend,
+  144: "sample_count": ranking.sample_count,
+
+[lrp\learning\adaptive_models.py]
+    8: from .ranking import StrategyRanking
+   20: rankings: tuple[StrategyRanking, ...]
+   25: return len(self.rankings)
+   34: rank_position: int
+   35: rank_score: float
+   51: if self.rank_position <= 0:
+   52: raise ValueError("rank_position must be positive")
+   59: self.rank_score,
+   78: "rank_position": self.rank_position,
+   79: "rank_score": round(self.rank_score, 6),
+
+[lrp\learning\adaptive_repository.py]
+    8: from .ranking import StrategyRanking
+    9: from .ranking_repository import RankingRepository
+   19: def __init__(self, ranking_repository: RankingRepository) -> None:
+   20: self.ranking_repository = ranking_repository
+   35: rankings: Sequence[StrategyRanking],
+   50: revision = self.ranking_repository.repository_revision()
+   61: rankings=tuple(rankings),
+
+[lrp\learning\aggregator.py]
+   33: """Incrementally aggregate reviewed prediction performance."""
+   62: for prediction, review in pending:
+   64: ("model", prediction.model_name),
+   67: scenario = prediction.parameters.get("scenario")
+   77: prediction_id=(
+   78: prediction.prediction_id
+   83: prediction_score=prediction.score,
+   84: prize_rank=review.prize_rank,
+
+[lrp\learning\evaluator.py]
+    1: """Prediction evaluation against official Lotto 6/45 results."""
+    9: PredictionRecord,
+   18: def determine_prize_rank(
+   23: """Return the Korean Lotto 6/45 prize rank."""
+   43: def evaluate_prediction(
+   44: prediction: PredictionRecord,
+   49: """Evaluate one prediction without mutating either record."""
+   51: if prediction.round_no != result.round_no:
+   53: "prediction and result round numbers must match"
+   56: prediction_numbers = set(prediction.numbers)
+   60: sorted(prediction_numbers & winning_numbers)
+   63: bonus_matched = result.bonus in prediction_numbers
+   76: "prediction_score": float(prediction.score),
+   77: "model_name": prediction.model_name,
+   78: "set_id": prediction.set_id,
+   82: prediction_id=prediction.prediction_id,
+   83: round_no=prediction.round_no,
+   87: prize_rank=determine_prize_rank(
+
+[lrp\learning\learning_facade.py]
+    1: """Derived learning-domain orchestration for ranking and adaptive weights."""
+    8: from .ranking import StrategyRanking, StrategyRankingEngine
+    9: from .ranking_repository import RankingRepository
+   13: """Coordinate derived ranking and adaptive-weight layers."""
+   18: ranking_repository: RankingRepository,
+   19: ranking_engine: StrategyRankingEngine,
+   23: self.ranking_repository = ranking_repository
+   24: self.ranking_engine = ranking_engine
+   28: def rank_strategies(
+   33: ) -> tuple[StrategyRanking, ...]:
+   34: dataset = self.ranking_repository.build_dataset(
+   38: return self.ranking_engine.rank(
+   49: rankings = self.rank_strategies(
+   54: rankings=rankings,
+   67: self.ranking_repository.invalidate_cache()
+
+[lrp\learning\models.py]
+   52: class PredictionRecord:
+   55: prediction_id: str
+   59: score: float
+   60: model_name: str
+   71: if not self.prediction_id.strip():
+   73: "prediction_id must not be empty"
+   90: if not 0.0 <= float(self.score) <= 1.0:
+   92: "score must be between 0 and 1"
+   95: if not self.model_name.strip():
+   97: "model_name must not be empty"
+  141: """Evaluation of one prediction against one result."""
+  143: prediction_id: str
+  148: prize_rank: int | None
+  155: if not self.prediction_id.strip():
+  157: "prediction_id must not be empty"
+  192: if self.prize_rank is not None and (
+  193: self.prize_rank < 1 or self.prize_rank > 5
+  196: "prize_rank must be 1 to 5 or None"
+
+[lrp\learning\ranking.py]
+    1: """Strategy ranking models and deterministic ranking engine.
+    3: M6-004 keeps ranking as a derived calculation layer.  No ranking table is
+   33: """One reviewed prediction used by bounded rolling-window calculations."""
+   35: prediction_id: str
+   38: prediction_score: float
+   39: prize_rank: int | None
+   42: if not self.prediction_id.strip():
+   43: raise ValueError("prediction_id must not be empty")
+   48: if not 0.0 <= float(self.prediction_score) <= 1.0:
+   49: raise ValueError("prediction_score must be between 0 and 1")
+   50: if self.prize_rank is not None and not 1 <= self.prize_rank <= 5:
+   51: raise ValueError("prize_rank must be 1 to 5 or None")
+   55: class RankingWeights:
+   56: """Weights used to build one normalized rank score."""
+   63: prediction_quality: float = 0.08
+   72: self.prediction_quality,
+   75: raise ValueError("ranking weights must be non-negative")
+   77: raise ValueError("ranking weights must sum to 1.0")
+   81: class RankingConfig:
+   82: """Deterministic ranking parameters."""
+   89: weights: RankingWeights = field(default_factory=RankingWeights)
+  112: class StrategyRanking:
+  113: """Derived ranking output for one model or scenario strategy."""
+  117: rank_position: int
+  118: rank_score: float
+  125: average_prediction_score: float
+  135: if self.rank_position <= 0:
+  136: raise ValueError("rank_position must be positive")
+  144: "rank_position": self.rank_position,
+  145: "rank_score": round(self.rank_score, 6),
+  152: "average_prediction_score": round(
+  153: self.average_prediction_score,
+  170: class StrategyRankingEngine:
+  171: """Build deterministic, normalized rankings from bounded history."""
+  175: config: RankingConfig | None = None,
+  177: self.config = config or RankingConfig()
+  179: def rank(
+  186: ) -> tuple[StrategyRanking, ...]:
+  187: """Rank strategies, then assign stable one-based positions."""
+  203: -float(row["rank_score"]),
+  212: StrategyRanking(
+  213: rank_position=index,
+  230: point.prediction_id,
+  240: 1.0 if point.prize_rank is not None else 0.0
+  264: prediction_quality_component = _clamp(
+  265: statistics.average_prediction_score
+  269: rank_score = _clamp(
+  275: + weights.prediction_quality
+  276: * prediction_quality_component
+  282: "rank_score": rank_score,
+  289: "average_prediction_score": (
+  290: statistics.average_prediction_score
+
+[lrp\learning\ranking_repository.py]
+    1: """Read-optimized data source for the M6-004 ranking engine.
+    8: revision and invalidates cached ranking datasets automatically.
+   18: from .ranking import StrategyPerformancePoint
+   27: class RankingDataset:
+   28: """Immutable input bundle consumed by StrategyRankingEngine."""
+   49: class RankingRepository:
+   50: """Build and cache bounded ranking datasets from learning records."""
+   62: self._cache_value: RankingDataset | None = None
+   68: events are append-only, either value changes whenever new ranking
+  116: event.prediction_id,
+  117: prediction.round_no,
+  119: prediction.score AS prediction_score,
+  120: review.prize_rank
+  122: INNER JOIN learning_predictions AS prediction
+  123: ON prediction.prediction_id =
+  124: event.prediction_id
+  126: ON review.prediction_id =
+  127: event.prediction_id
+  131: prediction.round_no DESC,
+  132: event.prediction_id DESC
+  146: prediction_id=str(row["prediction_id"]),
+  149: prediction_score=float(
+  150: row["prediction_score"]
+  152: prize_rank=(
+  154: if row["prize_rank"] is None
+  155: else int(row["prize_rank"])
+  166: ) -> RankingDataset:
+  167: """Build or reuse a complete ranking-engine input dataset."""
+  214: dataset = RankingDataset(
+
+[lrp\learning\repository.py]
+   12: PredictionRecord,
+   22: CREATE TABLE IF NOT EXISTS learning_predictions (
+   23: prediction_id TEXT PRIMARY KEY,
+   27: score REAL NOT NULL,
+   28: model_name TEXT NOT NULL,
+   36: idx_learning_predictions_round
+   37: ON learning_predictions(round_no);
+   40: idx_learning_predictions_model
+   41: ON learning_predictions(model_name);
+   51: prediction_id TEXT PRIMARY KEY,
+   56: prize_rank INTEGER,
+   59: FOREIGN KEY(prediction_id)
+   60: REFERENCES learning_predictions(prediction_id)
+   72: total_prediction_score REAL NOT NULL,
+   83: prediction_id TEXT NOT NULL,
+   88: prediction_id,
+   92: FOREIGN KEY(prediction_id)
+   93: REFERENCES learning_predictions(prediction_id)
+   97: idx_learning_strategy_events_prediction
+   98: ON learning_strategy_events(prediction_id);
+  115: def _prediction_from_row(
+  117: ) -> PredictionRecord:
+  118: return PredictionRecord(
+  119: prediction_id=str(row["prediction_id"]),
+  126: score=float(row["score"]),
+  127: model_name=str(row["model_name"]),
+  181: def add_prediction(
+  183: record: PredictionRecord,
+  188: record.prediction_id,
+  192: float(record.score),
+  193: record.model_name,
+  203: INSERT OR IGNORE INTO learning_predictions (
+  204: prediction_id,
+  208: score,
+  209: model_name,
+  225: prediction_id,
+  229: score,
+  230: model_name,
+  235: FROM learning_predictions
+  236: WHERE prediction_id = ?
+  238: (record.prediction_id,),
+  243: "prediction_id already exists "
+  306: record.prediction_id,
+  311: record.prize_rank,
+  320: prediction_id,
+  325: prize_rank,
+  339: prediction_id,
+  344: prize_rank,
+  348: WHERE prediction_id = ?
+  350: (record.prediction_id,),
+  355: "prediction review already exists "
+  361: def get_prediction(
+  363: prediction_id: str,
+  364: ) -> PredictionRecord | None:
+  371: FROM learning_predictions
+  372: WHERE prediction_id = ?
+  374: (prediction_id,),
+  380: return _prediction_from_row(row)
+  415: def pending_predictions_with_results(
+  420: ) -> tuple[PredictionRecord, ...]:
+  425: FROM learning_predictions AS p
+  429: ON review.prediction_id = p.prediction_id
+  430: WHERE review.prediction_id IS NULL
+  441: p.prediction_id ASC
+  458: _prediction_from_row(row)
+  466: ) -> tuple[tuple[PredictionRecord, ReviewRecord], ...]:
+  467: """Return reviewed predictions not yet aggregated."""
+  477: r.prize_rank,
+  480: FROM learning_predictions AS p
+  482: ON r.prediction_id = p.prediction_id
+  484: ON event.prediction_id = p.prediction_id
+  486: AND event.strategy_name = p.model_name
+  487: WHERE event.prediction_id IS NULL
+  490: p.prediction_id ASC
+  510: prediction = _prediction_from_row(row)
+  512: prediction_id=str(row["prediction_id"]),
+  522: prize_rank=(
+  524: if row["prize_rank"] is None
+  525: else int(row["prize_rank"])
+  534: items.append((prediction, review))
+  541: prediction_id: str,
+  545: prediction_score: float,
+  546: prize_rank: int | None,
+  557: prize = int(prize_rank is not None)
+  563: prediction_id,
+  570: prediction_id,
+  587: total_prediction_score,
+  601: total_prediction_score =
+  602: total_prediction_score
+  603: + excluded.total_prediction_score,
+  621: float(prediction_score),
+  681: total_prediction_score=float(
+  682: row["total_prediction_score"]
+  699: "predictions": int(
+  702: "FROM learning_predictions"
+  731: def pending_prediction_ids(
+  739: SELECT p.prediction_id
+  740: FROM learning_predictions AS p
+  742: ON r.prediction_id = p.prediction_id
+  743: WHERE r.prediction_id IS NULL
+  751: query += " ORDER BY p.round_no, p.prediction_id"
+  760: str(row["prediction_id"])
+
+[lrp\learning\service.py]
+    1: """Incremental learning, aggregation, ranking, and adaptive service."""
+   12: from .evaluator import evaluate_prediction
+   14: from .ranking import RankingConfig, StrategyRanking, StrategyRankingEngine
+   15: from .ranking_repository import RankingRepository
+   43: ranking_config: RankingConfig | None = None,
+   48: self.ranking_repository = RankingRepository(repository)
+   49: self.ranking_engine = StrategyRankingEngine(ranking_config)
+   51: self.ranking_repository
+   55: ranking_repository=self.ranking_repository,
+   56: ranking_engine=self.ranking_engine,
+   69: pending = self.repository.pending_predictions_with_results(
+   78: for prediction in pending:
+   79: result = result_cache.get(prediction.round_no)
+   81: result = self.repository.get_result(prediction.round_no)
+   85: result_cache[prediction.round_no] = result
+   87: review = evaluate_prediction(
+   88: prediction,
+  127: def rank_strategies(
+  132: ) -> tuple[StrategyRanking, ...]:
+  133: """Return deterministic rankings from current aggregated evidence."""
+  134: return self.learning_facade.rank_strategies(
+
+[lrp\learning\strategy_stats.py]
+   16: total_prediction_score: float
+   32: def average_prediction_score(self) -> float:
+   36: return self.total_prediction_score / self.sample_count
+   67: "average_prediction_score": round(
+   68: self.average_prediction_score,
+
+[lrp\management\doctor.py]
+   23: """Run lightweight diagnostics without prediction workloads."""
+   64: "lrp.pipelines",
+
+[lrp\management\status.py]
+   38: predictions_root: str | Path = "predictions",
+   44: This function does not execute statistics, candidate generation,
+   45: prediction, review, backup, or manifest verification.
+   48: predictions = root / predictions_root
+   52: prediction_files = _files(
+   53: predictions,
+   54: "prediction.json",
+   64: prediction_manifests = _files(
+   65: predictions,
+  101: "predictions": len(prediction_files),
+  105: len(prediction_manifests)
+  111: "prediction": _latest_path(prediction_files),
+
+[lrp\operations\__init__.py]
+    3: from .review import prize_rank, review_prediction
+   18: "prize_rank",
+   20: "review_prediction",
+
+[lrp\operations\review.py]
+    1: """Prediction review and hit-analysis services."""
+   29: def _load_prediction(source: str | Path | Mapping[str, Any]) -> dict[str, Any]:
+   37: raise ContractError("prediction JSON must be an object")
+   41: def prize_rank(main_hits: int, bonus_hit: bool) -> str:
+   55: def review_prediction(
+   56: prediction: str | Path | Mapping[str, Any],
+   61: payload = _load_prediction(prediction)
+   80: "rank": prize_rank(len(matched), bonus_hit),
+   81: "score": float(item.get("score", 0.0)),
+   91: practical = set(str(value) for value in payload.get("top5_practical", []))
+   92: practical_rows = [row for row in rows if row["id"] in practical]
+  107: "practical_best_hits": max(
+  108: (row["main_hits"] for row in practical_rows), default=0
+  110: "winning_rank_counts": {
+  111: rank: sum(row["rank"] == rank for row in rows)
+  112: for rank in ("1", "2", "3", "4", "5")
+  116: "prediction_metadata": dict(payload.get("metadata", {})),
+
+[lrp\pipelines\__init__.py]
+    1: """Prediction pipelines for Lotto645 Research Platform."""
+    4: PredictionGenerationResult,
+    5: PredictionRequest,
+    6: PredictionResult,
+    8: from .prediction import PredictionPipeline
+   11: prediction_to_dict,
+   12: prediction_to_json,
+   16: "PredictionGenerationResult",
+   17: "PredictionPipeline",
+   18: "PredictionRequest",
+   19: "PredictionResult",
+   21: "prediction_to_dict",
+   22: "prediction_to_json",
+
+[lrp\pipelines\models.py]
+    1: """Public request and result models for the prediction pipeline."""
+   52: class PredictionRequest:
+   53: """Immutable Project A prediction request."""
+   58: candidate_count: int = 10_000
+   61: practical_k: int = 5
+  107: ("candidate_count", self.candidate_count),
+  113: ("practical_k", self.practical_k),
+  124: if self.practical_k > self.top_k:
+  126: "practical_k must not exceed top_k"
+  229: "candidate_count": self.candidate_count,
+  234: "practical_k": self.practical_k,
+  251: class PredictionGenerationResult:
+  252: """Output of candidate generation."""
+  254: request: PredictionRequest
+  259: candidates: tuple[object, ...]
+  261: candidate_version: str
+  265: return len(self.candidates)
+  269: return self.generated_count >= self.request.candidate_count
+  273: class PredictionResult:
+  274: """Complete Project A prediction output."""
+  276: generation: PredictionGenerationResult
+  277: scored_candidates: tuple[object, ...]
+  278: ranking: object
+  279: diversity: object
+  280: practical: object
+  284: def request(self) -> PredictionRequest:
+
+[lrp\pipelines\prediction.py]
+    1: """Project A complete prediction pipeline."""
+   11: CandidateAdapter,
+   19: PredictionGenerationResult,
+   20: PredictionRequest,
+   21: PredictionResult,
+   76: score = float(value)
+   80: normalized[(left, right)] = score
+   86: class PredictionPipeline:
+   87: """Orchestrate Project C analysis and Project D prediction."""
+   90: candidate: CandidateAdapter
+   93: def load(cls) -> "PredictionPipeline":
+   96: candidate=CandidateAdapter.load(),
+  113: request: PredictionRequest,
+  114: ) -> PredictionGenerationResult:
+  115: if not isinstance(request, PredictionRequest):
+  117: "request must be a PredictionRequest"
+  123: contract_report = self.candidate.validate_statistics(
+  136: number_signals = self.candidate.number_signals(
+  145: module = self.candidate.module
+  147: candidate_config = module.CandidateConfig(
+  150: candidate_count=request.candidate_count,
+  169: candidates = self.candidate.generate_candidates(
+  171: candidate_config=candidate_config,
+  177: return PredictionGenerationResult(
+  183: candidates=tuple(candidates),
+  185: candidate_version=self.candidate.version,
+  191: request: PredictionRequest,
+  192: ) -> PredictionResult:
+  198: module = self.candidate.module
+  200: score_weights = module.ScoreWeights(
+  212: scored = self.candidate.score_candidates(
+  213: generation.candidates,
+  215: weights=score_weights,
+  220: scored = tuple(scored)
+  222: if not scored:
+  224: "Project D produced no scored candidates"
+  227: ranking_config = module.RankingConfig(
+  228: score_weight=0.70,
+  230: diversity_weight=0.15,
+  234: ranking = self.candidate.rank_candidates(
+  235: scored,
+  236: config=ranking_config,
+  239: diversity_config = module.DiversityConfig(
+  248: diversity = self.candidate.select_diverse_candidates(
+  249: scored,
+  250: config=diversity_config,
+  253: practical_config = module.PracticalSelectionConfig(
+  254: k=request.practical_k,
+  265: practical = self.candidate.select_practical_sets(
+  266: ranking,
+  267: config=practical_config,
+  271: return PredictionResult(
+  273: scored_candidates=scored,
+  274: ranking=ranking,
+  275: diversity=diversity,
+  276: practical=practical,
+  283: request: PredictionRequest,
+  286: ) -> PredictionResult:
+  300: request: PredictionRequest,
+  305: f"lrp-prediction-round-{request.round_no}"
+
+[lrp\pipelines\probability.py]
+    1: """Probability-vector construction for the prediction pipeline."""
+   48: score weights from being incorrectly discarded.
+   74: use bounded neutral priors and are evaluated fully during candidate
+   75: scoring in the next pipeline stage.
+
+[lrp\pipelines\serializer.py]
+    1: """Final prediction JSON serializer."""
+   11: from .models import PredictionResult
+   25: def _candidate_object(value: object) -> object:
+   35: "candidate",
+   36: "scored_candidate",
+   37: "scored",
+   38: "ranked",
+   47: "unable to locate candidate numbers"
+   52: candidate = _candidate_object(value)
+   53: raw = _read(candidate, "numbers")
+   59: "candidate numbers are invalid"
+   64: "candidate must contain six numbers"
+   70: def _normalized_score(value: object) -> float:
+   74: score = _read(
+   76: "normalized_score",
+   77: "score",
+   78: "ranking_score",
+   79: "final_score",
+   81: if isinstance(score, (int, float)) and not isinstance(
+   82: score,
+   85: return min(1.0, max(0.0, float(score)))
+   89: "candidate",
+   90: "scored_candidate",
+   91: "scored",
+   92: "ranked",
+  124: candidate = _candidate_object(value)
+  125: risk = _read(candidate, "risk")
+  178: def _diversity_metrics(
+  208: selected = _read(value, "selected", "items", "candidates")
+  216: def prediction_to_dict(
+  217: result: PredictionResult,
+  219: if not isinstance(result, PredictionResult):
+  221: "result must be a PredictionResult"
+  225: diversity_items = _selected_items(result.diversity)
+  230: for index, item in enumerate(diversity_items, start=1):
+  240: "score": round(_normalized_score(item), 8),
+  246: practical_ids: list[str] = []
+  248: for item in _selected_items(result.practical):
+  252: if set_id is not None and set_id not in practical_ids:
+  253: practical_ids.append(set_id)
+  255: if len(practical_ids) < request.practical_k:
+  258: key=lambda item: item["score"],
+  263: if item["id"] not in practical_ids:
+  264: practical_ids.append(item["id"])
+  266: if len(practical_ids) >= request.practical_k:
+  302: "diversity": _diversity_metrics(
+  308: "top5_practical": practical_ids[:request.practical_k],
+  310: "generated_candidates": result.generated_count,
+  314: "candidate_version": (
+  315: result.generation.candidate_version
+  317: "practical_complete": bool(
+  318: _read(result.practical, "complete")
+  324: def prediction_to_json(
+  325: result: PredictionResult,
+  330: prediction_to_dict(result),
+
+[tests\test_e001_ensemble_foundation.py]
+   18: class CandidateFixture:
+   20: normalized_score: float
+   71: def test_base_score_ordering() -> None:
+   72: candidates = (
+   73: CandidateFixture("B", 0.72),
+   74: CandidateFixture("A", 0.91),
+   75: CandidateFixture("C", 0.83),
+   80: candidates,
+   95: item.ensemble_score
+  139: CandidateFixture("A", 0.90),
+  140: CandidateFixture("B", 0.80),
+  141: CandidateFixture("C", 0.70),
+  145: base_score_weight=0.70,
+  165: assert result.items[0].ensemble_score > (
+  166: result.items[1].ensemble_score
+  182: test_base_score_ordering()
+  188: print("base_score_ordering: PASS")
+
+[tests\test_e002_learning_snapshot.py]
+   21: average_prediction_score: float
+   33: class RankingFixture:
+   36: rank_position: int
+   37: rank_score: float
+   44: average_prediction_score: float
+   54: rank_position: int
+   55: rank_score: float
+   68: class CandidateFixture:
+   70: normalized_score: float
+   73: class RankingRepositoryFixture:
+   85: self.ranking_repository = (
+   86: RankingRepositoryFixture()
+  101: average_prediction_score=0.90,
+  115: average_prediction_score=0.83,
+  132: average_prediction_score=0.90,
+  146: average_prediction_score=0.83,
+  157: def rank_strategies(
+  162: ) -> tuple[RankingFixture, ...]:
+  172: RankingFixture(
+  175: rank_position=1,
+  176: rank_score=0.708183,
+  183: average_prediction_score=0.90,
+  198: RankingFixture(
+  201: rank_position=2,
+  202: rank_score=0.48425,
+  209: average_prediction_score=0.83,
+  244: rank_position=1,
+  245: rank_score=0.758477,
+  259: rank_position=2,
+  260: rank_score=0.350477,
+  274: class RankingOnlyServiceFixture(
+  298: assert len(first.rankings) == 4
+  316: gap = first.ranking(
+  322: assert gap.rank_position == 1
+  330: assert len(payload["rankings"]) == 4
+  336: def test_ranking_fallback() -> None:
+  338: service=RankingOnlyServiceFixture(),
+  347: == "m6_ranking_fallback"
+  368: == "ranking_fallback"
+  391: CandidateFixture("A", 0.91),
+  392: CandidateFixture("B", 0.82),
+  393: CandidateFixture("C", 0.73),
+  397: base_score_weight=0.75,
+  418: result.items[0].ensemble_score
+  419: > result.items[1].ensemble_score
+  420: > result.items[2].ensemble_score
+  426: test_ranking_fallback()
+  433: print("m6_ranking_adapter: PASS")
+  435: print("ranking_fallback: PASS")
+
+[tests\test_e003_feature_rescoring.py]
+    9: CandidateRescorer,
+   11: RescoredCandidate,
+   13: StrategyRankingSnapshot,
+   22: class CandidateFixture:
+   23: """Minimal candidate fixture for E-003 regression tests."""
+   26: normalized_score: float
+   27: model_name: str | None = None
+   28: scenario_name: str | None = None
+   43: average_prediction_score=0.92,
+   55: average_prediction_score=0.40,
+   63: rankings=(
+   64: StrategyRankingSnapshot(
+   67: rank_position=1,
+   68: rank_score=0.95,
+   75: average_prediction_score=0.92,
+   78: StrategyRankingSnapshot(
+   81: rank_position=2,
+   82: rank_score=0.20,
+   89: average_prediction_score=0.40,
+  119: items: tuple[RescoredCandidate, ...],
+  120: ) -> dict[str, RescoredCandidate]:
+  121: """Index result items by fixture candidate name."""
+  157: assert strong.rank_score == 0.95
+  158: assert strong.trend_score == 1.0
+  159: assert strong.average_match_score == (
+  162: assert strong.average_prediction_score == 0.92
+  168: assert weak.rank_score == 0.20
+  169: assert weak.trend_score == 0.0
+  170: assert weak.average_match_score == (
+  173: assert weak.average_prediction_score == 0.40
+  182: assert strong.rank_score > weak.rank_score
+  184: strong.average_match_score
+  185: > weak.average_match_score
+  190: candidates = (
+  191: CandidateFixture(
+  193: normalized_score=0.90,
+  195: CandidateFixture(
+  197: normalized_score=0.80,
+  201: result = CandidateRescorer().evaluate(
+  202: candidates,
+  209: assert result.changed_rank_count == 0
+  211: assert items["A"].base_score == 0.90
+  212: assert items["A"].ensemble_score == 0.90
+  213: assert items["A"].rank_before == 1
+  214: assert items["A"].rank_after == 1
+  215: assert items["A"].rank_change == 0
+  219: assert items["B"].base_score == 0.80
+  220: assert items["B"].ensemble_score == 0.80
+  221: assert items["B"].rank_before == 2
+  222: assert items["B"].rank_after == 2
+  223: assert items["B"].rank_change == 0
+  237: "evidence_candidate_count"
+  249: def test_candidate_specific_rescoring() -> None:
+  250: candidates = (
+  251: CandidateFixture(
+  253: normalized_score=0.90,
+  254: model_name="weak",
+  256: CandidateFixture(
+  258: normalized_score=0.86,
+  259: model_name="strong",
+  261: CandidateFixture(
+  263: normalized_score=0.70,
+  268: base_score_weight=0.60,
+  270: ranking_weight=0.08,
+  278: result = CandidateRescorer(
+  281: candidates,
+  294: "candidate_count"
+  306: "evidence_candidate_count"
+  312: assert weak.rank_before == 1
+  313: assert strong.rank_before == 2
+  314: assert neutral.rank_before == 3
+  317: assert strong.rank_after == 1
+  318: assert strong.rank_change == 1
+  322: strong.ensemble_score
+  323: > weak.ensemble_score
+  327: assert neutral.base_score == 0.70
+  328: assert neutral.ensemble_score == 0.70
+  335: neutral.ensemble_score
+  336: > weak.ensemble_score
+  361: strong.ensemble_score
+  364: weak.ensemble_score
+  367: neutral.ensemble_score
+  373: - strong.ensemble_score
+  378: - weak.ensemble_score
+  386: strong.contributions.ranking
+  387: > weak.contributions.ranking
+  399: scores = [
+  400: item.ensemble_score
+  404: assert scores == sorted(
+  405: scores,
+  410: assert result.changed_rank_count >= 2
+  414: candidates = (
+  415: CandidateFixture(
+  417: normalized_score=0.90,
+  418: model_name="weak",
+  420: CandidateFixture(
+  422: normalized_score=0.86,
+  423: model_name="strong",
+  425: CandidateFixture(
+  427: normalized_score=0.70,
+  431: result = CandidateRescorer(
+  433: base_score_weight=0.60,
+  435: ranking_weight=0.08,
+  443: candidates,
+  457: "candidate_count"
+  460: "changed_rank_count"
+  461: ] == result.changed_rank_count
+  466: "base_score",
+  467: "ensemble_score",
+  468: "rank_before",
+  469: "rank_after",
+  470: "rank_change",
+  483: "ranking",
+  494: item["ensemble_score"]
+  502: test_candidate_specific_rescoring()
+  511: print("candidate_specific_rescoring: PASS")
+  512: print("rank_change_tracking: PASS")
+
+[tests\test_m3_application.py]
+   16: write_prediction_artifacts,
+   80: "candidate_version": "test",
+   84: artifacts = write_prediction_artifacts(
+   86: output_root=root / "predictions",
+   89: prediction_path = Path(
+   90: artifacts["prediction_path"]
+   96: assert prediction_path.is_file()
+  106: manifest["files"]["prediction.json"][
+  109: == sha256_file(prediction_path)
+  123: "prediction_path": str(
+  124: prediction_path
+
+[tests\test_m4_operations.py]
+   13: review_prediction,
+   22: prediction = {
+   26: {"id": "S1", "numbers": [1, 2, 3, 4, 5, 6], "score": 1.0},
+   27: {"id": "S2", "numbers": [7, 8, 9, 10, 11, 12], "score": 0.5},
+   29: "top5_practical": ["S1"],
+   32: review = review_prediction(
+   33: prediction,
+
+[tests\test_m59_status.py]
+   23: prediction = (
+   25: / "predictions"
+   28: / "prediction.json"
+   30: prediction.parent.mkdir(parents=True)
+   31: prediction.write_text(
+   58: assert result["counts"]["predictions"] == 1
+   61: assert result["latest"]["prediction"] is not None
+
+[tests\test_m6_adaptive_weight.py]
+   12: PredictionRecord,
+   23: def make_prediction(
+   25: prediction_id: str,
+   27: model_name: str,
+   29: score: float,
+   30: ) -> PredictionRecord:
+   31: return PredictionRecord(
+   32: prediction_id=prediction_id,
+   34: set_id=prediction_id.rsplit(":", 1)[-1],
+   36: score=score,
+   37: model_name=model_name,
+   53: predictions = (
+   54: make_prediction(
+   55: prediction_id="1220:GPT-v3.3:S1",
+   57: model_name="GPT-v3.3",
+   59: score=0.92,
+   61: make_prediction(
+   62: prediction_id="1220:Gemini-v7.1:S1",
+   64: model_name="Gemini-v7.1",
+   66: score=0.82,
+   69: for prediction in predictions:
+   70: assert repository.add_prediction(prediction)
+  115: ranking_before = service.rank_strategies(
+  119: ranking_after = service.rank_strategies(
+  123: assert ranking_before == ranking_after
+
+[tests\test_m6_automatic_review.py]
+   11: PredictionRecord,
+   13: determine_prize_rank,
+   14: evaluate_prediction,
+   18: def make_prediction(
+   19: prediction_id: str,
+   22: ) -> PredictionRecord:
+   23: return PredictionRecord(
+   24: prediction_id=prediction_id,
+   28: score=0.85,
+   29: model_name="GPT-v3.3",
+   45: assert determine_prize_rank(
+   50: assert determine_prize_rank(
+   55: assert determine_prize_rank(
+   60: assert determine_prize_rank(
+   65: assert determine_prize_rank(
+   70: assert determine_prize_rank(
+   85: prediction_1 = make_prediction(
+   90: prediction_2 = make_prediction(
+  105: repository.add_prediction(prediction_1)
+  106: repository.add_prediction(prediction_2)
+  121: direct_review = evaluate_prediction(
+  122: prediction_1,
+  135: assert direct_review.prize_rank == 5
+  160: assert counts["predictions"] == 2
+  164: assert repository.pending_prediction_ids() == ()
+
+[tests\test_m6_learning_foundation.py]
+   10: PredictionRecord,
+   26: prediction = PredictionRecord(
+   27: prediction_id="1219:GPT-v3.3:S1",
+   31: score=0.91,
+   32: model_name="GPT-v3.3",
+   56: prediction_id=prediction.prediction_id,
+   61: prize_rank=5,
+   70: assert repository.add_prediction(
+   71: prediction
+   74: assert repository.add_prediction(
+   75: prediction
+   78: assert repository.pending_prediction_ids() == (
+   79: prediction.prediction_id,
+   88: assert repository.pending_prediction_ids() == ()
+   92: assert counts["predictions"] == 1
+
+[tests\test_m6_strategy_ranking.py]
+    1: """M6-004 strategy-ranking regression test."""
+   11: PredictionRecord,
+   22: def make_prediction(
+   24: prediction_id: str,
+   26: model_name: str,
+   28: score: float,
+   30: ) -> PredictionRecord:
+   31: return PredictionRecord(
+   32: prediction_id=prediction_id,
+   34: set_id=prediction_id.rsplit(":", 1)[-1],
+   36: score=score,
+   37: model_name=model_name,
+   57: predictions: tuple[PredictionRecord, ...],
+   59: for prediction in predictions:
+   60: assert repository.add_prediction(prediction) is True
+   83: predictions=(
+   84: make_prediction(
+   85: prediction_id="1220:GPT-v3.3:S1",
+   87: model_name="GPT-v3.3",
+   89: score=0.92,
+   92: make_prediction(
+   93: prediction_id="1220:Gemini-v7.1:S1",
+   95: model_name="Gemini-v7.1",
+   97: score=0.84,
+  108: predictions=(
+  109: make_prediction(
+  110: prediction_id="1221:GPT-v3.3:S1",
+  112: model_name="GPT-v3.3",
+  114: score=0.88,
+  117: make_prediction(
+  118: prediction_id="1221:Gemini-v7.1:S1",
+  120: model_name="Gemini-v7.1",
+  122: score=0.82,
+  142: model_rankings = service.rank_strategies(
+  147: assert len(model_rankings) == 2
+  148: assert model_rankings[0].rank_position == 1
+  149: assert model_rankings[1].rank_position == 2
+  150: assert model_rankings[0].strategy_name == "GPT-v3.3"
+  151: assert model_rankings[1].strategy_name == "Gemini-v7.1"
+  153: gpt = model_rankings[0]
+  154: gemini = model_rankings[1]
+  161: assert gpt.rank_score > gemini.rank_score
+  162: assert 0.0 <= gpt.rank_score <= 1.0
+  167: scenario_rankings = service.rank_strategies(
+  172: assert len(scenario_rankings) == 2
+  173: assert scenario_rankings[0].strategy_name == "gap"
+  174: assert scenario_rankings[1].strategy_name == "pair"
+  177: service.ranking_repository.build_dataset(
+  183: service.ranking_repository.build_dataset(
+  202: rankings_again = service.rank_strategies(
+  207: assert rankings_again == model_rankings
+  209: print("PASS: M6-004 strategy ranking")
+  211: "model_rankings:",
+  212: [item.as_dict() for item in model_rankings],
+  215: "scenario_rankings:",
+  216: [item.as_dict() for item in scenario_rankings],
+
+[tests\test_m6_strategy_statistics.py]
+   12: PredictionRecord,
+   25: def make_prediction(
+   27: prediction_id: str,
+   29: model_name: str,
+   31: score: float,
+   33: ) -> PredictionRecord:
+   34: """Create deterministic prediction data for this test."""
+   36: return PredictionRecord(
+   37: prediction_id=prediction_id,
+   41: score=score,
+   42: model_name=model_name,
+   78: predictions: int,
+   88: assert counts["predictions"] == predictions
+  105: assert repository.add_prediction(
+  106: make_prediction(
+  107: prediction_id="1220:GPT-v3.3:S1",
+  109: model_name="GPT-v3.3",
+  111: score=0.91,
+  117: assert repository.add_prediction(
+  118: make_prediction(
+  119: prediction_id="1220:GPT-v3.3:S2",
+  121: model_name="GPT-v3.3",
+  123: score=0.83,
+  129: assert repository.add_prediction(
+  130: make_prediction(
+  131: prediction_id="1220:Gemini-v7.1:S1",
+  133: model_name="Gemini-v7.1",
+  135: score=0.86,
+  172: # the same reviewed predictions must not be aggregated again.
+  208: gpt.average_prediction_score,
+  229: gemini.average_prediction_score,
+  273: gap.average_prediction_score,
+  294: pair.average_prediction_score,
+  307: predictions=3,
+
+[tests\test_prediction_orchestrator.py]
+    1: """M2 prediction orchestrator integration smoke test."""
+    7: from lrp.pipelines import (
+    8: PredictionPipeline,
+    9: PredictionRequest,
+   10: prediction_to_dict,
+   47: pipeline = PredictionPipeline.load()
+   48: draws = build_draws(pipeline.statistics.module)
+   52: request = PredictionRequest(
+   56: candidate_count=500,
+   59: practical_k=5,
+   64: first = pipeline.run(draws, request)
+   65: second = pipeline.run(draws, request)
+   67: first_payload = prediction_to_dict(first)
+   68: second_payload = prediction_to_dict(second)
+   86: assert len(first_payload["top5_practical"]) <= 5
+   97: "generated_candidates": first.generated_count,
+   98: "selected_sets": len(first_payload["sets"]),
+   99: "top5_practical": (
+  100: first_payload["top5_practical"]
+  102: "diversity": first_payload["diversity"],
+  108: "candidate_version": (
+  110: "candidate_version"
+
+------------------------------------------------------------------------------
+8. E-004 Questions to Resolve
+------------------------------------------------------------------------------
+Q1. What is the concrete Project D candidate class?
+Q2. Which candidate field is the authoritative base score?
+Q3. Where is candidate sorting or ranking performed?
+Q4. Where is diversity compression performed?
+Q5. Where are Top10 and Top5 selected?
+Q6. Does a candidate carry model or scenario provenance?
+Q7. Can ranking accept a wrapper, or must E-004 expose the original candidate interface?
+Q8. What is the lowest-risk insertion point between Project D scoring and diversity selection?
+
+==============================================================================
+END
+==============================================================================

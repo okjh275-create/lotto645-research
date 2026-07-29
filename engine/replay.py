@@ -15,3 +15,19 @@ class ReplayEngine:
     @staticmethod
     def count_hits(predicted, actual):
         return len(set(predicted) & set(actual))
+
+    @classmethod
+    def replay(
+        cls,
+        train_last_round,
+        test_round,
+        predicted,
+        actual,
+    ):
+        return ReplayResult(
+            train_last_round=train_last_round,
+            test_round=test_round,
+            predicted=predicted,
+            actual=actual,
+            hit_count=cls.count_hits(predicted, actual),
+        )

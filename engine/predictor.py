@@ -2,6 +2,7 @@ from engine.feature import FeatureEngine
 from engine.score import ScoreEngine
 from engine.candidate import CandidateSelector
 from engine.generator import GeneratorEngine
+from engine.config import Config
 
 
 class Predictor:
@@ -12,25 +13,30 @@ class Predictor:
         self.selector = CandidateSelector()
         self.generator = GeneratorEngine()
 
-    def predict(self):
+    def predict(self, until_round=None):
 
         # 1. Feature 생성
-        features = self.feature_engine.build()
+        features = self.feature_engine.build(
+            until_round=until_round,
+        )
 
-        # 2. 번호별 점수 계산
+        # 2. 번호 점수 계산
         scores = [
-            self.score_engine.build(f)
+            self.score_engine.build(
+                f,
+                until_round=until_round,
+            )
             for f in features
         ]
 
-        # 3. 상위 후보 선택
+        # 3. 후보번호 선택
         candidates = self.selector.select(
             scores,
-            limit=18,
+            limit=Config.candidate_size(),
         )
 
         # 4. 조합 생성
         return self.generator.generate(
             candidates,
-            count=5,
+            count=Config.predict_count(),
         )

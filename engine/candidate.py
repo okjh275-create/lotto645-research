@@ -1,18 +1,22 @@
 class CandidateSelector:
+    """
+    점수가 높은 번호를 후보군으로 선택한다.
+    Generator는 번호(int) 리스트를 입력으로 받으므로
+    NumberScore -> int 변환까지 담당한다.
+    """
 
     def __init__(self):
         pass
 
     def select(self, scores, limit=18):
-        """
-        scores : NumberScore 리스트
-        limit  : 선택할 후보 개수
-        """
 
         ordered = sorted(
             scores,
-            key=lambda x: x.total_score,
+            key=lambda s: s.total_score,
             reverse=True,
         )
 
-        return ordered[:limit]
+        return [
+            score.number
+            for score in ordered[:limit]
+        ]

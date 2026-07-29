@@ -7,6 +7,10 @@ import time
 
 from .adaptive_engine import AdaptiveWeightConfig, AdaptiveWeightEngine
 from .adaptive_models import AdaptiveWeight
+from .adaptive_reporting import (
+    AdaptiveWeightReport,
+    AdaptiveWeightReporter,
+)
 from .adaptive_repository import AdaptiveWeightRepository
 from .aggregator import StrategyAggregationSummary, StrategyAggregator
 from .evaluator import evaluate_prediction
@@ -51,6 +55,7 @@ class LearningService:
             self.ranking_repository
         )
         self.adaptive_engine = AdaptiveWeightEngine(adaptive_config)
+        self.adaptive_reporter = AdaptiveWeightReporter()
         self.learning_facade = LearningFacade(
             ranking_repository=self.ranking_repository,
             ranking_engine=self.ranking_engine,
@@ -146,4 +151,25 @@ class LearningService:
         return self.learning_facade.get_adaptive_weights(
             strategy_type=strategy_type,
             history_limit=history_limit,
+        )
+
+    def get_adaptive_weight_report(
+        self,
+        *,
+        strategy_type: str | None = None,
+        history_limit: int = 100,
+        generated_at_kst: str | None = None,
+    ) -> AdaptiveWeightReport:
+        """Return a validated E-005B report for current adaptive weights."""
+        weights = self.get_adaptive_weights(
+            strategy_type=strategy_type,
+            history_limit=history_limit,
+        )
+        revision = self.ranking_repository.repository_revision()
+        return self.adaptive_reporter.build(
+            weights=weights,
+            strategy_type=strategy_type,
+            history_limit=history_limit,
+            generated_at_kst=generated_at_kst,
+            revision=revision,
         )

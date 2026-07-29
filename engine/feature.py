@@ -19,14 +19,30 @@ class FeatureEngine:
     def __init__(self):
         self.stats = StatisticsEngine()
 
-    def build(self):
+    def build(self, until_round=None):
 
-        freq_all = self.stats.frequency()
-        freq10 = self.stats.frequency(10)
-        freq20 = self.stats.frequency(20)
-        freq50 = self.stats.frequency(50)
+        freq_all = self.stats.frequency(
+            until_round=until_round,
+        )
 
-        gaps = self.stats.gap()
+        freq10 = self.stats.frequency(
+            10,
+            until_round=until_round,
+        )
+
+        freq20 = self.stats.frequency(
+            20,
+            until_round=until_round,
+        )
+
+        freq50 = self.stats.frequency(
+            50,
+            until_round=until_round,
+        )
+
+        gaps = self.stats.gap(
+            until_round=until_round,
+        )
 
         features = []
 
