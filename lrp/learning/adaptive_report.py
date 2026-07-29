@@ -489,7 +489,7 @@ class AdaptiveWeightReporter:
             metadata={
                 "source": "lrp.learning",
                 "reporter": "E-005B",
-                    "calculation_owner": "AdaptiveWeightEngine",
+                "calculation_owner": "AdaptiveWeightEngine",
                 "read_only": True,
                 "unchanged_tolerance": self.unchanged_tolerance,
                 "high_confidence_threshold": (
