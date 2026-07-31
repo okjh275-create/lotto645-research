@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
+from typing import ClassVar, Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,11 +30,7 @@ class BayesianEvidence:
 
     @property
     def success_rate(self) -> float:
-        """Return the empirical success rate.
-
-        An empty evidence set has no empirical success rate and
-        therefore returns 0.0.
-        """
+        """Return the empirical success rate."""
 
         if self.observations == 0:
             return 0.0
@@ -158,3 +155,213 @@ class BayesianPosterior:
             raise ValueError(
                 f"{name} must be greater than 0"
             )
+
+
+@dataclass(frozen=True, slots=True)
+class BayesianComponentState:
+    """Posterior state assigned to one evolution component."""
+
+    name: str
+    posterior: BayesianPosterior
+
+    COMPONENTS: ClassVar[tuple[str, ...]] = (
+        "hot",
+        "cold",
+        "gap",
+        "trend",
+        "transition",
+        "learning",
+        "adaptive",
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str):
+            raise TypeError(
+                "name must be a string"
+            )
+
+        normalized_name = self.name.strip()
+
+        if normalized_name not in self.COMPONENTS:
+            raise ValueError(
+                f"unsupported Bayesian component: "
+                f"{normalized_name}"
+            )
+
+        if not isinstance(
+            self.posterior,
+            BayesianPosterior,
+        ):
+            raise TypeError(
+                "posterior must be BayesianPosterior"
+            )
+
+        object.__setattr__(
+            self,
+            "name",
+            normalized_name,
+        )
+
+    @property
+    def signal(self) -> float:
+        """Return the component adaptive signal."""
+
+        return self.posterior.adaptive_signal
+
+
+@dataclass(frozen=True, slots=True)
+class BayesianState:
+    """Complete Bayesian state for all evolution components."""
+
+    hot: BayesianComponentState
+    cold: BayesianComponentState
+    gap: BayesianComponentState
+    trend: BayesianComponentState
+    transition: BayesianComponentState
+    learning: BayesianComponentState
+    adaptive: BayesianComponentState
+
+    COMPONENTS: ClassVar[tuple[str, ...]] = (
+        "hot",
+        "cold",
+        "gap",
+        "trend",
+        "transition",
+        "learning",
+        "adaptive",
+    )
+
+    def __post_init__(self) -> None:
+        for name in self.COMPONENTS:
+            component = getattr(self, name)
+
+            if not isinstance(
+                component,
+                BayesianComponentState,
+            ):
+                raise TypeError(
+                    f"{name} must be a "
+                    "BayesianComponentState"
+                )
+
+            if component.name != name:
+                raise ValueError(
+                    f"{name} component must have "
+                    f"name '{name}'"
+                )
+
+    @classmethod
+    def default(
+        cls,
+        *,
+        alpha: float = 1.0,
+        beta: float = 1.0,
+    ) -> BayesianState:
+        """Create a state using an identical prior for every component."""
+
+        posterior = BayesianPosterior(
+            alpha=alpha,
+            beta=beta,
+        )
+
+        return cls.from_posteriors(
+            {
+                name: posterior
+                for name in cls.COMPONENTS
+            }
+        )
+
+    @classmethod
+    def from_posteriors(
+        cls,
+        posteriors: Mapping[str, BayesianPosterior],
+    ) -> BayesianState:
+        """Create a state from an exact component-posterior mapping."""
+
+        cls._validate_posteriors(posteriors)
+
+        components = {
+            name: BayesianComponentState(
+                name=name,
+                posterior=posteriors[name],
+            )
+            for name in cls.COMPONENTS
+        }
+
+        return cls(
+            hot=components["hot"],
+            cold=components["cold"],
+            gap=components["gap"],
+            trend=components["trend"],
+            transition=components["transition"],
+            learning=components["learning"],
+            adaptive=components["adaptive"],
+        )
+
+    @property
+    def components(
+        self,
+    ) -> dict[str, BayesianComponentState]:
+        """Return all component states by canonical name."""
+
+        return {
+            name: getattr(self, name)
+            for name in self.COMPONENTS
+        }
+
+    @property
+    def posteriors(
+        self,
+    ) -> dict[str, BayesianPosterior]:
+        """Return all posterior values by component name."""
+
+        return {
+            name: component.posterior
+            for name, component in self.components.items()
+        }
+
+    def to_signals(self) -> dict[str, float]:
+        """Return signals compatible with AdaptiveWeightCalculator."""
+
+        return {
+            name: component.signal
+            for name, component in self.components.items()
+        }
+
+    @classmethod
+    def _validate_posteriors(
+        cls,
+        posteriors: Mapping[str, BayesianPosterior],
+    ) -> None:
+        if not isinstance(posteriors, Mapping):
+            raise TypeError(
+                "posteriors must be a mapping"
+            )
+
+        provided = set(posteriors)
+        required = set(cls.COMPONENTS)
+
+        missing = sorted(required - provided)
+        unknown = sorted(provided - required)
+
+        if missing:
+            raise ValueError(
+                "missing Bayesian components: "
+                + ", ".join(missing)
+            )
+
+        if unknown:
+            raise ValueError(
+                "unknown Bayesian components: "
+                + ", ".join(unknown)
+            )
+
+        for name in cls.COMPONENTS:
+            if not isinstance(
+                posteriors[name],
+                BayesianPosterior,
+            ):
+                raise TypeError(
+                    f"posterior for '{name}' must be "
+                    "BayesianPosterior"
+                )
