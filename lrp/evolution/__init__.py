@@ -5,6 +5,13 @@ from lrp.evolution.policies import (
     AdaptivePolicyDecision,
     AdaptiveWeightPolicy,
 )
+from lrp.evolution.storage import (
+    EvolutionSnapshot,
+    EvolutionSnapshotSerializer,
+    SnapshotNotFoundError,
+    SnapshotRepository,
+    SnapshotSerializationError,
+)
 
 __all__ = [
     "AdaptivePolicyConfig",
@@ -12,4 +19,9 @@ __all__ = [
     "AdaptiveWeightCalculator",
     "AdaptiveWeightPolicy",
     "AdaptiveWeightProfile",
+    "EvolutionSnapshot",
+    "EvolutionSnapshotSerializer",
+    "SnapshotNotFoundError",
+    "SnapshotRepository",
+    "SnapshotSerializationError",
 ]
