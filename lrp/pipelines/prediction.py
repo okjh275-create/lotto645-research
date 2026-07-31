@@ -1,4 +1,4 @@
-﻿"""Project A complete prediction pipeline."""
+"""Project A complete prediction pipeline."""
 
 from __future__ import annotations
 
@@ -21,13 +21,16 @@ from lrp.ensemble import (
     PipelineRescoringBridge,
     PipelineRescoringResult,
 )
+from lrp.prediction import (
+    ProbabilityFusionEngine,
+    RegimeDetector,
+)
 
 from .models import (
     PredictionGenerationResult,
     PredictionRequest,
     PredictionResult,
 )
-from .probability import build_probability_vector
 
 
 _KST = ZoneInfo("Asia/Seoul")
@@ -70,6 +73,45 @@ def _analysis_snapshot(
         "Project C analysis output does not expose "
         "a stable snapshot"
     )
+
+
+def _regime_features(
+    snapshot: object,
+) -> tuple[object, ...]:
+    """Extract canonical Project C number features."""
+
+    numbers = getattr(
+        snapshot,
+        "numbers",
+        None,
+    )
+
+    if numbers is None:
+        raise ContractError(
+            "Project C snapshot does not expose "
+            "number features"
+        )
+
+    if isinstance(numbers, Mapping):
+        features = tuple(
+            numbers.values()
+        )
+    else:
+        try:
+            features = tuple(numbers)
+        except TypeError as exc:
+            raise ContractError(
+                "Project C snapshot numbers "
+                "must be iterable"
+            ) from exc
+
+    if len(features) != 45:
+        raise ContractError(
+            "Project C snapshot must contain "
+            "exactly 45 number features"
+        )
+
+    return features
 
 
 def _pair_affinities(
@@ -225,10 +267,27 @@ class PredictionPipeline:
             )
         )
 
+        regime_profile = RegimeDetector().detect(
+            _regime_features(snapshot),
+            round_no=request.round_no,
+            metadata={
+                "source": "Project C",
+                "pipeline": type(self).__name__,
+            },
+        )
+
+        probability_vector = (
+            ProbabilityFusionEngine().build(
+                regime_profile,
+                metadata={
+                    "pipeline": type(self).__name__,
+                },
+            )
+        )
+
         probabilities = (
-            build_probability_vector(
-                number_signals,
-                weights=request.weights,
+            self.candidate.probability_mapping(
+                probability_vector
             )
         )
 
@@ -288,6 +347,10 @@ class PredictionPipeline:
             ),
             candidate_version=(
                 self.candidate.version
+            ),
+            regime_profile=regime_profile,
+            probability_vector=(
+                probability_vector
             ),
         )
 

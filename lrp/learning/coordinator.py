@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import math
 from pathlib import Path
+import time
 from typing import Any, Mapping
 
 from .aggregator import StrategyAggregationSummary
-from .service import IncrementalReviewSummary
-from .snapshot import LearningSnapshot
+from .service import IncrementalReviewSummary, LearningService
+from .snapshot import LearningSnapshot, LearningSnapshotWriter
 
 
 def _positive_integer(
@@ -271,10 +272,6 @@ class LearningCoordinatorResult:
         }
 
 
-from .service import LearningService
-from .snapshot import LearningSnapshotWriter
-
-
 class LearningCoordinator:
     """Coordinates the complete learning workflow."""
 
@@ -299,3 +296,105 @@ class LearningCoordinator:
 
         self._service = service
         self._snapshot_writer = snapshot_writer
+
+    def run(
+        self,
+        *,
+        round_no: int,
+        output_root: str | Path,
+        config: LearningCoordinatorConfig | None = None,
+        reviewed_at_kst: str | None = None,
+        aggregated_at_kst: str | None = None,
+        generated_at_kst: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> LearningCoordinatorResult:
+        """Run review, aggregation, and snapshot persistence."""
+
+        started = time.perf_counter()
+
+        normalized_round = _positive_integer(
+            round_no,
+            field_name="round_no",
+        )
+
+        if config is None:
+            effective_config = LearningCoordinatorConfig()
+        elif isinstance(
+            config,
+            LearningCoordinatorConfig,
+        ):
+            effective_config = config
+        else:
+            raise TypeError(
+                "config must be a "
+                "LearningCoordinatorConfig or None"
+            )
+
+        if metadata is None:
+            extra_metadata: dict[str, Any] = {}
+        elif isinstance(metadata, Mapping):
+            extra_metadata = dict(metadata)
+        else:
+            raise TypeError(
+                "metadata must be a mapping or None"
+            )
+
+        review_summary = (
+            self._service.run_incremental_review(
+                round_no=normalized_round,
+                limit=effective_config.review_limit,
+                reviewed_at_kst=reviewed_at_kst,
+            )
+        )
+
+        aggregation_summary = (
+            self._service.run_strategy_aggregation(
+                limit=effective_config.aggregation_limit,
+                aggregated_at_kst=aggregated_at_kst,
+            )
+        )
+
+        snapshot_metadata = {
+            **extra_metadata,
+            "coordinator": "E-005D",
+            "coordinator_config": (
+                effective_config.as_dict()
+            ),
+            "review_summary": (
+                review_summary.as_dict()
+            ),
+            "aggregation_summary": (
+                aggregation_summary.as_dict()
+            ),
+        }
+
+        snapshot = self._snapshot_writer.write(
+            round_no=normalized_round,
+            output_root=output_root,
+            strategy_type=effective_config.strategy_type,
+            history_limit=effective_config.history_limit,
+            generated_at_kst=generated_at_kst,
+            metadata=snapshot_metadata,
+            overwrite=effective_config.overwrite_snapshot,
+        )
+
+        elapsed_seconds = round(
+            time.perf_counter() - started,
+            6,
+        )
+
+        result_metadata = {
+            **extra_metadata,
+            "coordinator": "E-005D",
+            "config": effective_config.as_dict(),
+            "snapshot_written": True,
+        }
+
+        return LearningCoordinatorResult(
+            round_no=normalized_round,
+            review_summary=review_summary,
+            aggregation_summary=aggregation_summary,
+            snapshot=snapshot,
+            elapsed_seconds=elapsed_seconds,
+            metadata=result_metadata,
+        )

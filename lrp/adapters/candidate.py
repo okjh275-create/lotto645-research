@@ -8,6 +8,7 @@ from types import ModuleType
 from typing import Any, Mapping
 
 from lrp.contracts import CompatibilityError, ContractError
+from lrp.prediction.probability import ProbabilityVector
 
 
 _REQUIRED_EXPORTS = (
@@ -57,6 +58,41 @@ class CandidateAdapter:
                 "Candidate package does not expose __version__"
             )
         return value
+
+    @staticmethod
+    def probability_mapping(
+        vector: ProbabilityVector,
+    ) -> dict[int, float]:
+        """Convert an LRP probability vector to Project D input format."""
+
+        if not isinstance(vector, ProbabilityVector):
+            raise ContractError(
+                "vector must be a ProbabilityVector"
+            )
+
+        probabilities = {
+            item.number: item.probability
+            for item in vector.probabilities
+        }
+
+        expected_numbers = set(range(1, 46))
+        actual_numbers = set(probabilities)
+
+        if actual_numbers != expected_numbers:
+            missing = sorted(expected_numbers - actual_numbers)
+            extra = sorted(actual_numbers - expected_numbers)
+            raise ContractError(
+                "probability vector must contain exactly numbers 1..45; "
+                f"missing={missing}, extra={extra}"
+            )
+
+        total = sum(probabilities.values())
+        if abs(total - 1.0) > 1e-9:
+            raise ContractError(
+                "probability vector values must sum to 1.0"
+            )
+
+        return probabilities
 
     def validate_statistics(
         self,

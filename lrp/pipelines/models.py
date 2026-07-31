@@ -1,4 +1,4 @@
-﻿"""Public request and result models for the prediction pipeline."""
+"""Public request and result models for the prediction pipeline."""
 
 from __future__ import annotations
 
@@ -316,6 +316,8 @@ class PredictionGenerationResult:
     candidates: tuple[object, ...]
     statistics_version: str
     candidate_version: str
+    regime_profile: object | None = None
+    probability_vector: object | None = None
 
     @property
     def generated_count(self) -> int:
