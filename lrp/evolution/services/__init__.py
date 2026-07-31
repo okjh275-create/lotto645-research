@@ -1,3 +1,6 @@
+from lrp.evolution.services.adaptive_pipeline import (
+    AdaptiveEvolutionPipeline,
+)
 from lrp.evolution.services.coordinator import (
     EvolutionCoordinator,
 )
@@ -10,6 +13,7 @@ from lrp.evolution.services.evolution_pipeline import (
 )
 
 __all__ = [
+    "AdaptiveEvolutionPipeline",
     "CallableEvolutionPipeline",
     "EvolutionCoordinator",
     "EvolutionEngine",
