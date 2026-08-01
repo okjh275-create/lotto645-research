@@ -18,6 +18,9 @@ from lrp.evolution.integration.profile_provider import (
 from lrp.evolution.integration.provider_weight_adapter import (
     ProviderEvolutionWeightAdapter,
 )
+from lrp.evolution.integration.review_signal_extractor import (
+    ReviewSignalExtractor,
+)
 from lrp.evolution.integration.weight_adapter import (
     EvolutionWeightAdapter,
 )
@@ -30,6 +33,7 @@ __all__ = [
     "NoOpEvolutionWeightAdapter",
     "PredictionRewardMapper",
     "ProviderEvolutionWeightAdapter",
+    "ReviewSignalExtractor",
     "SnapshotProfileProvider",
     "StaticProfileProvider",
 ]
