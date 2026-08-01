@@ -11,6 +11,18 @@ from lrp.evolution.services.evolution_pipeline import (
     CallableEvolutionPipeline,
     EvolutionPipeline,
 )
+from lrp.evolution.services.learning_cycle import (
+    LearningCycle,
+)
+from lrp.evolution.services.persistent_learning_runner import (
+    PersistentLearningRunner,
+)
+from lrp.evolution.services.persistent_learning_service import (
+    PersistentLearningService,
+)
+from lrp.evolution.services.snapshot_factory import (
+    SnapshotFactory,
+)
 
 __all__ = [
     "AdaptiveEvolutionPipeline",
@@ -18,4 +30,8 @@ __all__ = [
     "EvolutionCoordinator",
     "EvolutionEngine",
     "EvolutionPipeline",
+    "LearningCycle",
+    "PersistentLearningRunner",
+    "PersistentLearningService",
+    "SnapshotFactory",
 ]
