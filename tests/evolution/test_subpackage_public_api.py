@@ -104,5 +104,6 @@ def test_services_all_exports() -> None:
         "LearningCycle",
         "PersistentLearningRunner",
         "PersistentLearningService",
+        "ReviewLearningService",
         "SnapshotFactory",
     ]

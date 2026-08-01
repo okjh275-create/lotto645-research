@@ -20,6 +20,9 @@ from lrp.evolution.services.persistent_learning_runner import (
 from lrp.evolution.services.persistent_learning_service import (
     PersistentLearningService,
 )
+from lrp.evolution.services.review_learning_service import (
+    ReviewLearningService,
+)
 from lrp.evolution.services.snapshot_factory import (
     SnapshotFactory,
 )
@@ -33,5 +36,6 @@ __all__ = [
     "LearningCycle",
     "PersistentLearningRunner",
     "PersistentLearningService",
+    "ReviewLearningService",
     "SnapshotFactory",
 ]
