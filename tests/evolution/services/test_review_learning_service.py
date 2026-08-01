@@ -164,6 +164,7 @@ def test_snapshot_metadata_is_enriched(
             "prediction_review"
         ),
         "feedback_count": 2,
+        "review_set_count": 10,
         "policy": "thompson",
     }
 

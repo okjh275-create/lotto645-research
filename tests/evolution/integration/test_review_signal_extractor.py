@@ -137,3 +137,18 @@ def test_out_of_range_reward_is_rejected() -> None:
         ReviewSignalExtractor().extract(
             context
         )
+
+
+def test_sample_size_prefers_review_set_count() -> None:
+    context = LearningContext(
+        cycle_id="cycle-1220",
+        round_no=1220,
+        metadata={
+            "review_set_count": 10,
+            "feedback_observation_count": 1,
+        },
+    )
+
+    assert ReviewSignalExtractor.sample_size(
+        context
+    ) == 10

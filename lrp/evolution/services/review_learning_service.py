@@ -99,10 +99,17 @@ class ReviewLearningService:
             policy=policy,
         )
 
+        review_set_count = (
+            self._review_set_count(
+                review_payload
+            )
+        )
+
         snapshot_metadata = self._build_metadata(
             metadata=metadata,
             policy=policy,
             feedback_count=len(feedbacks),
+            review_set_count=review_set_count,
         )
 
         run_result = self.runner.run(
@@ -120,11 +127,44 @@ class ReviewLearningService:
         )
 
     @staticmethod
+    def _review_set_count(
+        review_payload: Mapping[str, Any],
+    ) -> int:
+        summary = review_payload.get(
+            "summary",
+            review_payload,
+        )
+
+        if not isinstance(summary, Mapping):
+            raise TypeError(
+                "review summary must be a mapping"
+            )
+
+        value = summary.get("set_count")
+
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+        ):
+            raise TypeError(
+                "set_count must be an integer"
+            )
+
+        if value < 1:
+            raise ValueError(
+                "set_count must be greater than "
+                "or equal to 1"
+            )
+
+        return value
+
+    @staticmethod
     def _build_metadata(
         *,
         metadata: Mapping[str, Any] | None,
         policy: str | None,
         feedback_count: int,
+        review_set_count: int,
     ) -> dict[str, Any]:
         if metadata is None:
             normalized: dict[str, Any] = {}
@@ -142,6 +182,9 @@ class ReviewLearningService:
                     "prediction_review"
                 ),
                 "feedback_count": feedback_count,
+                "review_set_count": (
+                    review_set_count
+                ),
             }
         )
 
