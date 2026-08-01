@@ -36,6 +36,7 @@ def test_integration_all_exports() -> None:
     import lrp.evolution.integration as integration
 
     assert integration.__all__ == [
+        "AdaptiveEvolutionWeightAdapter",
         "EvolutionWeightAdapter",
         "NoOpEvolutionWeightAdapter",
     ]
