@@ -1,3 +1,6 @@
+from lrp.evolution.integration.adapter_factory import (
+    EvolutionAdapterFactory,
+)
 from lrp.evolution.integration.adaptive_weight_adapter import (
     AdaptiveEvolutionWeightAdapter,
 )
@@ -19,6 +22,7 @@ from lrp.evolution.integration.weight_adapter import (
 __all__ = [
     "AdaptiveEvolutionWeightAdapter",
     "AdaptiveWeightProfileProvider",
+    "EvolutionAdapterFactory",
     "EvolutionWeightAdapter",
     "NoOpEvolutionWeightAdapter",
     "ProviderEvolutionWeightAdapter",

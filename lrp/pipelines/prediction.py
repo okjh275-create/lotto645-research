@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Iterable, Mapping
 from zoneinfo import ZoneInfo
 
@@ -22,6 +23,7 @@ from lrp.ensemble import (
     PipelineRescoringResult,
 )
 from lrp.evolution.integration import (
+    EvolutionAdapterFactory,
     EvolutionWeightAdapter,
     NoOpEvolutionWeightAdapter,
 )
@@ -217,16 +219,24 @@ class PredictionPipeline:
             EvolutionWeightAdapter[object]
             | None
         ) = None,
+        evolution_snapshot_root: (
+            str | Path | None
+        ) = None,
     ) -> "PredictionPipeline":
+        resolved_evolution = (
+            EvolutionAdapterFactory.build(
+                evolution=evolution,
+                snapshot_root=(
+                    evolution_snapshot_root
+                ),
+            )
+        )
+
         return cls(
             statistics=StatisticsAdapter.load(),
             candidate=CandidateAdapter.load(),
             ensemble=ensemble,
-            evolution=(
-                evolution
-                if evolution is not None
-                else NoOpEvolutionWeightAdapter()
-            ),
+            evolution=resolved_evolution,
         )
 
     def analyze(

@@ -38,6 +38,7 @@ def test_integration_all_exports() -> None:
     assert integration.__all__ == [
         "AdaptiveEvolutionWeightAdapter",
         "AdaptiveWeightProfileProvider",
+        "EvolutionAdapterFactory",
         "EvolutionWeightAdapter",
         "NoOpEvolutionWeightAdapter",
         "ProviderEvolutionWeightAdapter",
