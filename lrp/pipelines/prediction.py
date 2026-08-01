@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Iterable, Mapping
 from zoneinfo import ZoneInfo
@@ -20,6 +20,10 @@ from lrp.core import RuntimeContext
 from lrp.ensemble import (
     PipelineRescoringBridge,
     PipelineRescoringResult,
+)
+from lrp.evolution.integration import (
+    EvolutionWeightAdapter,
+    NoOpEvolutionWeightAdapter,
 )
 from lrp.prediction import (
     ProbabilityFusionEngine,
@@ -175,6 +179,9 @@ class PredictionPipeline:
     statistics: StatisticsAdapter
     candidate: CandidateAdapter
     ensemble: PipelineRescoringBridge | None = None
+    evolution: EvolutionWeightAdapter[object] = field(
+        default_factory=NoOpEvolutionWeightAdapter
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -189,6 +196,15 @@ class PredictionPipeline:
                 "PipelineRescoringBridge or None"
             )
 
+        if not isinstance(
+            self.evolution,
+            EvolutionWeightAdapter,
+        ):
+            raise ContractError(
+                "evolution must implement "
+                "EvolutionWeightAdapter"
+            )
+
     @classmethod
     def load(
         cls,
@@ -197,11 +213,20 @@ class PredictionPipeline:
             PipelineRescoringBridge
             | None
         ) = None,
+        evolution: (
+            EvolutionWeightAdapter[object]
+            | None
+        ) = None,
     ) -> "PredictionPipeline":
         return cls(
             statistics=StatisticsAdapter.load(),
             candidate=CandidateAdapter.load(),
             ensemble=ensemble,
+            evolution=(
+                evolution
+                if evolution is not None
+                else NoOpEvolutionWeightAdapter()
+            ),
         )
 
     def analyze(
@@ -285,6 +310,13 @@ class PredictionPipeline:
             )
         )
 
+        probability_vector = (
+            self._adjust_probability_vector(
+                probability_vector,
+                request=request,
+            )
+        )
+
         probabilities = (
             self.candidate.probability_mapping(
                 probability_vector
@@ -353,6 +385,25 @@ class PredictionPipeline:
                 probability_vector
             ),
         )
+
+    def _adjust_probability_vector(
+        self,
+        probability_vector: object,
+        *,
+        request: PredictionRequest,
+    ) -> object:
+        adjusted = self.evolution.adjust(
+            probability_vector,
+            round_no=request.round_no,
+            seed=request.seed,
+        )
+
+        if adjusted is None:
+            raise ContractError(
+                "evolution adapter returned None"
+            )
+
+        return adjusted
 
     def _apply_ensemble(
         self,
