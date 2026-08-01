@@ -1,4 +1,4 @@
-﻿"""LRP command-line dispatcher."""
+"""LRP command-line dispatcher."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Sequence
 
 from .backup import main as backup_main
 from .doctor import main as doctor_main
+from .export_history import main as export_history_main
 from .predict import main as predict_main
 from .restore import main as restore_main
 from .review import main as review_main
@@ -24,6 +25,7 @@ _COMMANDS = {
     "restore": restore_main,
     "status": status_main,
     "doctor": doctor_main,
+    "export-history": export_history_main,
 }
 
 
@@ -70,6 +72,10 @@ def main(
         (
             "doctor",
             "Run lightweight platform diagnostics",
+        ),
+        (
+            "export-history",
+            "Export draw history from SQLite",
         ),
     ):
         subparsers.add_parser(
