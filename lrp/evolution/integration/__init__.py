@@ -7,6 +7,9 @@ from lrp.evolution.integration.adaptive_weight_adapter import (
 from lrp.evolution.integration.noop_weight_adapter import (
     NoOpEvolutionWeightAdapter,
 )
+from lrp.evolution.integration.prediction_reward_mapper import (
+    PredictionRewardMapper,
+)
 from lrp.evolution.integration.profile_provider import (
     AdaptiveWeightProfileProvider,
     SnapshotProfileProvider,
@@ -25,6 +28,7 @@ __all__ = [
     "EvolutionAdapterFactory",
     "EvolutionWeightAdapter",
     "NoOpEvolutionWeightAdapter",
+    "PredictionRewardMapper",
     "ProviderEvolutionWeightAdapter",
     "SnapshotProfileProvider",
     "StaticProfileProvider",

@@ -41,6 +41,7 @@ def test_integration_all_exports() -> None:
         "EvolutionAdapterFactory",
         "EvolutionWeightAdapter",
         "NoOpEvolutionWeightAdapter",
+        "PredictionRewardMapper",
         "ProviderEvolutionWeightAdapter",
         "SnapshotProfileProvider",
         "StaticProfileProvider",
