@@ -81,10 +81,58 @@ def _analysis_snapshot(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _RegimeFeature:
+    """Project C number statistics adapted for RegimeDetector."""
+
+    number: int
+    freq_all: float
+    freq10: float
+    freq20: float
+    freq50: float
+    gap: float
+
+
+def _feature_value(
+    feature: object,
+    name: str,
+) -> object:
+    if isinstance(feature, Mapping):
+        if name not in feature:
+            raise ContractError(
+                f"Project C number feature is missing {name}"
+            )
+        return feature[name]
+
+    if not hasattr(feature, name):
+        raise ContractError(
+            f"Project C number feature is missing {name}"
+        )
+
+    return getattr(feature, name)
+
+
+def _feature_value_any(
+    feature: object,
+    *names: str,
+) -> object:
+    for name in names:
+        if isinstance(feature, Mapping):
+            if name in feature:
+                return feature[name]
+        elif hasattr(feature, name):
+            return getattr(feature, name)
+
+    raise ContractError(
+        "Project C number feature is missing "
+        + " or ".join(names)
+    )
+
+
 def _regime_features(
     snapshot: object,
-) -> tuple[object, ...]:
-    """Extract canonical Project C number features."""
+) -> tuple[_RegimeFeature, ...]:
+    """Adapt canonical Project C features for RegimeDetector."""
 
     numbers = getattr(
         snapshot,
@@ -99,26 +147,98 @@ def _regime_features(
         )
 
     if isinstance(numbers, Mapping):
-        features = tuple(
+        source_features = tuple(
             numbers.values()
         )
     else:
         try:
-            features = tuple(numbers)
+            source_features = tuple(numbers)
         except TypeError as exc:
             raise ContractError(
                 "Project C snapshot numbers "
                 "must be iterable"
             ) from exc
 
-    if len(features) != 45:
+    if len(source_features) != 45:
         raise ContractError(
             "Project C snapshot must contain "
             "exactly 45 number features"
         )
 
-    return features
+    converted: list[_RegimeFeature] = []
 
+    for feature in source_features:
+        try:
+            converted.append(
+                _RegimeFeature(
+                    number=int(
+                        _feature_value(
+                            feature,
+                            "number",
+                        )
+                    ),
+                    freq_all=float(
+                        _feature_value_any(
+                            feature,
+                            "total_frequency",
+                            "freq_all",
+                        )
+                    ),
+                    freq10=float(
+                        _feature_value_any(
+                            feature,
+                            "short_frequency",
+                            "freq10",
+                        )
+                    ),
+                    freq20=float(
+                        _feature_value_any(
+                            feature,
+                            "mid_frequency",
+                            "freq20",
+                        )
+                    ),
+                    freq50=float(
+                        _feature_value_any(
+                            feature,
+                            "long_frequency",
+                            "freq50",
+                        )
+                    ),
+                    gap=float(
+                        _feature_value(
+                            feature,
+                            "gap",
+                        )
+                    ),
+                )
+            )
+        except ContractError:
+            raise
+        except (TypeError, ValueError) as exc:
+            raise ContractError(
+                "Project C regime feature fields "
+                "must be numeric"
+            ) from exc
+
+    converted.sort(
+        key=lambda item: item.number
+    )
+
+    actual_numbers = tuple(
+        item.number
+        for item in converted
+    )
+
+    expected_numbers = tuple(range(1, 46))
+
+    if actual_numbers != expected_numbers:
+        raise ContractError(
+            "Project C number features must "
+            "contain exactly numbers 1..45"
+        )
+
+    return tuple(converted)
 
 def _pair_affinities(
     snapshot: object,
