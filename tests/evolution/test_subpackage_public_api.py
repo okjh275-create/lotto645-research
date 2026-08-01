@@ -105,5 +105,6 @@ def test_services_all_exports() -> None:
         "PersistentLearningRunner",
         "PersistentLearningService",
         "ReviewLearningService",
+        "ReviewProfileEvolutionService",
         "SnapshotFactory",
     ]
