@@ -272,3 +272,45 @@ def test_invalid_review_payload_is_rejected(
             review_payload=object(),  # type: ignore[arg-type]
             snapshot_id="review-1220",
         )
+
+
+def test_review_set_count_reaches_final_context(
+    tmp_path: Path,
+) -> None:
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=make_review(),
+        snapshot_id="review-1220",
+    )
+
+    assert result.final_context.metadata[
+        "review_set_count"
+    ] == 10
+
+
+def test_original_context_metadata_is_not_mutated(
+    tmp_path: Path,
+) -> None:
+    context = LearningContext(
+        cycle_id="cycle-1220",
+        round_no=1220,
+        metadata={
+            "seed": 20260802,
+        },
+    )
+
+    result = make_service(tmp_path).learn(
+        context=context,
+        review_payload=make_review(),
+        snapshot_id="review-1220",
+    )
+
+    assert context.metadata == {
+        "seed": 20260802,
+    }
+    assert result.final_context.metadata[
+        "seed"
+    ] == 20260802
+    assert result.final_context.metadata[
+        "review_set_count"
+    ] == 10

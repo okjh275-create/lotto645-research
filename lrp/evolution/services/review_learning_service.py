@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 from lrp.evolution.contracts.learning_context import (
@@ -112,8 +113,18 @@ class ReviewLearningService:
             review_set_count=review_set_count,
         )
 
+        enriched_context = replace(
+            context,
+            metadata={
+                **dict(context.metadata),
+                "review_set_count": (
+                    review_set_count
+                ),
+            },
+        )
+
         run_result = self.runner.run(
-            context=context,
+            context=enriched_context,
             feedbacks=feedbacks,
             snapshot_id=snapshot_id,
             metadata=snapshot_metadata,
