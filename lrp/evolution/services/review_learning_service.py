@@ -99,6 +99,10 @@ class ReviewLearningService:
             review_payload,
             policy=policy,
         )
+        reward_vector = self.reward_mapper.vector(
+            review_payload,
+            policy=policy,
+        )
 
         review_set_count = (
             self._review_set_count(
@@ -111,6 +115,11 @@ class ReviewLearningService:
             policy=policy,
             feedback_count=len(feedbacks),
             review_set_count=review_set_count,
+        )
+        snapshot_metadata.update(
+            self._reward_vector_metadata(
+                reward_vector
+            )
         )
 
         previous_cumulative = (
@@ -208,6 +217,66 @@ class ReviewLearningService:
             )
 
         return value
+
+    @staticmethod
+    def _reward_vector_metadata(
+        reward_vector: object,
+    ) -> dict[str, Any]:
+        payload = reward_vector.as_dict()
+
+        metadata = payload.get(
+            "metadata",
+            {},
+        )
+
+        result: dict[str, Any] = {
+            "reward_vector_portfolio_hit": (
+                payload["portfolio_hit"]
+            ),
+            "reward_vector_practical_hit": (
+                payload["practical_hit"]
+            ),
+            "reward_vector_rank_quality": (
+                payload["rank_quality"]
+            ),
+            "reward_vector_coverage": (
+                payload["coverage"]
+            ),
+            "reward_vector_diversity": (
+                payload["diversity"]
+            ),
+            "reward_vector_stability": (
+                payload["stability"]
+            ),
+            "reward_vector_sample_size": (
+                payload["sample_size"]
+            ),
+        }
+
+        if isinstance(metadata, Mapping):
+            source = metadata.get("source")
+            policy = metadata.get("policy")
+            round_no = metadata.get("round")
+
+            if isinstance(source, str):
+                result[
+                    "reward_vector_source"
+                ] = source
+
+            if isinstance(policy, str):
+                result[
+                    "reward_vector_policy"
+                ] = policy
+
+            if (
+                isinstance(round_no, int)
+                and not isinstance(round_no, bool)
+            ):
+                result[
+                    "reward_vector_round"
+                ] = round_no
+
+        return result
 
     @staticmethod
     def _build_metadata(

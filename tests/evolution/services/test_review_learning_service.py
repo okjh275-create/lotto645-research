@@ -158,15 +158,31 @@ def test_snapshot_metadata_is_enriched(
         },
     )
 
-    assert result.snapshot.metadata == {
-        "round": 1220,
-        "learning_source": (
-            "prediction_review"
-        ),
-        "feedback_count": 2,
-        "review_set_count": 10,
-        "policy": "thompson",
-    }
+    metadata = result.snapshot.metadata
+
+    assert metadata["round"] == 1220
+    assert metadata["learning_source"] == (
+        "prediction_review"
+    )
+    assert metadata["feedback_count"] == 2
+    assert metadata["review_set_count"] == 10
+    assert metadata["policy"] == "thompson"
+
+    assert metadata[
+        "reward_vector_portfolio_hit"
+    ] == 0.55
+    assert metadata[
+        "reward_vector_practical_hit"
+    ] == 0.20
+    assert metadata[
+        "reward_vector_sample_size"
+    ] == 10
+    assert metadata[
+        "reward_vector_source"
+    ] == "prediction_review"
+    assert metadata[
+        "reward_vector_policy"
+    ] == "thompson"
 
 
 def test_original_metadata_is_not_mutated(
@@ -360,3 +376,34 @@ def test_learning_accumulates_review_sample_metadata(
     assert second.final_context.metadata[
         "review_count"
     ] == 2
+
+
+
+def test_learning_snapshot_metadata_contains_reward_vector(
+    tmp_path,
+) -> None:
+    service = make_service(tmp_path)
+
+    result = service.learn(
+        context=make_context(),
+        review_payload=make_review(),
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    metadata = result.snapshot.metadata
+
+    assert metadata[
+        "reward_vector_portfolio_hit"
+    ] == 0.55
+    assert metadata[
+        "reward_vector_practical_hit"
+    ] == 0.20
+    assert metadata[
+        "reward_vector_sample_size"
+    ] == result.final_context.metadata[
+        "review_set_count"
+    ]
+    assert metadata[
+        "reward_vector_policy"
+    ] == "thompson"
