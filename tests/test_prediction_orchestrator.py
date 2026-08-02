@@ -1,4 +1,4 @@
-﻿"""M2 prediction orchestrator integration smoke test."""
+"""M2 prediction orchestrator integration smoke test."""
 
 from __future__ import annotations
 
@@ -84,6 +84,34 @@ def main() -> None:
     assert len(first_payload["sets"]) <= 10
     assert len(first_payload["sets"]) > 0
     assert len(first_payload["top5_practical"]) <= 5
+
+    probability_vector = first_payload[
+        "probability_vector"
+    ]
+
+    assert probability_vector[
+        "probability_count"
+    ] == 45
+    assert len(
+        probability_vector["probabilities"]
+    ) == 45
+
+    first_probability = probability_vector[
+        "probabilities"
+    ][0]
+
+    assert first_probability["number"] == 1
+    assert set(
+        first_probability["components"]
+    ) == {
+        "hot",
+        "cold",
+        "gap",
+        "trend",
+        "transition",
+        "learning",
+        "adaptive",
+    }
 
     for item in first_payload["sets"]:
         assert len(item["numbers"]) == 6

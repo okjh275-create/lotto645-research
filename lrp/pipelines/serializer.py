@@ -1,4 +1,4 @@
-﻿"""Final prediction JSON serializer."""
+"""Final prediction JSON serializer."""
 
 from __future__ import annotations
 
@@ -299,6 +299,11 @@ def prediction_to_dict(
             "K": request.top_k,
         },
         "sets": sets,
+        "probability_vector": (
+            result.generation
+            .probability_vector
+            .as_dict()
+        ),
         "diversity": _diversity_metrics(
             [
                 tuple(item["numbers"])
