@@ -1,3 +1,6 @@
+from .feature_attribution_mapper import (
+    FeatureAttributionMapper,
+)
 from lrp.evolution.integration.adapter_factory import (
     EvolutionAdapterFactory,
 )
@@ -30,6 +33,7 @@ __all__ = [
     "AdaptiveWeightProfileProvider",
     "EvolutionAdapterFactory",
     "EvolutionWeightAdapter",
+    "FeatureAttributionMapper",
     "NoOpEvolutionWeightAdapter",
     "PredictionRewardMapper",
     "ProviderEvolutionWeightAdapter",
