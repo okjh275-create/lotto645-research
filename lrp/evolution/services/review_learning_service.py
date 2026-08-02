@@ -155,6 +155,15 @@ class ReviewLearningService:
         ):
             previous_review_count = 0
 
+        reward_vector_metadata = {
+            key: value
+            for key, value
+            in snapshot_metadata.items()
+            if key.startswith(
+                "reward_vector_"
+            )
+        }
+
         enriched_context = replace(
             context,
             metadata={
@@ -169,6 +178,7 @@ class ReviewLearningService:
                 "review_count": (
                     previous_review_count + 1
                 ),
+                **reward_vector_metadata,
             },
         )
 

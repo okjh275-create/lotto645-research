@@ -407,3 +407,72 @@ def test_learning_snapshot_metadata_contains_reward_vector(
     assert metadata[
         "reward_vector_policy"
     ] == "thompson"
+
+
+def test_learning_context_contains_flattened_reward_vector(
+    tmp_path,
+) -> None:
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=make_review(),
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    metadata = result.final_context.metadata
+
+    assert metadata[
+        "reward_vector_portfolio_hit"
+    ] == 0.55
+    assert metadata[
+        "reward_vector_practical_hit"
+    ] == 0.20
+    assert metadata[
+        "reward_vector_sample_size"
+    ] == metadata["review_set_count"]
+    assert metadata[
+        "reward_vector_source"
+    ] == "prediction_review"
+    assert metadata[
+        "reward_vector_policy"
+    ] == "thompson"
+
+
+def test_reward_vector_metadata_is_replaced_by_latest_review(
+    tmp_path,
+) -> None:
+    service = make_service(tmp_path)
+
+    first = service.learn(
+        context=make_context(),
+        review_payload=make_review(),
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    second_review = make_review()
+    second_review["summary"][
+        "best_main_hits"
+    ] = 5
+    second_review["summary"][
+        "practical_best_hits"
+    ] = 4
+
+    second = service.learn(
+        context=first.final_context,
+        review_payload=second_review,
+        snapshot_id="review-1223",
+        policy="thompson",
+    )
+
+    metadata = second.final_context.metadata
+
+    assert metadata[
+        "reward_vector_portfolio_hit"
+    ] == 0.85
+    assert metadata[
+        "reward_vector_practical_hit"
+    ] == 0.55
+    assert metadata[
+        "review_count"
+    ] == 2
