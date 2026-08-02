@@ -12,4 +12,6 @@ __all__ = [
     "AdaptiveWeightProfile",
     "EvolutionPipelineRequest",
     "EvolutionRunResult",
+    "ReviewRewardVector",
 ]
+from .review_reward_vector import ReviewRewardVector
