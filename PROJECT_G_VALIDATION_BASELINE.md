@@ -55,3 +55,45 @@ Prediction
 - Profile rejection below policy thresholds is expected.
 - Prediction without a profile snapshot uses NoOpEvolutionWeightAdapter.
 - Review learning is enabled only with `--learn`.
+
+## Validation-001 Closed Loop Smoke Test
+
+### Test Round
+
+- Prediction round: 1231
+- Seed: 20260802
+- Candidate count: 1000
+- Selected sets: 20
+- Winning numbers: 4, 13, 14, 18, 31, 38
+- Bonus: 15
+
+### Review Result
+
+- Best main hits: 3
+- Best set IDs: S7, S9
+- Practical best hits: 3
+- Feedback count: 2
+- Learning context version: 3
+
+### Adaptive Profile
+
+- Applied: true
+- Revision: 1
+- Confidence: 0.8
+- Sample size: 20
+- Learning weight: 0.05179104477611941
+- Adaptive weight: 0.05179104477611941
+
+### Probability Vector Comparison
+
+- Changed numbers: 45
+- Maximum absolute delta: 0.000036142187536475356
+- Total absolute delta: 0.0006002718810181502
+- Changed final Top20 sets: 0
+
+### Result
+
+The adaptive profile was loaded and applied successfully.
+All 45 number probabilities changed.
+The adjustment magnitude was not large enough to change the
+final candidate portfolio for this seed.
