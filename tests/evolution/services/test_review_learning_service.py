@@ -314,3 +314,49 @@ def test_original_context_metadata_is_not_mutated(
     assert result.final_context.metadata[
         "review_set_count"
     ] == 10
+
+
+def test_learning_accumulates_review_sample_metadata(
+    tmp_path,
+) -> None:
+    service = make_service(tmp_path)
+
+    first_review = make_review()
+    first_review["summary"]["set_count"] = 20
+
+    first = service.learn(
+        context=make_context(),
+        review_payload=first_review,
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    second_review = make_review()
+    second_review["summary"]["set_count"] = 20
+
+    second = service.learn(
+        context=first.final_context,
+        review_payload=second_review,
+        snapshot_id="review-1223",
+        policy="thompson",
+    )
+
+    assert first.final_context.metadata[
+        "review_set_count"
+    ] == 20
+    assert first.final_context.metadata[
+        "cumulative_review_set_count"
+    ] == 20
+    assert first.final_context.metadata[
+        "review_count"
+    ] == 1
+
+    assert second.final_context.metadata[
+        "review_set_count"
+    ] == 20
+    assert second.final_context.metadata[
+        "cumulative_review_set_count"
+    ] == 40
+    assert second.final_context.metadata[
+        "review_count"
+    ] == 2

@@ -69,10 +69,13 @@ class ReviewSignalExtractor:
             )
 
         value = context.metadata.get(
-            "review_set_count",
+            "cumulative_review_set_count",
             context.metadata.get(
-                "feedback_observation_count",
-                1,
+                "review_set_count",
+                context.metadata.get(
+                    "feedback_observation_count",
+                    1,
+                ),
             ),
         )
 

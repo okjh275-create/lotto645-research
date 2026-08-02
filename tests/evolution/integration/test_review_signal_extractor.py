@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from lrp.evolution.contracts.learning_context import (
@@ -152,3 +154,17 @@ def test_sample_size_prefers_review_set_count() -> None:
     assert ReviewSignalExtractor.sample_size(
         context
     ) == 10
+
+
+def test_sample_size_prefers_cumulative_review_count() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = replace(
+        make_context(),
+        metadata={
+            "review_set_count": 20,
+            "cumulative_review_set_count": 80,
+        },
+    )
+
+    assert extractor.sample_size(context) == 80

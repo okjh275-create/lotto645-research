@@ -113,12 +113,52 @@ class ReviewLearningService:
             review_set_count=review_set_count,
         )
 
+        previous_cumulative = (
+            context.metadata.get(
+                "cumulative_review_set_count",
+                0,
+            )
+        )
+        previous_review_count = (
+            context.metadata.get(
+                "review_count",
+                0,
+            )
+        )
+
+        if (
+            isinstance(previous_cumulative, bool)
+            or not isinstance(
+                previous_cumulative,
+                int,
+            )
+            or previous_cumulative < 0
+        ):
+            previous_cumulative = 0
+
+        if (
+            isinstance(previous_review_count, bool)
+            or not isinstance(
+                previous_review_count,
+                int,
+            )
+            or previous_review_count < 0
+        ):
+            previous_review_count = 0
+
         enriched_context = replace(
             context,
             metadata={
                 **dict(context.metadata),
                 "review_set_count": (
                     review_set_count
+                ),
+                "cumulative_review_set_count": (
+                    previous_cumulative
+                    + review_set_count
+                ),
+                "review_count": (
+                    previous_review_count + 1
                 ),
             },
         )
