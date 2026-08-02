@@ -5,6 +5,9 @@ import pytest
 from lrp.evolution.contracts.reinforcement import (
     RewardFeedback,
 )
+from lrp.evolution.contracts.review_reward_vector import (
+    ReviewRewardVector,
+)
 from lrp.evolution.integration import (
     PredictionRewardMapper,
 )
@@ -192,4 +195,124 @@ def test_empty_policy_is_rejected() -> None:
         PredictionRewardMapper().map(
             make_review(),
             policy=" ",
+        )
+
+
+def test_vector_builds_structured_rewards() -> None:
+    vector = PredictionRewardMapper().vector(
+        make_review(),
+        policy=" thompson ",
+    )
+
+    assert isinstance(
+        vector,
+        ReviewRewardVector,
+    )
+    assert vector.portfolio_hit == pytest.approx(
+        0.55
+    )
+    assert vector.practical_hit == pytest.approx(
+        0.20
+    )
+    assert vector.sample_size == 10
+    assert vector.metadata["policy"] == "thompson"
+
+
+def test_vector_rank_quality() -> None:
+    vector = PredictionRewardMapper().vector(
+        make_review()
+    )
+
+    expected_quality = (
+        (
+            1 * 0.4
+            + 1 * 0.2
+        )
+        / 10
+    )
+
+    assert vector.rank_quality == pytest.approx(
+        (2.0 * expected_quality) - 1.0
+    )
+
+
+def test_vector_coverage() -> None:
+    vector = PredictionRewardMapper().vector(
+        make_review()
+    )
+
+    mean_hits = (
+        0 * 2
+        + 1 * 3
+        + 2 * 3
+        + 3 * 1
+        + 4 * 1
+    ) / 10
+
+    assert vector.coverage == pytest.approx(
+        (mean_hits / 3.0) - 1.0
+    )
+
+
+def test_vector_uses_neutral_optional_rewards() -> None:
+    vector = PredictionRewardMapper().vector(
+        make_review()
+    )
+
+    assert vector.diversity == 0.0
+    assert vector.stability == 0.0
+
+
+def test_vector_supports_missing_optional_metrics() -> None:
+    payload = {
+        "set_count": 10,
+        "best_main_hits": 3,
+        "practical_best_hits": 2,
+    }
+
+    vector = PredictionRewardMapper().vector(
+        payload
+    )
+
+    assert vector.rank_quality == 0.0
+    assert vector.coverage == 0.0
+
+
+def test_vector_rejects_distribution_count_mismatch() -> None:
+    payload = make_review()
+    summary = payload["summary"]
+
+    assert isinstance(summary, dict)
+    distribution = summary["hit_distribution"]
+
+    assert isinstance(distribution, dict)
+    distribution["0"] = 1
+
+    with pytest.raises(
+        ValueError,
+        match="hit_distribution total",
+    ):
+        PredictionRewardMapper().vector(
+            payload
+        )
+
+
+def test_vector_rejects_excess_rank_count() -> None:
+    payload = make_review()
+    summary = payload["summary"]
+
+    assert isinstance(summary, dict)
+    rank_counts = summary[
+        "winning_rank_counts"
+    ]
+
+    assert isinstance(rank_counts, dict)
+    rank_counts["5"] = 20
+
+    with pytest.raises(
+        ValueError,
+        match="exceeds set_count",
+    ):
+        PredictionRewardMapper().vector(
+            payload
         )
