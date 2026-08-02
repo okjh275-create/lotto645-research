@@ -168,3 +168,75 @@ def test_sample_size_prefers_cumulative_review_count() -> None:
     )
 
     assert extractor.sample_size(context) == 80
+
+
+def test_structured_reward_vector_is_preferred() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = replace(
+        make_context(),
+        metadata={
+            "reward_vector_portfolio_hit": 0.60,
+            "reward_vector_practical_hit": 0.30,
+            "reward_vector_rank_quality": 0.30,
+            "reward_vector_coverage": 0.00,
+            "reward_vector_diversity": 0.00,
+            "reward_vector_stability": 0.00,
+        },
+    )
+
+    signals = extractor.extract(context)
+
+    assert signals["learning"] == pytest.approx(
+        0.30
+    )
+    assert signals["adaptive"] == pytest.approx(
+        0.10
+    )
+
+
+def test_reward_vector_falls_back_to_legacy_rewards() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = make_context()
+
+    signals = extractor.extract(context)
+
+    assert signals["learning"] == pytest.approx(
+        0.55
+    )
+    assert signals["adaptive"] == pytest.approx(
+        0.20
+    )
+
+
+def test_invalid_structured_reward_is_rejected() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = replace(
+        make_context(),
+        metadata={
+            "reward_vector_portfolio_hit": 2.0,
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="between -1.0 and 1.0",
+    ):
+        extractor.extract(context)
+
+
+def test_sample_size_preserves_cumulative_review_count() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = replace(
+        make_context(),
+        metadata={
+            "review_set_count": 20,
+            "cumulative_review_set_count": 80,
+            "reward_vector_sample_size": 100,
+        },
+    )
+
+    assert extractor.sample_size(context) == 80
