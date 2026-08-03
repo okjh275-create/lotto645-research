@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -184,17 +184,9 @@ class HistoricalReplayExecutor:
             bonus=bonus,
         )
 
-        learning_context = (
-            state.learning_context
-            if isinstance(state, ReplayState)
-            else LearningContext(
-                cycle_id=(
-                    "historical-replay-"
-                    f"{self.config.start_round}-"
-                    f"{self.config.end_round}"
-                ),
-                round_no=round_no,
-            )
+        learning_context = self._learning_context(
+            state=state,
+            round_no=round_no,
         )
 
         learning_service = (
@@ -310,6 +302,29 @@ class HistoricalReplayExecutor:
                     learning.final_context
                 )
             ),
+        )
+
+    def _learning_context(
+        self,
+        *,
+        state: object | None,
+        round_no: int,
+    ) -> LearningContext:
+        """Advance the carried learning context to the current round."""
+
+        if isinstance(state, ReplayState):
+            return replace(
+                state.learning_context,
+                round_no=round_no,
+            )
+
+        return LearningContext(
+            cycle_id=(
+                "historical-replay-"
+                f"{self.config.start_round}-"
+                f"{self.config.end_round}"
+            ),
+            round_no=round_no,
         )
 
     def _build_learning_service(
