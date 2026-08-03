@@ -203,6 +203,8 @@ class HistoricalReplayExecutor:
         learning = learning_service.learn(
             context=learning_context,
             review_payload=adaptive_review,
+            prediction_payload=adaptive_payload,
+            winning_numbers=winning_numbers,
             snapshot_id=f"review-{round_no}",
             policy=self.policy,
             metadata={

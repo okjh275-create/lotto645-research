@@ -10,6 +10,9 @@ from lrp.evolution.contracts.learning_context import (
 from lrp.evolution.contracts.review_learning import (
     ReviewLearningResult,
 )
+from lrp.evolution.integration.feature_attribution_mapper import (
+    FeatureAttributionMapper,
+)
 from lrp.evolution.integration.prediction_reward_mapper import (
     PredictionRewardMapper,
 )
@@ -25,6 +28,7 @@ class ReviewLearningService:
         self,
         runner: PersistentLearningRunner,
         reward_mapper: PredictionRewardMapper | None = None,
+        feature_mapper: FeatureAttributionMapper | None = None,
     ) -> None:
         if not isinstance(
             runner,
@@ -47,11 +51,28 @@ class ReviewLearningService:
                 "PredictionRewardMapper"
             )
 
+        if (
+            feature_mapper is not None
+            and not isinstance(
+                feature_mapper,
+                FeatureAttributionMapper,
+            )
+        ):
+            raise TypeError(
+                "feature_mapper must be a "
+                "FeatureAttributionMapper"
+            )
+
         self._runner = runner
         self._reward_mapper = (
             reward_mapper
             if reward_mapper is not None
             else PredictionRewardMapper()
+        )
+        self._feature_mapper = (
+            feature_mapper
+            if feature_mapper is not None
+            else FeatureAttributionMapper()
         )
 
     @property
@@ -64,11 +85,19 @@ class ReviewLearningService:
     ) -> PredictionRewardMapper:
         return self._reward_mapper
 
+    @property
+    def feature_mapper(
+        self,
+    ) -> FeatureAttributionMapper:
+        return self._feature_mapper
+
     def learn(
         self,
         *,
         context: LearningContext,
         review_payload: Mapping[str, Any],
+        prediction_payload: Mapping[str, Any] | None = None,
+        winning_numbers: tuple[int, ...] | None = None,
         snapshot_id: str,
         policy: str | None = None,
         metadata: Mapping[str, Any] | None = None,
@@ -103,6 +132,10 @@ class ReviewLearningService:
             review_payload,
             policy=policy,
         )
+        feature_signals = self._feature_signals(
+            prediction_payload=prediction_payload,
+            winning_numbers=winning_numbers,
+        )
 
         review_set_count = (
             self._review_set_count(
@@ -119,6 +152,11 @@ class ReviewLearningService:
         snapshot_metadata.update(
             self._reward_vector_metadata(
                 reward_vector
+            )
+        )
+        snapshot_metadata.update(
+            self._feature_signal_metadata(
+                feature_signals
             )
         )
 
@@ -159,8 +197,9 @@ class ReviewLearningService:
             key: value
             for key, value
             in snapshot_metadata.items()
-            if key.startswith(
-                "reward_vector_"
+            if (
+                key.startswith("reward_vector_")
+                or key.startswith("feature_signal_")
             )
         }
 
@@ -227,6 +266,52 @@ class ReviewLearningService:
             )
 
         return value
+
+    def _feature_signals(
+        self,
+        *,
+        prediction_payload: Mapping[str, Any] | None,
+        winning_numbers: tuple[int, ...] | None,
+    ) -> dict[str, float]:
+        if (
+            prediction_payload is None
+            and winning_numbers is None
+        ):
+            return {}
+
+        if prediction_payload is None:
+            raise ValueError(
+                "prediction_payload is required "
+                "when winning_numbers is provided"
+            )
+
+        if winning_numbers is None:
+            raise ValueError(
+                "winning_numbers is required "
+                "when prediction_payload is provided"
+            )
+
+        if not isinstance(
+            prediction_payload,
+            Mapping,
+        ):
+            raise TypeError(
+                "prediction_payload must be a mapping"
+            )
+
+        return self.feature_mapper.map(
+            prediction_payload,
+            winning_numbers,
+        )
+
+    @staticmethod
+    def _feature_signal_metadata(
+        signals: Mapping[str, float],
+    ) -> dict[str, float]:
+        return {
+            f"feature_signal_{name}": value
+            for name, value in signals.items()
+        }
 
     @staticmethod
     def _reward_vector_metadata(

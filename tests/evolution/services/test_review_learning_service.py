@@ -476,3 +476,102 @@ def test_reward_vector_metadata_is_replaced_by_latest_review(
     assert metadata[
         "review_count"
     ] == 2
+
+
+def make_prediction_payload() -> dict[str, object]:
+    probabilities = []
+
+    for number in range(1, 46):
+        probabilities.append(
+            {
+                "number": number,
+                "components": {
+                    "hot": number / 45.0,
+                    "cold": 0.5,
+                    "gap": 0.5,
+                    "trend": 0.5,
+                    "transition": 0.5,
+                },
+            }
+        )
+
+    return {
+        "probability_vector": {
+            "probabilities": probabilities,
+        }
+    }
+
+
+def test_learning_stores_feature_attribution_signals(
+    tmp_path,
+) -> None:
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=make_review(),
+        prediction_payload=make_prediction_payload(),
+        winning_numbers=(
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+        ),
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    metadata = result.final_context.metadata
+
+    assert metadata["feature_signal_hot"] > 0.0
+    assert metadata[
+        "feature_signal_cold"
+    ] == pytest.approx(0.0)
+    assert metadata[
+        "feature_signal_gap"
+    ] == pytest.approx(0.0)
+    assert metadata[
+        "feature_signal_trend"
+    ] == pytest.approx(0.0)
+    assert metadata[
+        "feature_signal_transition"
+    ] == pytest.approx(0.0)
+
+    snapshot_metadata = result.snapshot.metadata
+
+    assert snapshot_metadata[
+        "feature_signal_hot"
+    ] == pytest.approx(
+        metadata["feature_signal_hot"]
+    )
+
+
+def test_learning_without_attribution_inputs_is_supported(
+    tmp_path,
+) -> None:
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=make_review(),
+        snapshot_id="review-1222",
+        policy="thompson",
+    )
+
+    assert not any(
+        key.startswith("feature_signal_")
+        for key in result.final_context.metadata
+    )
+
+
+def test_partial_attribution_inputs_are_rejected(
+    tmp_path,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="winning_numbers is required",
+    ):
+        make_service(tmp_path).learn(
+            context=make_context(),
+            review_payload=make_review(),
+            prediction_payload=make_prediction_payload(),
+            snapshot_id="review-1222",
+        )
