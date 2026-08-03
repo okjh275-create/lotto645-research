@@ -121,3 +121,30 @@ def test_policy_scenario_serialization() -> None:
         "adjustment_scale": 0.1,
         "minimum_weight": 0.02,
     }
+
+
+def test_ranking_accepts_flat_effectiveness() -> None:
+    result = make_result(
+        "flat",
+        practical=0.15,
+        best=0.05,
+        wins=22,
+        l1=0.03,
+    )
+
+    effectiveness = result["effectiveness"]
+
+    assert isinstance(effectiveness, dict)
+
+    summary = effectiveness["summary"]
+
+    assert isinstance(summary, dict)
+
+    result["effectiveness"] = summary
+
+    ranking = _rank_results([result])
+
+    assert ranking[0]["scenario"] == "flat"
+    assert ranking[0][
+        "practical_hit_mean_delta"
+    ] == pytest.approx(0.15)

@@ -316,9 +316,30 @@ def _rank_results(
     rows = []
 
     for result in results:
-        summary = result[
+        effectiveness = result[
             "effectiveness"
-        ]["summary"]
+        ]
+
+        if not isinstance(
+            effectiveness,
+            dict,
+        ):
+            raise TypeError(
+                "effectiveness must be an object"
+            )
+
+        nested_summary = effectiveness.get(
+            "summary"
+        )
+
+        summary = (
+            nested_summary
+            if isinstance(
+                nested_summary,
+                dict,
+            )
+            else effectiveness
+        )
 
         rows.append(
             {
