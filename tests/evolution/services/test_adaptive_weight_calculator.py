@@ -303,4 +303,10 @@ def test_public_evolution_api_exports_calculator() -> None:
     calculator = AdaptiveWeightCalculator()
 
     assert calculator.adjustment_scale == 0.25
-    assert calculator.minimum_weight == 0.01
+    assert calculator.minimum_weight == 0.03
+
+def test_default_minimum_weight_is_promoted() -> None:
+    calculator = AdaptiveWeightCalculator()
+
+    assert calculator.adjustment_scale == 0.25
+    assert calculator.minimum_weight == 0.03

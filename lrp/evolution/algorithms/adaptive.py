@@ -34,7 +34,7 @@ class AdaptiveWeightCalculator:
         self,
         *,
         adjustment_scale: float = 0.25,
-        minimum_weight: float = 0.01,
+        minimum_weight: float = 0.03,
     ) -> None:
         self._validate_configuration(
             adjustment_scale=adjustment_scale,
