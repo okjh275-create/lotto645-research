@@ -240,3 +240,55 @@ def test_sample_size_preserves_cumulative_review_count() -> None:
     )
 
     assert extractor.sample_size(context) == 80
+
+
+def test_feature_attribution_signals_are_extracted() -> None:
+    extractor = ReviewSignalExtractor()
+
+    context = replace(
+        make_context(),
+        metadata={
+            "feature_signal_hot": 0.25,
+            "feature_signal_cold": -0.10,
+            "feature_signal_gap": 0.15,
+            "feature_signal_trend": 0.05,
+            "feature_signal_transition": -0.20,
+        },
+    )
+
+    signals = extractor.extract(context)
+
+    assert signals["hot"] == pytest.approx(0.25)
+    assert signals["cold"] == pytest.approx(-0.10)
+    assert signals["gap"] == pytest.approx(0.15)
+    assert signals["trend"] == pytest.approx(0.05)
+    assert signals["transition"] == pytest.approx(-0.20)
+
+
+def test_missing_feature_signals_remain_neutral() -> None:
+    signals = ReviewSignalExtractor().extract(
+        make_context()
+    )
+
+    assert signals["hot"] == 0.0
+    assert signals["cold"] == 0.0
+    assert signals["gap"] == 0.0
+    assert signals["trend"] == 0.0
+    assert signals["transition"] == 0.0
+
+
+def test_invalid_feature_signal_is_rejected() -> None:
+    context = replace(
+        make_context(),
+        metadata={
+            "feature_signal_hot": 1.5,
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="between -1.0 and 1.0",
+    ):
+        ReviewSignalExtractor().extract(
+            context
+        )

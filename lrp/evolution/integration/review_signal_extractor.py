@@ -106,11 +106,31 @@ class ReviewSignalExtractor:
             adaptive_signal = legacy_practical_reward
 
         return {
-            "hot": 0.0,
-            "cold": 0.0,
-            "gap": 0.0,
-            "trend": 0.0,
-            "transition": 0.0,
+            "hot": self._metadata_reward(
+                context,
+                key="feature_signal_hot",
+                fallback=0.0,
+            ),
+            "cold": self._metadata_reward(
+                context,
+                key="feature_signal_cold",
+                fallback=0.0,
+            ),
+            "gap": self._metadata_reward(
+                context,
+                key="feature_signal_gap",
+                fallback=0.0,
+            ),
+            "trend": self._metadata_reward(
+                context,
+                key="feature_signal_trend",
+                fallback=0.0,
+            ),
+            "transition": self._metadata_reward(
+                context,
+                key="feature_signal_transition",
+                fallback=0.0,
+            ),
             "learning": learning_signal,
             "adaptive": adaptive_signal,
         }
