@@ -9,6 +9,9 @@ from time import perf_counter
 from typing import Any, Mapping
 
 from lrp.adapters.statistics import StatisticsAdapter
+from lrp.evolution.algorithms.adaptive import (
+    AdaptiveWeightCalculator,
+)
 from lrp.evolution.contracts.learning_context import (
     LearningContext,
 )
@@ -71,11 +74,26 @@ class HistoricalReplayExecutor:
     learning_root: Path
     profile_root: Path
     policy: str = "thompson"
+    adaptive_calculator: (
+        AdaptiveWeightCalculator | None
+    ) = None
 
     def __post_init__(self) -> None:
         if not self.history:
             raise ValueError(
                 "history must not be empty"
+            )
+
+        if (
+            self.adaptive_calculator is not None
+            and not isinstance(
+                self.adaptive_calculator,
+                AdaptiveWeightCalculator,
+            )
+        ):
+            raise TypeError(
+                "adaptive_calculator must be an "
+                "AdaptiveWeightCalculator or None"
             )
 
     def __call__(
@@ -344,7 +362,9 @@ class HistoricalReplayExecutor:
         self,
     ) -> ReviewProfileEvolutionService:
         coordinator = EvolutionCoordinator(
-            pipeline=AdaptiveEvolutionPipeline(),
+            pipeline=AdaptiveEvolutionPipeline(
+                calculator=self.adaptive_calculator
+            ),
             policy=AdaptiveWeightPolicy(),
             repository=SnapshotRepository(
                 self.profile_root
