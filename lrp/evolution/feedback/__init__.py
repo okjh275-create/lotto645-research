@@ -9,6 +9,9 @@ from lrp.evolution.feedback.contracts import (
     AdaptiveFeedback,
     AdaptiveRecommendation,
 )
+from lrp.evolution.feedback.recommendation import (
+    AdaptiveRecommendationEngine,
+)
 
 __all__ = [
     "AdaptiveAction",
@@ -16,4 +19,5 @@ __all__ = [
     "AdaptiveFeedback",
     "AdaptiveFeedbackAnalyzer",
     "AdaptiveRecommendation",
+    "AdaptiveRecommendationEngine",
 ]
