@@ -9,6 +9,10 @@ from lrp.evolution.feedback.contracts import (
     AdaptiveFeedback,
     AdaptiveRecommendation,
 )
+from lrp.evolution.feedback.profile_update import (
+    AdaptiveProfileUpdatePlan,
+    AdaptiveProfileUpdatePlanner,
+)
 from lrp.evolution.feedback.recommendation import (
     AdaptiveRecommendationEngine,
 )
@@ -22,6 +26,8 @@ __all__ = [
     "AdaptiveDecision",
     "AdaptiveFeedback",
     "AdaptiveFeedbackAnalyzer",
+    "AdaptiveProfileUpdatePlan",
+    "AdaptiveProfileUpdatePlanner",
     "AdaptiveRecommendation",
     "AdaptiveRecommendationEngine",
     "AdaptiveSafetyGuard",

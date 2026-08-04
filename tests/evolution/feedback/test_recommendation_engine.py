@@ -277,6 +277,8 @@ def test_public_exports_include_engine() -> None:
         "AdaptiveDecision",
         "AdaptiveFeedback",
         "AdaptiveFeedbackAnalyzer",
+        "AdaptiveProfileUpdatePlan",
+        "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",
         "AdaptiveRecommendationEngine",
         "AdaptiveSafetyGuard",
