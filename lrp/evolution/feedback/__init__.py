@@ -3,6 +3,10 @@
 from lrp.evolution.feedback.analyzer import (
     AdaptiveFeedbackAnalyzer,
 )
+from lrp.evolution.feedback.automation import (
+    AdaptiveAutomationResult,
+    AdaptiveAutomationService,
+)
 from lrp.evolution.feedback.contracts import (
     AdaptiveAction,
     AdaptiveDecision,
@@ -23,6 +27,8 @@ from lrp.evolution.feedback.safety import (
 
 __all__ = [
     "AdaptiveAction",
+    "AdaptiveAutomationResult",
+    "AdaptiveAutomationService",
     "AdaptiveDecision",
     "AdaptiveFeedback",
     "AdaptiveFeedbackAnalyzer",
