@@ -398,4 +398,6 @@ def test_public_exports_include_repository() -> None:
         "AdaptiveRecommendationEngine",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "RevisionAwareAutomationResult",
+        "RevisionAwareAutomationRunner",
     ]

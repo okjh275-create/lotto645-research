@@ -24,6 +24,10 @@ from lrp.evolution.feedback.repository import (
     AdaptiveAutomationRepository,
     AdaptiveAutomationSaveResult,
 )
+from lrp.evolution.feedback.runner import (
+    RevisionAwareAutomationResult,
+    RevisionAwareAutomationRunner,
+)
 from lrp.evolution.feedback.safety import (
     AdaptiveSafetyGuard,
     AdaptiveSafetyResult,
@@ -44,4 +48,6 @@ __all__ = [
     "AdaptiveRecommendationEngine",
     "AdaptiveSafetyGuard",
     "AdaptiveSafetyResult",
+    "RevisionAwareAutomationResult",
+    "RevisionAwareAutomationRunner",
 ]

@@ -241,4 +241,6 @@ def test_public_exports_include_planner() -> None:
         "AdaptiveRecommendationEngine",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "RevisionAwareAutomationResult",
+        "RevisionAwareAutomationRunner",
     ]

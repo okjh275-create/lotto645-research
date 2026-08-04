@@ -225,4 +225,6 @@ def test_feedback_public_exports() -> None:
         "AdaptiveRecommendationEngine",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "RevisionAwareAutomationResult",
+        "RevisionAwareAutomationRunner",
     ]

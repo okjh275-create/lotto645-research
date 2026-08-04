@@ -269,4 +269,6 @@ def test_public_exports_include_service() -> None:
         "AdaptiveRecommendationEngine",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "RevisionAwareAutomationResult",
+        "RevisionAwareAutomationRunner",
     ]
