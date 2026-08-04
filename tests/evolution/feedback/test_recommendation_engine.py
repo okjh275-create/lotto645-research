@@ -279,4 +279,6 @@ def test_public_exports_include_engine() -> None:
         "AdaptiveFeedbackAnalyzer",
         "AdaptiveRecommendation",
         "AdaptiveRecommendationEngine",
+        "AdaptiveSafetyGuard",
+        "AdaptiveSafetyResult",
     ]
