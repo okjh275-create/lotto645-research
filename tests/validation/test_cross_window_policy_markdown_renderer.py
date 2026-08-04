@@ -242,3 +242,47 @@ def test_render_contains_weight_trends() -> None:
         "0.050000 | 0.050000 | 0.000000 |"
         in text
     )
+
+
+def test_render_contains_significance() -> None:
+    report = make_report()
+
+    report["significance"] = {
+        "policies": {
+            "floor": {
+                "best": {
+                    "adaptive_wins": 25,
+                    "noop_wins": 17,
+                    "ties": 158,
+                    "non_tie_count": 42,
+                    "direction": "adaptive_better",
+                    "p_value": 0.28,
+                    "significant": False,
+                },
+                "practical": {
+                    "adaptive_wins": 24,
+                    "noop_wins": 18,
+                    "ties": 158,
+                    "non_tie_count": 42,
+                    "direction": "adaptive_better",
+                    "p_value": 0.44,
+                    "significant": False,
+                },
+            }
+        }
+    }
+
+    text = (
+        CrossWindowPolicyMarkdownRenderer()
+        .render(report)
+    )
+
+    assert (
+        "## Statistical Significance"
+        in text
+    )
+    assert (
+        "| floor | best | adaptive_better | "
+        "25 | 17 | 158 | 0.280000 | no |"
+        in text
+    )

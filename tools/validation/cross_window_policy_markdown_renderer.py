@@ -374,6 +374,118 @@ class CrossWindowPolicyMarkdownRenderer:
 
                 lines.append("")
 
+        significance = report.get(
+            "significance"
+        )
+
+        if isinstance(
+            significance,
+            Mapping,
+        ):
+            significance_policies = (
+                significance.get(
+                    "policies"
+                )
+            )
+
+            if not isinstance(
+                significance_policies,
+                Mapping,
+            ):
+                raise TypeError(
+                    "significance policies "
+                    "must be an object"
+                )
+
+            lines.extend(
+                [
+                    "## Statistical Significance",
+                    "",
+                    (
+                        "| Policy | Outcome | Direction | "
+                        "Adaptive wins | No-op wins | "
+                        "Ties | p-value | Significant |"
+                    ),
+                    (
+                        "|---|---|---|---:|---:|---:|"
+                        "---:|---|"
+                    ),
+                ]
+            )
+
+            for policy_name in sorted(
+                significance_policies
+            ):
+                outcomes = (
+                    significance_policies[
+                        policy_name
+                    ]
+                )
+
+                if not isinstance(
+                    outcomes,
+                    Mapping,
+                ):
+                    raise TypeError(
+                        "significance outcomes "
+                        "must be objects"
+                    )
+
+                for outcome_name in (
+                    "best",
+                    "practical",
+                ):
+                    values = outcomes.get(
+                        outcome_name
+                    )
+
+                    if not isinstance(
+                        values,
+                        Mapping,
+                    ):
+                        raise TypeError(
+                            "significance outcome "
+                            "must be an object"
+                        )
+
+                    direction = values.get(
+                        "direction"
+                    )
+                    significant = values.get(
+                        "significant"
+                    )
+
+                    if not isinstance(
+                        direction,
+                        str,
+                    ):
+                        raise TypeError(
+                            "significance direction "
+                            "must be a string"
+                        )
+
+                    if not isinstance(
+                        significant,
+                        bool,
+                    ):
+                        raise TypeError(
+                            "significant must be boolean"
+                        )
+
+                    lines.append(
+                        "| "
+                        f"{policy_name} | "
+                        f"{outcome_name} | "
+                        f"{direction} | "
+                        f"{self._integer(values, 'adaptive_wins')} | "
+                        f"{self._integer(values, 'noop_wins')} | "
+                        f"{self._integer(values, 'ties')} | "
+                        f"{self._format_number(values, 'p_value')} | "
+                        f"{'yes' if significant else 'no'} |"
+                    )
+
+            lines.append("")
+
         lines.extend(
             [
                 "",

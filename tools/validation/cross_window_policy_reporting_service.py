@@ -12,6 +12,9 @@ from tools.validation.cross_window_policy_aggregator import (
 from tools.validation.cross_window_policy_markdown_renderer import (
     CrossWindowPolicyMarkdownRenderer,
 )
+from tools.validation.cross_window_significance_analyzer import (
+    CrossWindowSignificanceAnalyzer,
+)
 from tools.validation.cross_window_weight_trend_analyzer import (
     CrossWindowWeightTrendAnalyzer,
 )
@@ -50,6 +53,10 @@ class CrossWindowPolicyReportingService:
         ) = None,
         trend_analyzer: (
             CrossWindowWeightTrendAnalyzer
+            | None
+        ) = None,
+        significance_analyzer: (
+            CrossWindowSignificanceAnalyzer
             | None
         ) = None,
     ) -> None:
@@ -91,6 +98,19 @@ class CrossWindowPolicyReportingService:
                 "CrossWindowWeightTrendAnalyzer or None"
             )
 
+
+        if (
+            significance_analyzer is not None
+            and not isinstance(
+                significance_analyzer,
+                CrossWindowSignificanceAnalyzer,
+            )
+        ):
+            raise TypeError(
+                "significance_analyzer must be a "
+                "CrossWindowSignificanceAnalyzer or None"
+            )
+
         self._aggregator = (
             aggregator
             if aggregator is not None
@@ -106,6 +126,12 @@ class CrossWindowPolicyReportingService:
             trend_analyzer
             if trend_analyzer is not None
             else CrossWindowWeightTrendAnalyzer()
+        )
+
+        self._significance_analyzer = (
+            significance_analyzer
+            if significance_analyzer is not None
+            else CrossWindowSignificanceAnalyzer()
         )
 
     @property
@@ -126,6 +152,13 @@ class CrossWindowPolicyReportingService:
         self,
     ) -> CrossWindowWeightTrendAnalyzer:
         return self._trend_analyzer
+
+
+    @property
+    def significance_analyzer(
+        self,
+    ) -> CrossWindowSignificanceAnalyzer:
+        return self._significance_analyzer
 
     def generate_from_paths(
         self,
@@ -184,6 +217,12 @@ class CrossWindowPolicyReportingService:
         report = dict(report)
         report["weight_trends"] = (
             self.trend_analyzer.analyze(
+                report
+            )
+        )
+
+        report["significance"] = (
+            self.significance_analyzer.analyze(
                 report
             )
         )

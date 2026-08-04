@@ -313,3 +313,67 @@ def test_generated_report_contains_weight_trends(
 
     assert "## Weight Trends" in markdown
     assert "| learning_weight |" in markdown
+
+
+def test_generated_report_contains_significance(
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+
+    write_window(
+        source_root
+        / "first"
+        / "policy_comparison.json",
+        start_round=100,
+        end_round=199,
+    )
+    write_window(
+        source_root
+        / "second"
+        / "policy_comparison.json",
+        start_round=200,
+        end_round=299,
+    )
+
+    result_value = (
+        CrossWindowPolicyReportingService()
+        .discover_and_generate(
+            source_root=source_root,
+            output_root=tmp_path / "reports",
+        )
+    )
+
+    significance = result_value.report[
+        "significance"
+    ]
+
+    assert significance[
+        "policy_count"
+    ] == 2
+
+    floor_best = significance[
+        "policies"
+    ]["floor"]["best"]
+
+    assert floor_best[
+        "adaptive_wins"
+    ] == 20
+    assert floor_best[
+        "noop_wins"
+    ] == 16
+    assert floor_best[
+        "ties"
+    ] == 164
+
+    markdown = (
+        result_value.markdown_path
+        .read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert (
+        "## Statistical Significance"
+        in markdown
+    )
+    assert "| floor | best |" in markdown
