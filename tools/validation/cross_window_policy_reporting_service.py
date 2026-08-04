@@ -12,6 +12,9 @@ from tools.validation.cross_window_policy_aggregator import (
 from tools.validation.cross_window_policy_markdown_renderer import (
     CrossWindowPolicyMarkdownRenderer,
 )
+from tools.validation.cross_window_weight_trend_analyzer import (
+    CrossWindowWeightTrendAnalyzer,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +48,10 @@ class CrossWindowPolicyReportingService:
             CrossWindowPolicyMarkdownRenderer
             | None
         ) = None,
+        trend_analyzer: (
+            CrossWindowWeightTrendAnalyzer
+            | None
+        ) = None,
     ) -> None:
         if (
             aggregator is not None
@@ -71,6 +78,19 @@ class CrossWindowPolicyReportingService:
                 "or None"
             )
 
+
+        if (
+            trend_analyzer is not None
+            and not isinstance(
+                trend_analyzer,
+                CrossWindowWeightTrendAnalyzer,
+            )
+        ):
+            raise TypeError(
+                "trend_analyzer must be a "
+                "CrossWindowWeightTrendAnalyzer or None"
+            )
+
         self._aggregator = (
             aggregator
             if aggregator is not None
@@ -80,6 +100,12 @@ class CrossWindowPolicyReportingService:
             renderer
             if renderer is not None
             else CrossWindowPolicyMarkdownRenderer()
+        )
+
+        self._trend_analyzer = (
+            trend_analyzer
+            if trend_analyzer is not None
+            else CrossWindowWeightTrendAnalyzer()
         )
 
     @property
@@ -93,6 +119,13 @@ class CrossWindowPolicyReportingService:
         self,
     ) -> CrossWindowPolicyMarkdownRenderer:
         return self._renderer
+
+
+    @property
+    def trend_analyzer(
+        self,
+    ) -> CrossWindowWeightTrendAnalyzer:
+        return self._trend_analyzer
 
     def generate_from_paths(
         self,
@@ -147,6 +180,13 @@ class CrossWindowPolicyReportingService:
         stem: str,
     ) -> CrossWindowPolicyReportingResult:
         output_root = Path(output_root)
+
+        report = dict(report)
+        report["weight_trends"] = (
+            self.trend_analyzer.analyze(
+                report
+            )
+        )
 
         output_root.mkdir(
             parents=True,

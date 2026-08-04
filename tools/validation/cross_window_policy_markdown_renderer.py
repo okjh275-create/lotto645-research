@@ -256,6 +256,124 @@ class CrossWindowPolicyMarkdownRenderer:
                 f"{winner or '-'} |"
             )
 
+        trends = report.get(
+            "weight_trends"
+        )
+
+        if isinstance(
+            trends,
+            Mapping,
+        ):
+            trend_policies = trends.get(
+                "policies"
+            )
+
+            if not isinstance(
+                trend_policies,
+                Mapping,
+            ):
+                raise TypeError(
+                    "trend policies must be an object"
+                )
+
+            lines.extend(
+                [
+                    "## Weight Trends",
+                    "",
+                ]
+            )
+
+            for policy_name in sorted(
+                trend_policies
+            ):
+                policy_trends = (
+                    trend_policies[
+                        policy_name
+                    ]
+                )
+
+                if not isinstance(
+                    policy_trends,
+                    Mapping,
+                ):
+                    raise TypeError(
+                        "policy trend values "
+                        "must be objects"
+                    )
+
+                weight_trends = (
+                    policy_trends.get(
+                        "weights"
+                    )
+                )
+
+                if not isinstance(
+                    weight_trends,
+                    Mapping,
+                ):
+                    raise TypeError(
+                        "weight trends must "
+                        "be an object"
+                    )
+
+                lines.extend(
+                    [
+                        f"### {policy_name}",
+                        "",
+                        (
+                            "| Weight | Direction | "
+                            "First | Last | Net change |"
+                        ),
+                        "|---|---|---:|---:|---:|",
+                    ]
+                )
+
+                for field in (
+                    "hot_weight",
+                    "cold_weight",
+                    "gap_weight",
+                    "trend_weight",
+                    "transition_weight",
+                    "learning_weight",
+                    "adaptive_weight",
+                ):
+                    values = weight_trends.get(
+                        field
+                    )
+
+                    if not isinstance(
+                        values,
+                        Mapping,
+                    ):
+                        raise TypeError(
+                            "weight trend rows "
+                            "must be objects"
+                        )
+
+                    direction = values.get(
+                        "direction"
+                    )
+
+                    if not isinstance(
+                        direction,
+                        str,
+                    ):
+                        raise TypeError(
+                            "trend direction "
+                            "must be a string"
+                        )
+
+                    lines.append(
+                        "| "
+                        f"{field} | "
+                        f"{direction} | "
+                        f"{self._optional_number(values.get('first'))} | "
+                        f"{self._optional_number(values.get('last'))} | "
+                        f"{self._optional_number(values.get('net_change'))} |"
+                    )
+
+                lines.append("")
+
         lines.extend(
             [
                 "",
@@ -376,6 +494,27 @@ class CrossWindowPolicyMarkdownRenderer:
             )
 
         return value
+
+    @staticmethod
+    def _optional_number(
+        value: Any,
+    ) -> str:
+        if value is None:
+            return "-"
+
+        if (
+            isinstance(value, bool)
+            or not isinstance(
+                value,
+                (int, float),
+            )
+        ):
+            raise TypeError(
+                "optional numeric value must "
+                "be numeric or None"
+            )
+
+        return f"{float(value):.6f}"
 
     @staticmethod
     def _format_number(

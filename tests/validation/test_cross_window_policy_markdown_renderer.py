@@ -201,3 +201,44 @@ def test_output_directory_is_rejected(
             report=make_report(),
             output=output,
         )
+
+
+def test_render_contains_weight_trends() -> None:
+    report = make_report()
+
+    report["weight_trends"] = {
+        "policies": {
+            "floor": {
+                "weights": {
+                    field: {
+                        "direction": "stable",
+                        "first": 0.05,
+                        "last": 0.05,
+                        "net_change": 0.0,
+                    }
+                    for field in (
+                        "hot_weight",
+                        "cold_weight",
+                        "gap_weight",
+                        "trend_weight",
+                        "transition_weight",
+                        "learning_weight",
+                        "adaptive_weight",
+                    )
+                }
+            }
+        }
+    }
+
+    text = (
+        CrossWindowPolicyMarkdownRenderer()
+        .render(report)
+    )
+
+    assert "## Weight Trends" in text
+    assert "### floor" in text
+    assert (
+        "| learning_weight | stable | "
+        "0.050000 | 0.050000 | 0.000000 |"
+        in text
+    )
