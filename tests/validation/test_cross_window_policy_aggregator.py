@@ -334,3 +334,38 @@ def test_missing_reports_are_rejected(
         ).discover_and_aggregate(
             tmp_path
         )
+
+
+def test_policy_windows_include_final_weights(
+    tmp_path: Path,
+) -> None:
+    path = (
+        tmp_path
+        / "window"
+        / "policy_comparison.json"
+    )
+
+    write_window(
+        path,
+        start_round=100,
+        end_round=199,
+        baseline_practical=0.1,
+        floor_practical=0.2,
+    )
+
+    report = (
+        CrossWindowPolicyAggregator()
+        .aggregate((path,))
+    )
+
+    floor_window = report[
+        "policies"
+    ]["floor"]["windows"][0]
+
+    assert floor_window["final_weights"][
+        "learning_weight"
+    ] == pytest.approx(0.05)
+
+    assert sum(
+        floor_window["final_weights"].values()
+    ) == pytest.approx(1.0)

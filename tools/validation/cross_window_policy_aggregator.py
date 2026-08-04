@@ -567,6 +567,9 @@ class CrossWindowPolicyAggregator:
                             "practical_hit_mean_delta"
                         ]
                     ),
+                    "final_weights": dict(
+                        item["result"]["weights"]
+                    ),
                 }
                 for item in matches
             ],
