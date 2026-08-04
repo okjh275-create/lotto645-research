@@ -228,7 +228,9 @@ def test_public_exports_include_planner() -> None:
 
     assert feedback.__all__ == [
         "AdaptiveAction",
+        "AdaptiveAutomationRepository",
         "AdaptiveAutomationResult",
+        "AdaptiveAutomationSaveResult",
         "AdaptiveAutomationService",
         "AdaptiveDecision",
         "AdaptiveFeedback",

@@ -212,7 +212,9 @@ def test_feedback_public_exports() -> None:
 
     assert feedback.__all__ == [
         "AdaptiveAction",
+        "AdaptiveAutomationRepository",
         "AdaptiveAutomationResult",
+        "AdaptiveAutomationSaveResult",
         "AdaptiveAutomationService",
         "AdaptiveDecision",
         "AdaptiveFeedback",

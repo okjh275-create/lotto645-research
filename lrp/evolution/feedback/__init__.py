@@ -20,6 +20,10 @@ from lrp.evolution.feedback.profile_update import (
 from lrp.evolution.feedback.recommendation import (
     AdaptiveRecommendationEngine,
 )
+from lrp.evolution.feedback.repository import (
+    AdaptiveAutomationRepository,
+    AdaptiveAutomationSaveResult,
+)
 from lrp.evolution.feedback.safety import (
     AdaptiveSafetyGuard,
     AdaptiveSafetyResult,
@@ -27,7 +31,9 @@ from lrp.evolution.feedback.safety import (
 
 __all__ = [
     "AdaptiveAction",
+    "AdaptiveAutomationRepository",
     "AdaptiveAutomationResult",
+    "AdaptiveAutomationSaveResult",
     "AdaptiveAutomationService",
     "AdaptiveDecision",
     "AdaptiveFeedback",
