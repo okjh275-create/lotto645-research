@@ -263,6 +263,8 @@ def test_public_exports_include_service() -> None:
         "AdaptiveDecision",
         "AdaptiveFeedback",
         "AdaptiveFeedbackAnalyzer",
+        "AdaptiveProfileIntegrityDoctor",
+        "AdaptiveProfileIntegrityReport",
         "AdaptiveProfileUpdatePlan",
         "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",

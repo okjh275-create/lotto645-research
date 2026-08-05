@@ -13,6 +13,10 @@ from lrp.evolution.feedback.contracts import (
     AdaptiveFeedback,
     AdaptiveRecommendation,
 )
+from lrp.evolution.feedback.profile_integrity import (
+    AdaptiveProfileIntegrityDoctor,
+    AdaptiveProfileIntegrityReport,
+)
 from lrp.evolution.feedback.profile_update import (
     AdaptiveProfileUpdatePlan,
     AdaptiveProfileUpdatePlanner,
@@ -58,6 +62,8 @@ __all__ = [
     "AdaptiveDecision",
     "AdaptiveFeedback",
     "AdaptiveFeedbackAnalyzer",
+    "AdaptiveProfileIntegrityDoctor",
+    "AdaptiveProfileIntegrityReport",
     "AdaptiveProfileUpdatePlan",
     "AdaptiveProfileUpdatePlanner",
     "AdaptiveRecommendation",

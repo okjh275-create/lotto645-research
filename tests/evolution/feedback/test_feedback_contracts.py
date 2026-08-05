@@ -219,6 +219,8 @@ def test_feedback_public_exports() -> None:
         "AdaptiveDecision",
         "AdaptiveFeedback",
         "AdaptiveFeedbackAnalyzer",
+        "AdaptiveProfileIntegrityDoctor",
+        "AdaptiveProfileIntegrityReport",
         "AdaptiveProfileUpdatePlan",
         "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",

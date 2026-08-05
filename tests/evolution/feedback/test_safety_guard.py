@@ -257,6 +257,8 @@ def test_public_exports_include_safety() -> None:
         "AdaptiveDecision",
         "AdaptiveFeedback",
         "AdaptiveFeedbackAnalyzer",
+        "AdaptiveProfileIntegrityDoctor",
+        "AdaptiveProfileIntegrityReport",
         "AdaptiveProfileUpdatePlan",
         "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",
