@@ -279,3 +279,144 @@ def test_existing_repository_can_be_required(
         )
 
     assert error.value.code == 2
+
+
+def test_parser_supports_dry_run() -> None:
+    args = build_parser().parse_args(
+        [
+            "--report",
+            "report.json",
+            "--profile",
+            "profile.json",
+            "--repository",
+            "repository",
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "dry-1",
+            "--dry-run",
+        ]
+    )
+
+    assert args.dry_run is True
+
+
+def test_dry_run_does_not_create_repository(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    exit_code = run(
+        [
+            "--report",
+            str(report_path),
+            "--profile",
+            str(profile_path),
+            "--repository",
+            str(repository),
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "dry-13",
+            "--created-at-utc",
+            "2026-08-05T00:00:00+00:00",
+            "--dry-run",
+        ]
+    )
+
+    payload = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert exit_code == 0
+    assert payload["status"] == "PASS"
+    assert payload["mode"] == "dry_run"
+    assert payload["automation_created"] is False
+    assert payload["profile_created"] is False
+    assert payload["automation_path"] is None
+    assert payload["profile_path"] is None
+    assert payload["repository_exists"] is False
+    assert not repository.exists()
+    assert len(payload["decisions"]) == 7
+    assert payload["planned_profile"][
+        "revision"
+    ] == 13
+
+
+def test_persisted_run_reports_mode(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    assert run(
+        [
+            "--report",
+            str(report_path),
+            "--profile",
+            str(profile_path),
+            "--repository",
+            str(repository),
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "persisted-13",
+        ]
+    ) == 0
+
+    payload = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert payload["mode"] == "persisted"
+    assert payload["automation_created"] is True
+    assert payload["profile_created"] is True
+    assert payload["repository_exists"] is True
+    assert repository.is_dir()
+
+
+def test_dry_run_ignores_existing_repository_requirement(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "missing-repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    assert run(
+        [
+            "--report",
+            str(report_path),
+            "--profile",
+            str(profile_path),
+            "--repository",
+            str(repository),
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "dry-required",
+            "--require-existing-repository",
+            "--dry-run",
+        ]
+    ) == 0
+
+    payload = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert payload["mode"] == "dry_run"
+    assert repository.exists() is False

@@ -1,4 +1,4 @@
-"""Command-line entry point for revision-aware adaptive automation."""
+"""Command-line entry point for adaptive automation."""
 
 from __future__ import annotations
 
@@ -9,9 +9,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from lrp.evolution.contracts import AdaptiveWeightProfile
+from lrp.evolution.contracts import (
+    AdaptiveWeightProfile,
+)
 from lrp.evolution.feedback import (
     AdaptiveAutomationRepository,
+    AdaptiveAutomationService,
     RevisionAwareAutomationRunner,
 )
 
@@ -20,8 +23,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="adaptive-automation",
         description=(
-            "Run revision-aware adaptive automation "
-            "from a cross-window validation report."
+            "Run adaptive automation from a "
+            "cross-window validation report."
         ),
     )
 
@@ -29,28 +32,37 @@ def build_parser() -> argparse.ArgumentParser:
         "--report",
         required=True,
         type=Path,
+        help="Cross-window validation report JSON.",
     )
     parser.add_argument(
         "--profile",
         required=True,
         type=Path,
+        help="Current AdaptiveWeightProfile JSON.",
     )
     parser.add_argument(
         "--repository",
         required=True,
         type=Path,
+        help="Adaptive automation repository root.",
     )
     parser.add_argument(
         "--policy",
         required=True,
+        help="Policy name to analyze.",
     )
     parser.add_argument(
         "--recommendation-id",
         required=True,
+        help="Unique recommendation identifier.",
     )
     parser.add_argument(
         "--created-at-utc",
         default=None,
+        help=(
+            "Optional timezone-aware ISO-8601 "
+            "timestamp."
+        ),
     )
     parser.add_argument(
         "--target-confidence",
@@ -65,6 +77,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--require-existing-repository",
         action="store_true",
+        help=(
+            "Reject persisted execution when no "
+            "profile revision exists."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Analyze and plan without writing "
+            "repository records."
+        ),
     )
 
     return parser
@@ -77,7 +101,9 @@ def run(
     args = parser.parse_args(argv)
 
     try:
-        report = _load_object(args.report)
+        report = _load_object(
+            args.report
+        )
         current_profile = _load_profile(
             args.profile
         )
@@ -85,30 +111,43 @@ def run(
             args.created_at_utc
         )
 
-        repository = AdaptiveAutomationRepository(
-            args.repository
-        )
-
-        result = RevisionAwareAutomationRunner(
-            repository=repository,
-            allow_empty_repository=(
-                not args.require_existing_repository
-            ),
-        ).run(
-            report=report,
-            policy_name=args.policy,
-            recommendation_id=(
-                args.recommendation_id
-            ),
-            current_profile=current_profile,
-            created_at_utc=created_at,
-            target_confidence=(
-                args.target_confidence
-            ),
-            target_sample_size=(
-                args.target_sample_size
-            ),
-        )
+        if args.dry_run:
+            payload = _run_dry(
+                report=report,
+                policy_name=args.policy,
+                recommendation_id=(
+                    args.recommendation_id
+                ),
+                current_profile=current_profile,
+                created_at_utc=created_at,
+                target_confidence=(
+                    args.target_confidence
+                ),
+                target_sample_size=(
+                    args.target_sample_size
+                ),
+                repository_path=args.repository,
+            )
+        else:
+            payload = _run_persisted(
+                report=report,
+                policy_name=args.policy,
+                recommendation_id=(
+                    args.recommendation_id
+                ),
+                current_profile=current_profile,
+                created_at_utc=created_at,
+                target_confidence=(
+                    args.target_confidence
+                ),
+                target_sample_size=(
+                    args.target_sample_size
+                ),
+                repository_path=args.repository,
+                require_existing_repository=(
+                    args.require_existing_repository
+                ),
+            )
     except (
         FileNotFoundError,
         FileExistsError,
@@ -123,8 +162,115 @@ def run(
             message=f"error: {exc}\n",
         )
 
-    payload = {
+    print(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+    return 0
+
+
+def _run_dry(
+    *,
+    report: Mapping[str, Any],
+    policy_name: str,
+    recommendation_id: str,
+    current_profile: AdaptiveWeightProfile,
+    created_at_utc: datetime | None,
+    target_confidence: float | None,
+    target_sample_size: int | None,
+    repository_path: Path,
+) -> dict[str, Any]:
+    result = AdaptiveAutomationService().run(
+        report=report,
+        policy_name=policy_name,
+        recommendation_id=recommendation_id,
+        current_profile=current_profile,
+        created_at_utc=created_at_utc,
+        target_confidence=target_confidence,
+        target_sample_size=target_sample_size,
+    )
+
+    return {
         "status": "PASS",
+        "mode": "dry_run",
+        "recommendation_id": (
+            result.recommendation
+            .recommendation_id
+        ),
+        "approved": (
+            result.update_plan.approved
+        ),
+        "source_revision": (
+            result.update_plan.source_revision
+        ),
+        "target_revision": (
+            result.update_plan.target_revision
+        ),
+        "repository_revision_before": None,
+        "repository_revision_after": None,
+        "automation_created": False,
+        "profile_created": False,
+        "automation_path": None,
+        "profile_path": None,
+        "repository_path": str(
+            repository_path
+        ),
+        "repository_exists": (
+            repository_path.exists()
+        ),
+        "violations": list(
+            result.safety_result.violations
+        ),
+        "decisions": [
+            decision.as_dict()
+            for decision
+            in result.recommendation.decisions
+        ],
+        "planned_profile": (
+            result.update_plan
+            .as_dict()["profile"]
+        ),
+    }
+
+
+def _run_persisted(
+    *,
+    report: Mapping[str, Any],
+    policy_name: str,
+    recommendation_id: str,
+    current_profile: AdaptiveWeightProfile,
+    created_at_utc: datetime | None,
+    target_confidence: float | None,
+    target_sample_size: int | None,
+    repository_path: Path,
+    require_existing_repository: bool,
+) -> dict[str, Any]:
+    repository = AdaptiveAutomationRepository(
+        repository_path
+    )
+
+    result = RevisionAwareAutomationRunner(
+        repository=repository,
+        allow_empty_repository=(
+            not require_existing_repository
+        ),
+    ).run(
+        report=report,
+        policy_name=policy_name,
+        recommendation_id=recommendation_id,
+        current_profile=current_profile,
+        created_at_utc=created_at_utc,
+        target_confidence=target_confidence,
+        target_sample_size=target_sample_size,
+    )
+
+    return {
+        "status": "PASS",
+        "mode": "persisted",
         "recommendation_id": (
             result.automation_result
             .recommendation
@@ -169,22 +315,29 @@ def run(
             is not None
             else None
         ),
+        "repository_path": str(
+            repository_path
+        ),
+        "repository_exists": (
+            repository_path.exists()
+        ),
         "violations": list(
             result.automation_result
             .safety_result
             .violations
         ),
+        "decisions": [
+            decision.as_dict()
+            for decision
+            in result.automation_result
+            .recommendation.decisions
+        ],
+        "planned_profile": (
+            result.automation_result
+            .update_plan
+            .as_dict()["profile"]
+        ),
     }
-
-    print(
-        json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-    )
-
-    return 0
 
 
 def _load_object(
@@ -196,7 +349,9 @@ def _load_object(
         raise FileNotFoundError(path)
 
     payload = json.loads(
-        path.read_text(encoding="utf-8")
+        path.read_text(
+            encoding="utf-8"
+        )
     )
 
     if not isinstance(payload, dict):
@@ -214,6 +369,7 @@ def _load_profile(
     payload = _load_object(path)
 
     nested = payload.get("profile")
+
     profile = (
         nested
         if isinstance(nested, Mapping)
