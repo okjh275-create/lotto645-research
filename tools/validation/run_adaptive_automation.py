@@ -90,6 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
             "repository records."
         ),
     )
+    parser.add_argument(
+        "--approve",
+        action="store_true",
+        help=(
+            "Explicitly approve repository writes. "
+            "Required for persisted execution."
+        ),
+    )
 
     return parser
 
@@ -110,6 +118,24 @@ def run(
         created_at = _optional_datetime(
             args.created_at_utc
         )
+
+        if (
+            args.dry_run
+            and args.approve
+        ):
+            raise ValueError(
+                "--dry-run and --approve "
+                "cannot be used together"
+            )
+
+        if (
+            not args.dry_run
+            and not args.approve
+        ):
+            raise ValueError(
+                "persisted execution requires "
+                "explicit --approve"
+            )
 
         if args.dry_run:
             payload = _run_dry(

@@ -163,6 +163,7 @@ def test_run_creates_repository_records(
             "floor",
             "--recommendation-id",
             "auto-13",
+            "--approve",
             "--created-at-utc",
             "2026-08-05T00:00:00+00:00",
         ]
@@ -275,6 +276,7 @@ def test_existing_repository_can_be_required(
                 "--recommendation-id",
                 "auto-1",
                 "--require-existing-repository",
+                "--approve",
             ]
         )
 
@@ -372,6 +374,7 @@ def test_persisted_run_reports_mode(
             "floor",
             "--recommendation-id",
             "persisted-13",
+            "--approve",
         ]
     ) == 0
 
@@ -420,3 +423,126 @@ def test_dry_run_ignores_existing_repository_requirement(
 
     assert payload["mode"] == "dry_run"
     assert repository.exists() is False
+
+
+def test_parser_supports_approve() -> None:
+    args = build_parser().parse_args(
+        [
+            "--report",
+            "report.json",
+            "--profile",
+            "profile.json",
+            "--repository",
+            "repository",
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "approved-1",
+            "--approve",
+        ]
+    )
+
+    assert args.approve is True
+
+
+def test_persisted_run_requires_approval(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    with pytest.raises(
+        SystemExit,
+    ) as error:
+        run(
+            [
+                "--report",
+                str(report_path),
+                "--profile",
+                str(profile_path),
+                "--repository",
+                str(repository),
+                "--policy",
+                "floor",
+                "--recommendation-id",
+                "not-approved",
+            ]
+        )
+
+    assert error.value.code == 2
+    assert not repository.exists()
+
+
+def test_approved_run_persists_records(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    assert run(
+        [
+            "--report",
+            str(report_path),
+            "--profile",
+            str(profile_path),
+            "--repository",
+            str(repository),
+            "--policy",
+            "floor",
+            "--recommendation-id",
+            "approved-13",
+            "--approve",
+        ]
+    ) == 0
+
+    payload = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert payload["mode"] == "persisted"
+    assert payload["automation_created"] is True
+    assert payload["profile_created"] is True
+    assert repository.is_dir()
+
+
+def test_dry_run_and_approve_are_mutually_exclusive(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "report.json"
+    profile_path = tmp_path / "profile.json"
+    repository = tmp_path / "repository"
+
+    write_report(report_path)
+    write_profile(profile_path)
+
+    with pytest.raises(
+        SystemExit,
+    ) as error:
+        run(
+            [
+                "--report",
+                str(report_path),
+                "--profile",
+                str(profile_path),
+                "--repository",
+                str(repository),
+                "--policy",
+                "floor",
+                "--recommendation-id",
+                "invalid-mode",
+                "--dry-run",
+                "--approve",
+            ]
+        )
+
+    assert error.value.code == 2
+    assert not repository.exists()
