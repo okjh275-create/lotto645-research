@@ -202,6 +202,7 @@ def test_public_exports_include_analyzer() -> None:
     assert feedback.__all__ == [
         "AdaptiveAction",
         "AdaptiveAutomationDoctor",
+        "AdaptiveAutomationDoctorMarkdownRenderer",
         "AdaptiveAutomationDoctorReport",
         "AdaptiveAutomationDoctorReportWriter",
         "AdaptiveAutomationRepository",
