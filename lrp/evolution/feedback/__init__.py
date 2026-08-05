@@ -17,6 +17,10 @@ from lrp.evolution.feedback.doctor import (
     AdaptiveAutomationDoctor,
     AdaptiveAutomationDoctorReport,
 )
+from lrp.evolution.feedback.doctor_report_writer import (
+    AdaptiveAutomationDoctorReportWriter,
+    AdaptiveDoctorReportWriteResult,
+)
 from lrp.evolution.feedback.profile_integrity import (
     AdaptiveProfileIntegrityDoctor,
     AdaptiveProfileIntegrityReport,
@@ -61,11 +65,13 @@ __all__ = [
     "AdaptiveAction",
     "AdaptiveAutomationDoctor",
     "AdaptiveAutomationDoctorReport",
+    "AdaptiveAutomationDoctorReportWriter",
     "AdaptiveAutomationRepository",
     "AdaptiveAutomationResult",
     "AdaptiveAutomationSaveResult",
     "AdaptiveAutomationService",
     "AdaptiveDecision",
+    "AdaptiveDoctorReportWriteResult",
     "AdaptiveFeedback",
     "AdaptiveFeedbackAnalyzer",
     "AdaptiveProfileIntegrityDoctor",
