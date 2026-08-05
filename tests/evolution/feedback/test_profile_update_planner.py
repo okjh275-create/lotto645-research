@@ -239,6 +239,7 @@ def test_public_exports_include_planner() -> None:
         "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",
         "AdaptiveRecommendationEngine",
+        "AdaptiveRepositoryStatusAnalyzer",
         "AdaptiveRollbackDiff",
         "AdaptiveRollbackManager",
         "AdaptiveRollbackPlan",
@@ -246,6 +247,8 @@ def test_public_exports_include_planner() -> None:
         "AdaptiveRollbackSaveResult",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "AdaptiveStatusIssue",
+        "AdaptiveStatusReport",
         "RevisionAwareAutomationResult",
         "RevisionAwareAutomationRunner",
     ]

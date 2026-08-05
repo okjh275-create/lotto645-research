@@ -223,6 +223,7 @@ def test_feedback_public_exports() -> None:
         "AdaptiveProfileUpdatePlanner",
         "AdaptiveRecommendation",
         "AdaptiveRecommendationEngine",
+        "AdaptiveRepositoryStatusAnalyzer",
         "AdaptiveRollbackDiff",
         "AdaptiveRollbackManager",
         "AdaptiveRollbackPlan",
@@ -230,6 +231,8 @@ def test_feedback_public_exports() -> None:
         "AdaptiveRollbackSaveResult",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
+        "AdaptiveStatusIssue",
+        "AdaptiveStatusReport",
         "RevisionAwareAutomationResult",
         "RevisionAwareAutomationRunner",
     ]

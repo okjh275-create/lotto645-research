@@ -24,6 +24,9 @@ from lrp.evolution.feedback.repository import (
     AdaptiveAutomationRepository,
     AdaptiveAutomationSaveResult,
 )
+from lrp.evolution.feedback.repository_status_analyzer import (
+    AdaptiveRepositoryStatusAnalyzer,
+)
 from lrp.evolution.feedback.rollback import (
     AdaptiveRollbackDiff,
     AdaptiveRollbackManager,
@@ -33,13 +36,17 @@ from lrp.evolution.feedback.rollback_repository import (
     AdaptiveRollbackRepository,
     AdaptiveRollbackSaveResult,
 )
-from lrp.evolution.feedback.runner import (
-    RevisionAwareAutomationResult,
-    RevisionAwareAutomationRunner,
-)
 from lrp.evolution.feedback.safety import (
     AdaptiveSafetyGuard,
     AdaptiveSafetyResult,
+)
+from lrp.evolution.feedback.status import (
+    AdaptiveStatusIssue,
+    AdaptiveStatusReport,
+)
+from lrp.evolution.feedback.runner import (
+    RevisionAwareAutomationResult,
+    RevisionAwareAutomationRunner,
 )
 
 __all__ = [
@@ -55,6 +62,7 @@ __all__ = [
     "AdaptiveProfileUpdatePlanner",
     "AdaptiveRecommendation",
     "AdaptiveRecommendationEngine",
+    "AdaptiveRepositoryStatusAnalyzer",
     "AdaptiveRollbackDiff",
     "AdaptiveRollbackManager",
     "AdaptiveRollbackPlan",
@@ -62,6 +70,8 @@ __all__ = [
     "AdaptiveRollbackSaveResult",
     "AdaptiveSafetyGuard",
     "AdaptiveSafetyResult",
+    "AdaptiveStatusIssue",
+    "AdaptiveStatusReport",
     "RevisionAwareAutomationResult",
     "RevisionAwareAutomationRunner",
 ]
