@@ -226,6 +226,8 @@ def test_feedback_public_exports() -> None:
         "AdaptiveRollbackDiff",
         "AdaptiveRollbackManager",
         "AdaptiveRollbackPlan",
+        "AdaptiveRollbackRepository",
+        "AdaptiveRollbackSaveResult",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
         "RevisionAwareAutomationResult",

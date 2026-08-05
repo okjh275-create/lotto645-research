@@ -29,6 +29,10 @@ from lrp.evolution.feedback.rollback import (
     AdaptiveRollbackManager,
     AdaptiveRollbackPlan,
 )
+from lrp.evolution.feedback.rollback_repository import (
+    AdaptiveRollbackRepository,
+    AdaptiveRollbackSaveResult,
+)
 from lrp.evolution.feedback.runner import (
     RevisionAwareAutomationResult,
     RevisionAwareAutomationRunner,
@@ -54,6 +58,8 @@ __all__ = [
     "AdaptiveRollbackDiff",
     "AdaptiveRollbackManager",
     "AdaptiveRollbackPlan",
+    "AdaptiveRollbackRepository",
+    "AdaptiveRollbackSaveResult",
     "AdaptiveSafetyGuard",
     "AdaptiveSafetyResult",
     "RevisionAwareAutomationResult",

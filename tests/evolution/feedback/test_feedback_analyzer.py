@@ -215,6 +215,8 @@ def test_public_exports_include_analyzer() -> None:
         "AdaptiveRollbackDiff",
         "AdaptiveRollbackManager",
         "AdaptiveRollbackPlan",
+        "AdaptiveRollbackRepository",
+        "AdaptiveRollbackSaveResult",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
         "RevisionAwareAutomationResult",

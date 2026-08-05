@@ -288,6 +288,8 @@ def test_public_exports_include_engine() -> None:
         "AdaptiveRollbackDiff",
         "AdaptiveRollbackManager",
         "AdaptiveRollbackPlan",
+        "AdaptiveRollbackRepository",
+        "AdaptiveRollbackSaveResult",
         "AdaptiveSafetyGuard",
         "AdaptiveSafetyResult",
         "RevisionAwareAutomationResult",
