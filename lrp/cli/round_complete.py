@@ -184,10 +184,12 @@ def main(
             )
 
         response = {
+            "schema_version": "1.0",
             "status": "PASS",
             **report_payload,
             "artifact": artifact,
             "verification": verification,
+            "warnings": [],
         }
 
         print(
@@ -204,9 +206,11 @@ def main(
         print(
             json.dumps(
                 {
+                    "schema_version": "1.0",
                     "status": "ERROR",
                     "error_type": type(exc).__name__,
                     "message": str(exc),
+                    "warnings": [],
                 },
                 ensure_ascii=False,
                 indent=2,

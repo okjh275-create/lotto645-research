@@ -224,3 +224,82 @@ def test_round_complete_manifest_detects_tampering(
         verification["failures"][0]["reason"]
         == "sha256_mismatch"
     )
+
+def test_round_complete_success_contract(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    prediction = write_prediction(tmp_path)
+
+    code = main(
+        [
+            "--prediction",
+            str(prediction),
+            "--numbers",
+            "3",
+            "8",
+            "14",
+            "22",
+            "35",
+            "41",
+            "--bonus",
+            "9",
+            "--output",
+            str(tmp_path / "output"),
+        ]
+    )
+
+    assert code == 0
+
+    payload = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert payload["schema_version"] == "1.0"
+    assert payload["status"] == "PASS"
+    assert payload["warnings"] == []
+    assert payload["verification"]["status"] == "PASS"
+    assert "artifact" in payload
+    assert "learning" in payload
+    assert "profile" in payload
+
+
+def test_round_complete_error_contract(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    missing = tmp_path / "missing.json"
+
+    code = main(
+        [
+            "--prediction",
+            str(missing),
+            "--numbers",
+            "3",
+            "8",
+            "14",
+            "22",
+            "35",
+            "41",
+            "--bonus",
+            "9",
+            "--output",
+            str(tmp_path / "output"),
+        ]
+    )
+
+    assert code == 1
+
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+
+    payload = json.loads(
+        captured.err
+    )
+
+    assert payload["schema_version"] == "1.0"
+    assert payload["status"] == "ERROR"
+    assert payload["error_type"] == "FileNotFoundError"
+    assert payload["message"]
+    assert payload["warnings"] == []
