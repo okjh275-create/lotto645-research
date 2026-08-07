@@ -11,6 +11,7 @@ from .export_history import main as export_history_main
 from .predict import main as predict_main
 from .restore import main as restore_main
 from .review import main as review_main
+from .round_complete import main as round_complete_main
 from .status import main as status_main
 from .verify import main as verify_main
 from .weekly import main as weekly_main
@@ -20,6 +21,7 @@ _COMMANDS = {
     "predict": predict_main,
     "weekly": weekly_main,
     "review": review_main,
+    "round-complete": round_complete_main,
     "verify": verify_main,
     "backup": backup_main,
     "restore": restore_main,
@@ -52,6 +54,10 @@ def main(
         (
             "review",
             "Review a saved prediction",
+        ),
+        (
+            "round-complete",
+            "Complete review and learning for a draw",
         ),
         (
             "verify",
