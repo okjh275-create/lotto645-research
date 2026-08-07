@@ -74,3 +74,90 @@ def test_round_complete_cli_runs(tmp_path: Path, capsys) -> None:
         / "learning"
         / "review-1232.json"
     ).is_file()
+
+def test_round_complete_writes_operation_artifact(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    prediction = write_prediction(tmp_path)
+    output = tmp_path / "output"
+
+    code = main(
+        [
+            "--prediction",
+            str(prediction),
+            "--numbers",
+            "3",
+            "8",
+            "14",
+            "22",
+            "35",
+            "41",
+            "--bonus",
+            "9",
+            "--output",
+            str(output),
+            "--policy",
+            "thompson",
+        ]
+    )
+
+    assert code == 0
+
+    response = json.loads(
+        capsys.readouterr().out
+    )
+
+    data_path = (
+        output
+        / "round-completion"
+        / "round_1232"
+        / "round_completion.json"
+    )
+    manifest_path = (
+        output
+        / "round-completion"
+        / "round_1232"
+        / "manifest.json"
+    )
+    operation_log = (
+        output
+        / "operation_log.jsonl"
+    )
+
+    assert data_path.is_file()
+    assert manifest_path.is_file()
+    assert operation_log.is_file()
+
+    saved = json.loads(
+        data_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert saved["round_no"] == 1232
+    assert saved["platform_version"] == "4.0.0"
+    assert saved["completed_at_kst"]
+    assert saved["learning"]["feedback_count"] > 0
+
+    assert (
+        response["artifact"]["data_path"]
+        == str(data_path.resolve())
+    )
+    assert response["artifact"]["sha256"]
+
+    manifest = json.loads(
+        manifest_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["artifact_type"] == (
+        "round-completion"
+    )
+    assert manifest["round"] == 1232
+    assert (
+        "round_completion.json"
+        in manifest["files"]
+    )

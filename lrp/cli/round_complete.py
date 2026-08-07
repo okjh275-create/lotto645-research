@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import Sequence
 
 from lrp import __version__
@@ -31,8 +33,12 @@ from lrp.evolution.services.review_profile_evolution_service import (
 )
 from lrp.evolution.storage import SnapshotRepository
 from lrp.learning import LearningRepository
+from lrp.operations import write_operation_artifact
 from lrp.outcomes import OutcomeBridge, OutcomeLearningBridge
 from lrp.pipelines.round_completion import RoundCompletionPipeline
+
+
+_KST = ZoneInfo("Asia/Seoul")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -149,9 +155,28 @@ def main(
             ),
         )
 
+        report_payload = {
+            **result.as_dict(),
+            "platform_version": __version__,
+            "completed_at_kst": datetime.now(
+                _KST
+            ).isoformat(
+                timespec="seconds"
+            ),
+        }
+
+        artifact = write_operation_artifact(
+            report_payload,
+            output_root=output,
+            artifact_type="round-completion",
+            round_no=result.round_no,
+            filename="round_completion.json",
+        )
+
         response = {
             "status": "PASS",
-            **result.as_dict(),
+            **report_payload,
+            "artifact": artifact,
         }
 
         print(
