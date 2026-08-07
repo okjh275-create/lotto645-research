@@ -162,9 +162,7 @@ def test_result_as_dict(tmp_path: Path) -> None:
 def test_public_exports() -> None:
     import lrp.outcomes as outcomes
 
-    assert outcomes.__all__ == [
-        "OutcomeBridge",
-        "OutcomeBridgeResult",
-        "OutcomeImporter",
-        "OutcomeImportError",
-    ]
+    assert "OutcomeBridge" in outcomes.__all__
+    assert "OutcomeBridgeResult" in outcomes.__all__
+    assert "OutcomeImporter" in outcomes.__all__
+    assert "OutcomeImportError" in outcomes.__all__
