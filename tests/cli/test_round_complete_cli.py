@@ -145,6 +145,9 @@ def test_round_complete_writes_operation_artifact(
         == str(data_path.resolve())
     )
     assert response["artifact"]["sha256"]
+    assert response["verification"]["status"] == "PASS"
+    assert response["verification"]["failures"] == []
+    assert response["verification"]["checked"]
 
     manifest = json.loads(
         manifest_path.read_text(
@@ -160,4 +163,64 @@ def test_round_complete_writes_operation_artifact(
     assert (
         "round_completion.json"
         in manifest["files"]
+    )
+
+def test_round_complete_manifest_detects_tampering(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    from lrp.operations import verify_manifest
+
+    prediction = write_prediction(tmp_path)
+    output = tmp_path / "output"
+
+    code = main(
+        [
+            "--prediction",
+            str(prediction),
+            "--numbers",
+            "3",
+            "8",
+            "14",
+            "22",
+            "35",
+            "41",
+            "--bonus",
+            "9",
+            "--output",
+            str(output),
+            "--policy",
+            "thompson",
+        ]
+    )
+
+    assert code == 0
+
+    response = json.loads(
+        capsys.readouterr().out
+    )
+
+    assert response["verification"]["status"] == "PASS"
+
+    data_path = Path(
+        response["artifact"]["data_path"]
+    )
+    manifest_path = Path(
+        response["artifact"]["manifest_path"]
+    )
+
+    data_path.write_text(
+        '{"tampered": true}\n',
+        encoding="utf-8",
+    )
+
+    verification = verify_manifest(
+        manifest_path
+    )
+
+    assert verification["status"] == "FAIL"
+    assert verification["failures"]
+    assert (
+        verification["failures"][0]["reason"]
+        == "sha256_mismatch"
     )

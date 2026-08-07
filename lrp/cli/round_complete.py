@@ -33,7 +33,7 @@ from lrp.evolution.services.review_profile_evolution_service import (
 )
 from lrp.evolution.storage import SnapshotRepository
 from lrp.learning import LearningRepository
-from lrp.operations import write_operation_artifact
+from lrp.operations import verify_manifest, write_operation_artifact
 from lrp.outcomes import OutcomeBridge, OutcomeLearningBridge
 from lrp.pipelines.round_completion import RoundCompletionPipeline
 
@@ -173,10 +173,21 @@ def main(
             filename="round_completion.json",
         )
 
+        verification = verify_manifest(
+            artifact["manifest_path"]
+        )
+
+        if verification["status"] != "PASS":
+            raise RuntimeError(
+                "round completion artifact "
+                "verification failed"
+            )
+
         response = {
             "status": "PASS",
             **report_payload,
             "artifact": artifact,
+            "verification": verification,
         }
 
         print(
