@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from lrp import __version__
 from lrp.evolution.contracts.learning_context import (
     LearningContext,
 )
@@ -39,9 +40,14 @@ from lrp.evolution.services.review_profile_evolution_service import (
 from lrp.evolution.storage import (
     SnapshotRepository,
 )
+from lrp.learning import LearningRepository
 from lrp.operations import (
     review_prediction,
     write_operation_artifact,
+)
+from lrp.outcomes import (
+    OutcomeBridge,
+    OutcomeLearningBridge,
 )
 
 
@@ -88,6 +94,21 @@ def _parser() -> argparse.ArgumentParser:
         help=(
             "Adaptive profile snapshot directory. "
             "Default: <output>/profiles"
+        ),
+    )
+    parser.add_argument(
+        "--learning-database",
+        help=(
+            "Outcome learning SQLite database. "
+            "Default: <output>/learning/learning.db"
+        ),
+    )
+    parser.add_argument(
+        "--outcome-model-name",
+        default=f"lrp-v{__version__}",
+        help=(
+            "Model identifier stored with imported "
+            "prediction records."
         ),
     )
     parser.add_argument(
@@ -144,6 +165,47 @@ def _resolve_profile_root(
     return Path(arguments.output) / "profiles"
 
 
+def _resolve_learning_database(
+    arguments: argparse.Namespace,
+) -> Path:
+    configured = getattr(
+        arguments,
+        "learning_database",
+        None,
+    )
+
+    if configured:
+        return Path(configured)
+
+    return (
+        Path(arguments.output)
+        / "learning"
+        / "learning.db"
+    )
+
+
+def _load_prediction_payload(
+    source: str | Path,
+) -> dict[str, Any]:
+    path = Path(source)
+
+    if not path.is_file():
+        raise FileNotFoundError(path)
+
+    payload = json.loads(
+        path.read_text(
+            encoding="utf-8-sig"
+        )
+    )
+
+    if not isinstance(payload, dict):
+        raise TypeError(
+            "prediction JSON must be an object"
+        )
+
+    return payload
+
+
 def _build_review_learning_service(
     root: Path,
 ) -> ReviewLearningService:
@@ -171,6 +233,64 @@ def _build_profile_evolution_service(
     )
 
 
+def _run_outcome_bridge(
+    *,
+    prediction_payload: Mapping[str, Any],
+    review_payload: Mapping[str, Any],
+    arguments: argparse.Namespace,
+) -> dict[str, Any]:
+    if arguments.bonus is None:
+        return {
+            "status": "SKIPPED",
+            "reason": "bonus_required",
+            "database": str(
+                _resolve_learning_database(
+                    arguments
+                )
+            ),
+        }
+
+    repository = LearningRepository(
+        _resolve_learning_database(arguments)
+    )
+
+    model_name = getattr(
+        arguments,
+        "outcome_model_name",
+        f"lrp-v{__version__}",
+    )
+
+    bridge = OutcomeBridge(
+        repository=repository,
+        model_name=model_name,
+    )
+
+    reviewed_at = str(
+        review_payload["reviewed_at_kst"]
+    )
+
+    result = bridge.process(
+        prediction_payload,
+        winning_numbers=tuple(
+            int(value)
+            for value in arguments.numbers
+        ),
+        bonus=int(arguments.bonus),
+        recorded_at_kst=reviewed_at,
+        reviewed_at_kst=reviewed_at,
+    )
+
+    return {
+        "status": "PASS",
+        "database": str(
+            _resolve_learning_database(
+                arguments
+            )
+        ),
+        **result.as_dict(),
+    }
+
+
 def _run_learning(
     *,
     payload: Mapping[str, Any],
@@ -194,7 +314,11 @@ def _run_learning(
         )
     )
 
-    learning = learning_service.learn(
+    learning_bridge = OutcomeLearningBridge(
+        service=learning_service
+    )
+
+    bridged = learning_bridge.learn(
         context=context,
         review_payload=payload,
         snapshot_id=snapshot_id,
@@ -207,6 +331,8 @@ def _run_learning(
             arguments.overwrite_learning
         ),
     )
+
+    learning = bridged.learning
 
     profile_service = (
         _build_profile_evolution_service(
@@ -287,9 +413,27 @@ def main(
         }
 
         if arguments.learn:
-            response["learning"] = _run_learning(
-                payload=payload,
-                arguments=arguments,
+            prediction_payload = (
+                _load_prediction_payload(
+                    arguments.prediction
+                )
+            )
+
+            response["outcome"] = (
+                _run_outcome_bridge(
+                    prediction_payload=(
+                        prediction_payload
+                    ),
+                    review_payload=payload,
+                    arguments=arguments,
+                )
+            )
+
+            response["learning"] = (
+                _run_learning(
+                    payload=payload,
+                    arguments=arguments,
+                )
             )
 
         print(

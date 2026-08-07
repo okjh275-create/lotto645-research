@@ -1,4 +1,4 @@
-﻿"""Append-only SQLite repository for learning records."""
+"""Append-only SQLite repository for learning records."""
 
 from __future__ import annotations
 
@@ -259,6 +259,12 @@ class LearningRepository:
             record.recorded_at_kst,
         )
 
+        identity = (
+            record.round_no,
+            _json(record.numbers),
+            record.bonus,
+        )
+
         with self._connect() as connection:
             cursor = connection.execute(
                 """
@@ -288,7 +294,19 @@ class LearningRepository:
                 (record.round_no,),
             ).fetchone()
 
-            if existing is None or tuple(existing) != values:
+            if existing is None:
+                raise ValueError(
+                    "round result already exists "
+                    "with different content"
+                )
+
+            existing_identity = (
+                int(existing["round_no"]),
+                str(existing["numbers_json"]),
+                int(existing["bonus"]),
+            )
+
+            if existing_identity != identity:
                 raise ValueError(
                     "round result already exists "
                     "with different content"
