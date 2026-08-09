@@ -149,6 +149,41 @@ class ReviewLearningService:
             feedback_count=len(feedbacks),
             review_set_count=review_set_count,
         )
+
+        global_regime = self._global_regime_metadata(
+            review_payload=review_payload,
+            prediction_payload=prediction_payload,
+        )
+
+        if global_regime is not None:
+            flattened_global_regime = {
+                "global_regime_primary": (
+                    global_regime.get("primary")
+                ),
+                "global_regime_confidence": (
+                    global_regime.get("confidence")
+                ),
+                "global_regime_secondary": (
+                    global_regime.get("secondary")
+                ),
+                "global_regime_secondary_confidence": (
+                    global_regime.get(
+                        "secondary_confidence"
+                    )
+                ),
+                "global_regime_mode": (
+                    global_regime.get("mode")
+                ),
+            }
+
+            snapshot_metadata.update(
+                {
+                    key: value
+                    for key, value
+                    in flattened_global_regime.items()
+                    if value is not None
+                }
+            )
         snapshot_metadata.update(
             self._reward_vector_metadata(
                 reward_vector
@@ -193,7 +228,7 @@ class ReviewLearningService:
         ):
             previous_review_count = 0
 
-        reward_vector_metadata = {
+        context_signal_metadata = {
             key: value
             for key, value
             in snapshot_metadata.items()
@@ -202,6 +237,36 @@ class ReviewLearningService:
                 or key.startswith("feature_signal_")
             )
         }
+
+        if global_regime is not None:
+            context_signal_metadata.update(
+                {
+                    "global_regime_primary": (
+                        global_regime.get("primary")
+                    ),
+                    "global_regime_confidence": (
+                        global_regime.get("confidence")
+                    ),
+                    "global_regime_secondary": (
+                        global_regime.get("secondary")
+                    ),
+                    "global_regime_secondary_confidence": (
+                        global_regime.get(
+                            "secondary_confidence"
+                        )
+                    ),
+                    "global_regime_mode": (
+                        global_regime.get("mode")
+                    ),
+                }
+            )
+
+            context_signal_metadata = {
+                key: value
+                for key, value
+                in context_signal_metadata.items()
+                if value is not None
+            }
 
         enriched_context = replace(
             context,
@@ -217,7 +282,7 @@ class ReviewLearningService:
                 "review_count": (
                     previous_review_count + 1
                 ),
-                **reward_vector_metadata,
+                **context_signal_metadata,
             },
         )
 
@@ -234,6 +299,54 @@ class ReviewLearningService:
             feedback_count=len(feedbacks),
             policy=policy,
         )
+
+    @staticmethod
+    def _global_regime_metadata(
+        *,
+        review_payload: Mapping[str, Any],
+        prediction_payload: Mapping[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Extract shadow global-regime metadata."""
+
+        candidate: object | None = None
+
+        if prediction_payload is not None:
+            prediction_metadata = prediction_payload.get(
+                "metadata",
+                {},
+            )
+
+            if isinstance(
+                prediction_metadata,
+                Mapping,
+            ):
+                candidate = prediction_metadata.get(
+                    "global_regime"
+                )
+
+        if candidate is None:
+            review_metadata = review_payload.get(
+                "prediction_metadata",
+                {},
+            )
+
+            if isinstance(
+                review_metadata,
+                Mapping,
+            ):
+                candidate = review_metadata.get(
+                    "global_regime"
+                )
+
+        if candidate is None:
+            return None
+
+        if not isinstance(candidate, Mapping):
+            raise TypeError(
+                "global_regime metadata must be a mapping"
+            )
+
+        return dict(candidate)
 
     @staticmethod
     def _review_set_count(

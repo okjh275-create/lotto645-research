@@ -575,3 +575,129 @@ def test_partial_attribution_inputs_are_rejected(
             prediction_payload=make_prediction_payload(),
             snapshot_id="review-1222",
         )
+
+def test_global_regime_from_prediction_reaches_snapshot(
+    tmp_path: Path,
+) -> None:
+    global_regime = {
+        "primary": "gap_recovery",
+        "confidence": 0.78,
+        "secondary": "cluster_rotation",
+        "secondary_confidence": 0.54,
+        "scores": {
+            "gap_recovery": 0.78,
+            "cluster_rotation": 0.54,
+        },
+        "features": {
+            "average_recency": 0.41,
+        },
+        "mode": "shadow",
+    }
+
+    review = make_review()
+    review["prediction_metadata"] = {
+        "global_regime": global_regime,
+    }
+
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=review,
+        snapshot_id="review-1220",
+    )
+
+    assert (
+        result.snapshot.metadata[
+            "global_regime_primary"
+        ]
+        == "gap_recovery"
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_confidence"
+        ]
+        == 0.78
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_secondary"
+        ]
+        == "cluster_rotation"
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_secondary_confidence"
+        ]
+        == 0.54
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_mode"
+        ]
+        == "shadow"
+    )
+
+
+def test_global_regime_from_review_reaches_final_context(
+    tmp_path: Path,
+) -> None:
+    global_regime = {
+        "primary": "high_band_expansion",
+        "confidence": 0.71,
+        "secondary": None,
+        "secondary_confidence": None,
+        "scores": {
+            "high_band_expansion": 0.71,
+        },
+        "features": {
+            "high_band_ratio": 0.67,
+        },
+        "mode": "shadow",
+    }
+
+    review = make_review()
+    review["prediction_metadata"] = {
+        "global_regime": global_regime,
+    }
+
+    result = make_service(tmp_path).learn(
+        context=make_context(),
+        review_payload=review,
+        snapshot_id="review-1220",
+    )
+
+    assert (
+        result.snapshot.metadata[
+            "global_regime_primary"
+        ]
+        == "high_band_expansion"
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_confidence"
+        ]
+        == 0.71
+    )
+    assert (
+        result.snapshot.metadata[
+            "global_regime_mode"
+        ]
+        == "shadow"
+    )
+    assert (
+        result.final_context.metadata[
+            "global_regime_primary"
+        ]
+        == "high_band_expansion"
+    )
+    assert (
+        result.final_context.metadata[
+            "global_regime_confidence"
+        ]
+        == 0.71
+    )
+    assert (
+        result.final_context.metadata[
+            "global_regime_mode"
+        ]
+        == "shadow"
+    )
