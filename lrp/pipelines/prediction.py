@@ -31,6 +31,10 @@ from lrp.regimes import (
     RegimeFeatureExtractor as GlobalRegimeFeatureExtractor,
     RegimeStabilityPolicy as GlobalRegimeStabilityPolicy,
 )
+from lrp.regimes.integration import (
+    GlobalRegimeAdjustmentAdapter,
+    NoOpGlobalRegimeAdjustmentAdapter,
+)
 from lrp.prediction import (
     ProbabilityFusionEngine,
     RegimeDetector,
@@ -308,6 +312,11 @@ class PredictionPipeline:
     evolution: EvolutionWeightAdapter[object] = field(
         default_factory=NoOpEvolutionWeightAdapter
     )
+    global_regime_adjustment: (
+        GlobalRegimeAdjustmentAdapter[object]
+    ) = field(
+        default_factory=NoOpGlobalRegimeAdjustmentAdapter
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -331,6 +340,15 @@ class PredictionPipeline:
                 "EvolutionWeightAdapter"
             )
 
+        if not isinstance(
+            self.global_regime_adjustment,
+            GlobalRegimeAdjustmentAdapter,
+        ):
+            raise ContractError(
+                "global_regime_adjustment must implement "
+                "GlobalRegimeAdjustmentAdapter"
+            )
+
     @classmethod
     def load(
         cls,
@@ -346,6 +364,10 @@ class PredictionPipeline:
         evolution_snapshot_root: (
             str | Path | None
         ) = None,
+        global_regime_adjustment: (
+            GlobalRegimeAdjustmentAdapter[object]
+            | None
+        ) = None,
     ) -> "PredictionPipeline":
         resolved_evolution = (
             EvolutionAdapterFactory.build(
@@ -356,11 +378,20 @@ class PredictionPipeline:
             )
         )
 
+        resolved_global_regime_adjustment = (
+            global_regime_adjustment
+            if global_regime_adjustment is not None
+            else NoOpGlobalRegimeAdjustmentAdapter()
+        )
+
         return cls(
             statistics=StatisticsAdapter.load(),
             candidate=CandidateAdapter.load(),
             ensemble=ensemble,
             evolution=resolved_evolution,
+            global_regime_adjustment=(
+                resolved_global_regime_adjustment
+            ),
         )
 
     def analyze(
@@ -464,6 +495,14 @@ class PredictionPipeline:
             )
         )
 
+        probability_vector = (
+            self._adjust_global_regime_probability_vector(
+                probability_vector,
+                global_regime=global_regime_context,
+                request=request,
+            )
+        )
+
         probabilities = (
             self.candidate.probability_mapping(
                 probability_vector
@@ -555,6 +594,26 @@ class PredictionPipeline:
 
         return adjusted
 
+    def _adjust_global_regime_probability_vector(
+        self,
+        probability_vector: object,
+        *,
+        global_regime: object | None,
+        request: PredictionRequest,
+    ) -> object:
+        adjusted = self.global_regime_adjustment.adjust(
+            probability_vector,
+            global_regime=global_regime,
+            round_no=request.round_no,
+            seed=request.seed,
+        )
+
+        if adjusted is None:
+            raise ContractError(
+                "global regime adjustment adapter returned None"
+            )
+
+        return adjusted
     def _apply_ensemble(
         self,
         scored: tuple[object, ...],
