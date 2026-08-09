@@ -318,6 +318,7 @@ class PredictionGenerationResult:
     candidate_version: str
     regime_profile: object | None = None
     probability_vector: object | None = None
+    global_regime_context: object | None = None
 
     @property
     def generated_count(self) -> int:

@@ -27,6 +27,10 @@ from lrp.evolution.integration import (
     EvolutionWeightAdapter,
     NoOpEvolutionWeightAdapter,
 )
+from lrp.regimes import (
+    RegimeFeatureExtractor as GlobalRegimeFeatureExtractor,
+    RegimeStabilityPolicy as GlobalRegimeStabilityPolicy,
+)
 from lrp.prediction import (
     ProbabilityFusionEngine,
     RegimeDetector,
@@ -386,6 +390,19 @@ class PredictionPipeline:
         bridge = build_statistics_signals(
             snapshot
         )
+
+        global_regime_features = (
+            GlobalRegimeFeatureExtractor().extract(
+                bridge
+            )
+        )
+
+        global_regime_context = (
+            GlobalRegimeStabilityPolicy().decide(
+                global_regime_features
+            )
+        )
+
         statistics_payload = bridge.to_dict()
 
         contract_report = (
@@ -513,6 +530,9 @@ class PredictionPipeline:
             regime_profile=regime_profile,
             probability_vector=(
                 probability_vector
+            ),
+            global_regime_context=(
+                global_regime_context
             ),
         )
 

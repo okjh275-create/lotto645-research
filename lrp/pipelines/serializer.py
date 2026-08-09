@@ -322,6 +322,20 @@ def prediction_to_dict(
             "practical_complete": bool(
                 _read(result.practical, "complete")
             ),
+            "global_regime": (
+                {
+                    **result.generation
+                    .global_regime_context
+                    .as_dict(),
+                    "mode": "shadow",
+                }
+                if (
+                    result.generation
+                    .global_regime_context
+                    is not None
+                )
+                else None
+            ),
         },
     }
 
