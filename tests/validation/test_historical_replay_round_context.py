@@ -75,3 +75,90 @@ def test_initial_learning_context_uses_current_round(
     assert context.cycle_id == (
         "historical-replay-1132-1231"
     )
+
+
+def test_executor_can_enable_regime_calibration_root(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "regime-calibration"
+
+    executor = HistoricalReplayExecutor(
+        history=(object(),),
+        config=ReplayConfig(
+            start_round=1132,
+            end_round=1231,
+            seed_base=20260802,
+            candidate_count=1000,
+            top_k=20,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_calibration_root=root,
+    )
+
+    assert executor.regime_calibration_root == root
+
+
+def test_learning_service_uses_regime_calibration_repository(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    root = tmp_path / "regime-calibration"
+
+    executor = HistoricalReplayExecutor(
+        history=(object(),),
+        config=ReplayConfig(
+            start_round=1132,
+            end_round=1231,
+            seed_base=20260802,
+            candidate_count=1000,
+            top_k=20,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_calibration_root=root,
+    )
+
+    service = executor._build_learning_service()
+
+    assert isinstance(
+        service.regime_reward_calculator,
+        RegimeRewardCalculator,
+    )
+    assert isinstance(
+        service.regime_calibration_updater,
+        RegimeCalibrationUpdater,
+    )
+    assert isinstance(
+        service.regime_calibration_repository,
+        RegimeCalibrationRepository,
+    )
+    assert (
+        service.regime_calibration_repository.root
+        == root
+    )
+
+
+def test_learning_service_keeps_regime_learning_disabled_by_default(
+    tmp_path: Path,
+) -> None:
+    executor = make_executor(tmp_path)
+
+    service = executor._build_learning_service()
+
+    assert service.regime_reward_calculator is None
+    assert service.regime_calibration_updater is None
+    assert service.regime_calibration_repository is None

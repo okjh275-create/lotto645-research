@@ -39,6 +39,15 @@ from lrp.evolution.services.review_profile_evolution_service import (
     ReviewProfileEvolutionService,
 )
 from lrp.evolution.storage import SnapshotRepository
+from lrp.regimes.calibration_repository import (
+    RegimeCalibrationRepository,
+)
+from lrp.regimes.calibration_updater import (
+    RegimeCalibrationUpdater,
+)
+from lrp.regimes.reward_calculator import (
+    RegimeRewardCalculator,
+)
 from lrp.io import (
     history_until_round,
     long_gap_numbers,
@@ -73,6 +82,7 @@ class HistoricalReplayExecutor:
     config: ReplayConfig
     learning_root: Path
     profile_root: Path
+    regime_calibration_root: Path | None = None
     policy: str = "thompson"
     adaptive_calculator: (
         AdaptiveWeightCalculator | None
@@ -167,7 +177,10 @@ class HistoricalReplayExecutor:
             evolution=NoOpEvolutionWeightAdapter()
         )
         adaptive_pipeline = PredictionPipeline.load(
-            evolution_snapshot_root=self.profile_root
+            evolution_snapshot_root=self.profile_root,
+            regime_calibration_snapshot_root=(
+                self.regime_calibration_root
+            ),
         )
 
         noop_result = noop_pipeline.run(
@@ -356,7 +369,23 @@ class HistoricalReplayExecutor:
         runner = PersistentLearningRunner(
             persistence
         )
-        return ReviewLearningService(runner)
+        if self.regime_calibration_root is None:
+            return ReviewLearningService(runner)
+
+        return ReviewLearningService(
+            runner,
+            regime_reward_calculator=(
+                RegimeRewardCalculator()
+            ),
+            regime_calibration_updater=(
+                RegimeCalibrationUpdater()
+            ),
+            regime_calibration_repository=(
+                RegimeCalibrationRepository(
+                    self.regime_calibration_root
+                )
+            ),
+        )
 
     def _build_profile_service(
         self,
