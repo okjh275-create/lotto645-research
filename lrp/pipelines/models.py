@@ -319,6 +319,7 @@ class PredictionGenerationResult:
     regime_profile: object | None = None
     probability_vector: object | None = None
     global_regime_context: object | None = None
+    global_regime_mode: str = "shadow"
 
     @property
     def generated_count(self) -> int:

@@ -24,6 +24,7 @@ def make_request() -> PredictionRequest:
     )
 
 from lrp.regimes.integration import (
+    ActiveGlobalRegimeAdjustmentAdapter,
     GlobalRegimeAdjustmentAdapter,
     NoOpGlobalRegimeAdjustmentAdapter,
 )
@@ -174,3 +175,15 @@ def test_none_global_regime_adjustment_is_rejected() -> None:
             global_regime=object(),
             request=make_request(),
         )
+
+def test_pipeline_load_accepts_active_global_regime_adapter() -> None:
+    adapter = ActiveGlobalRegimeAdjustmentAdapter()
+
+    pipeline = PredictionPipeline.load(
+        global_regime_adjustment=adapter,
+    )
+
+    assert (
+        pipeline.global_regime_adjustment
+        is adapter
+    )

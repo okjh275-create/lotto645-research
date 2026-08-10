@@ -701,3 +701,404 @@ def test_global_regime_from_review_reaches_final_context(
         ]
         == "shadow"
     )
+
+
+def test_review_learning_service_accepts_regime_dependencies(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    calculator = RegimeRewardCalculator()
+    updater = RegimeCalibrationUpdater()
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=calculator,
+        regime_calibration_updater=updater,
+        regime_calibration_repository=repository,
+    )
+
+    assert (
+        service.regime_reward_calculator
+        is calculator
+    )
+    assert (
+        service.regime_calibration_updater
+        is updater
+    )
+    assert (
+        service.regime_calibration_repository
+        is repository
+    )
+
+
+def test_review_learning_service_defaults_regime_dependencies_to_none(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+
+    assert service.regime_reward_calculator is None
+    assert service.regime_calibration_updater is None
+    assert service.regime_calibration_repository is None
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "regime_reward_calculator",
+        "regime_calibration_updater",
+        "regime_calibration_repository",
+    ],
+)
+def test_review_learning_service_rejects_invalid_regime_dependency(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(tmp_path),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    with pytest.raises(
+        TypeError,
+        match=field_name,
+    ):
+        ReviewLearningService(
+            runner,
+            **{
+                field_name: object(),
+            },
+        )
+
+def test_apply_regime_learning_creates_first_snapshot(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=repository,
+    )
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.5,
+        practical_hit=0.2,
+        rank_quality=0.1,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    result = service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    assert result is not None
+    assert result["applied"] is True
+    assert result["revision"] == 1
+    assert result["sample_size"] == 10
+    assert result["regime"] == "gap_recovery"
+
+    snapshot = repository.load_latest()
+
+    assert snapshot.revision == 1
+    assert snapshot.sample_size == 10
+    assert (
+        snapshot.calibration.gap_recovery
+        > 1.0
+    )
+    assert (
+        snapshot.calibration.cluster_rotation
+        == 1.0
+    )
+    assert (
+        snapshot.calibration.high_band_expansion
+        == 1.0
+    )
+    assert (
+        snapshot.calibration.low_band_expansion
+        == 1.0
+    )
+
+
+def test_apply_regime_learning_increments_revision_and_sample_size(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=repository,
+    )
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.5,
+        practical_hit=0.2,
+        rank_quality=0.1,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    result = service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=5,
+    )
+
+    assert result is not None
+    assert result["revision"] == 2
+    assert result["sample_size"] == 15
+
+    assert repository.revisions() == (
+        1,
+        2,
+    )
+
+
+def test_apply_regime_learning_is_disabled_without_dependencies(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+
+    service = make_service(tmp_path)
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.0,
+        practical_hit=0.0,
+        rank_quality=0.0,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    result = service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    assert result is None
+
+def test_learn_persists_regime_calibration_end_to_end(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    regime_repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=(
+            regime_repository
+        ),
+    )
+
+    review = make_review()
+    review["prediction_metadata"] = {
+        "global_regime": {
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+            "secondary": None,
+            "secondary_confidence": None,
+            "scores": {
+                "gap_recovery": 1.0,
+            },
+            "features": {
+                "average_gap_reversion": 0.8,
+            },
+            "mode": "active",
+        }
+    }
+
+    result = service.learn(
+        context=make_context(),
+        review_payload=review,
+        snapshot_id="review-1220",
+        policy="thompson",
+    )
+
+    assert result.snapshot_id == "review-1220"
+
+    regime_snapshot = (
+        regime_repository.load_latest()
+    )
+
+    assert regime_snapshot.revision == 1
+    assert regime_snapshot.sample_size == 10
+
+    assert (
+        regime_snapshot
+        .calibration
+        .gap_recovery
+        > 1.0
+    )
+
+    assert (
+        regime_snapshot
+        .calibration
+        .cluster_rotation
+        == 1.0
+    )
+    assert (
+        regime_snapshot
+        .calibration
+        .high_band_expansion
+        == 1.0
+    )
+    assert (
+        regime_snapshot
+        .calibration
+        .low_band_expansion
+        == 1.0
+    )

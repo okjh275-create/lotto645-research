@@ -1,3 +1,8 @@
+from .active_adjustment import (
+    ActiveGlobalRegimeAdjustmentAdapter,
+    ProbabilityVectorAdjuster,
+    RegimeAdjustmentConfig,
+)
 from .adjustment import (
     GlobalRegimeAdjustmentAdapter,
 )
@@ -6,6 +11,9 @@ from .noop_adjustment import (
 )
 
 __all__ = [
+    "ActiveGlobalRegimeAdjustmentAdapter",
     "GlobalRegimeAdjustmentAdapter",
     "NoOpGlobalRegimeAdjustmentAdapter",
+    "ProbabilityVectorAdjuster",
+    "RegimeAdjustmentConfig",
 ]

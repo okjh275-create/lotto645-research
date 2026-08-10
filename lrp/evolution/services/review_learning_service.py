@@ -10,6 +10,9 @@ from lrp.evolution.contracts.learning_context import (
 from lrp.evolution.contracts.review_learning import (
     ReviewLearningResult,
 )
+from lrp.evolution.contracts.regime_calibration import (
+    RegimeCalibration,
+)
 from lrp.evolution.integration.feature_attribution_mapper import (
     FeatureAttributionMapper,
 )
@@ -19,6 +22,17 @@ from lrp.evolution.integration.prediction_reward_mapper import (
 from lrp.evolution.services.persistent_learning_runner import (
     PersistentLearningRunner,
 )
+from lrp.regimes.calibration_repository import (
+    RegimeCalibrationNotFoundError,
+    RegimeCalibrationRepository,
+)
+from lrp.regimes.calibration_updater import (
+    RegimeCalibrationUpdater,
+)
+from lrp.regimes.reward_calculator import (
+    RegimeRewardCalculator,
+)
+
 
 
 class ReviewLearningService:
@@ -29,6 +43,15 @@ class ReviewLearningService:
         runner: PersistentLearningRunner,
         reward_mapper: PredictionRewardMapper | None = None,
         feature_mapper: FeatureAttributionMapper | None = None,
+        regime_reward_calculator: (
+            RegimeRewardCalculator | None
+        ) = None,
+        regime_calibration_updater: (
+            RegimeCalibrationUpdater | None
+        ) = None,
+        regime_calibration_repository: (
+            RegimeCalibrationRepository | None
+        ) = None,
     ) -> None:
         if not isinstance(
             runner,
@@ -63,6 +86,42 @@ class ReviewLearningService:
                 "FeatureAttributionMapper"
             )
 
+        if (
+            regime_reward_calculator is not None
+            and not isinstance(
+                regime_reward_calculator,
+                RegimeRewardCalculator,
+            )
+        ):
+            raise TypeError(
+                "regime_reward_calculator must be a "
+                "RegimeRewardCalculator"
+            )
+
+        if (
+            regime_calibration_updater is not None
+            and not isinstance(
+                regime_calibration_updater,
+                RegimeCalibrationUpdater,
+            )
+        ):
+            raise TypeError(
+                "regime_calibration_updater must be a "
+                "RegimeCalibrationUpdater"
+            )
+
+        if (
+            regime_calibration_repository is not None
+            and not isinstance(
+                regime_calibration_repository,
+                RegimeCalibrationRepository,
+            )
+        ):
+            raise TypeError(
+                "regime_calibration_repository must be a "
+                "RegimeCalibrationRepository"
+            )
+
         self._runner = runner
         self._reward_mapper = (
             reward_mapper
@@ -74,10 +133,37 @@ class ReviewLearningService:
             if feature_mapper is not None
             else FeatureAttributionMapper()
         )
+        self._regime_reward_calculator = (
+            regime_reward_calculator
+        )
+        self._regime_calibration_updater = (
+            regime_calibration_updater
+        )
+        self._regime_calibration_repository = (
+            regime_calibration_repository
+        )
 
     @property
     def runner(self) -> PersistentLearningRunner:
         return self._runner
+
+    @property
+    def regime_reward_calculator(
+        self,
+    ) -> RegimeRewardCalculator | None:
+        return self._regime_reward_calculator
+
+    @property
+    def regime_calibration_updater(
+        self,
+    ) -> RegimeCalibrationUpdater | None:
+        return self._regime_calibration_updater
+
+    @property
+    def regime_calibration_repository(
+        self,
+    ) -> RegimeCalibrationRepository | None:
+        return self._regime_calibration_repository
 
     @property
     def reward_mapper(
@@ -294,12 +380,85 @@ class ReviewLearningService:
             overwrite=overwrite,
         )
 
+        self._apply_regime_learning(
+            reward_vector=reward_vector,
+            global_regime=global_regime,
+            review_set_count=review_set_count,
+        )
+
         return ReviewLearningResult(
             run_result=run_result,
             feedback_count=len(feedbacks),
             policy=policy,
         )
 
+    def _apply_regime_learning(
+        self,
+        *,
+        reward_vector: object,
+        global_regime: Mapping[str, Any] | None,
+        review_set_count: int,
+    ) -> dict[str, Any] | None:
+        calculator = self.regime_reward_calculator
+        updater = self.regime_calibration_updater
+        repository = self.regime_calibration_repository
+
+        if (
+            calculator is None
+            or updater is None
+            or repository is None
+            or global_regime is None
+        ):
+            return None
+
+        regime_reward = calculator.calculate(
+            reward_vector,
+            global_regime=global_regime,
+        )
+
+        try:
+            previous = repository.load_latest()
+        except RegimeCalibrationNotFoundError:
+            current_calibration = (
+                RegimeCalibration.neutral()
+            )
+            next_revision = 1
+            previous_sample_size = 0
+        else:
+            current_calibration = (
+                previous.calibration
+            )
+            next_revision = (
+                previous.revision + 1
+            )
+            previous_sample_size = (
+                previous.sample_size
+            )
+
+        updated_calibration = updater.update(
+            current_calibration,
+            regime_reward,
+        )
+
+        snapshot = repository.save(
+            updated_calibration,
+            revision=next_revision,
+            sample_size=(
+                previous_sample_size
+                + review_set_count
+            ),
+        )
+
+        return {
+            "applied": True,
+            "revision": snapshot.revision,
+            "sample_size": snapshot.sample_size,
+            "regime": regime_reward.regime,
+            "reward": regime_reward.reward,
+            "effective_reward": (
+                regime_reward.effective_reward
+            ),
+        }
     @staticmethod
     def _global_regime_metadata(
         *,

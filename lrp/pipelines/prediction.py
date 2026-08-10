@@ -503,6 +503,23 @@ class PredictionPipeline:
             )
         )
 
+        global_regime_mode = "shadow"
+
+        probability_metadata = getattr(
+            probability_vector,
+            "metadata",
+            {},
+        )
+
+        if (
+            isinstance(probability_metadata, Mapping)
+            and probability_metadata.get(
+                "global_regime_adjusted"
+            )
+            is True
+        ):
+            global_regime_mode = "active"
+
         probabilities = (
             self.candidate.probability_mapping(
                 probability_vector
@@ -572,6 +589,9 @@ class PredictionPipeline:
             ),
             global_regime_context=(
                 global_regime_context
+            ),
+            global_regime_mode=(
+                global_regime_mode
             ),
         )
 

@@ -327,7 +327,10 @@ def prediction_to_dict(
                     **result.generation
                     .global_regime_context
                     .as_dict(),
-                    "mode": "shadow",
+                    "mode": (
+                        result.generation
+                        .global_regime_mode
+                    ),
                 }
                 if (
                     result.generation
