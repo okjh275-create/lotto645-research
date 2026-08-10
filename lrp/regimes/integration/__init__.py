@@ -6,6 +6,11 @@ from .active_adjustment import (
 from .adjustment import (
     GlobalRegimeAdjustmentAdapter,
 )
+from .calibration_provider import (
+    RegimeCalibrationProvider,
+    RepositoryRegimeCalibrationProvider,
+    StaticRegimeCalibrationProvider,
+)
 from .noop_adjustment import (
     NoOpGlobalRegimeAdjustmentAdapter,
 )
@@ -16,4 +21,7 @@ __all__ = [
     "NoOpGlobalRegimeAdjustmentAdapter",
     "ProbabilityVectorAdjuster",
     "RegimeAdjustmentConfig",
+    "RegimeCalibrationProvider",
+    "RepositoryRegimeCalibrationProvider",
+    "StaticRegimeCalibrationProvider",
 ]

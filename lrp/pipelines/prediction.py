@@ -31,9 +31,14 @@ from lrp.regimes import (
     RegimeFeatureExtractor as GlobalRegimeFeatureExtractor,
     RegimeStabilityPolicy as GlobalRegimeStabilityPolicy,
 )
+from lrp.regimes.calibration_repository import (
+    RegimeCalibrationRepository,
+)
 from lrp.regimes.integration import (
+    ActiveGlobalRegimeAdjustmentAdapter,
     GlobalRegimeAdjustmentAdapter,
     NoOpGlobalRegimeAdjustmentAdapter,
+    RepositoryRegimeCalibrationProvider,
 )
 from lrp.prediction import (
     ProbabilityFusionEngine,
@@ -368,6 +373,9 @@ class PredictionPipeline:
             GlobalRegimeAdjustmentAdapter[object]
             | None
         ) = None,
+        regime_calibration_snapshot_root: (
+            str | Path | None
+        ) = None,
     ) -> "PredictionPipeline":
         resolved_evolution = (
             EvolutionAdapterFactory.build(
@@ -378,11 +386,32 @@ class PredictionPipeline:
             )
         )
 
-        resolved_global_regime_adjustment = (
-            global_regime_adjustment
-            if global_regime_adjustment is not None
-            else NoOpGlobalRegimeAdjustmentAdapter()
-        )
+        if global_regime_adjustment is not None:
+            resolved_global_regime_adjustment = (
+                global_regime_adjustment
+            )
+        elif regime_calibration_snapshot_root is not None:
+            calibration_repository = (
+                RegimeCalibrationRepository(
+                    regime_calibration_snapshot_root
+                )
+            )
+            calibration_provider = (
+                RepositoryRegimeCalibrationProvider(
+                    calibration_repository
+                )
+            )
+            resolved_global_regime_adjustment = (
+                ActiveGlobalRegimeAdjustmentAdapter(
+                    calibration_provider=(
+                        calibration_provider
+                    )
+                )
+            )
+        else:
+            resolved_global_regime_adjustment = (
+                NoOpGlobalRegimeAdjustmentAdapter()
+            )
 
         return cls(
             statistics=StatisticsAdapter.load(),

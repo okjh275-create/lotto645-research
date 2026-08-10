@@ -187,3 +187,67 @@ def test_pipeline_load_accepts_active_global_regime_adapter() -> None:
         pipeline.global_regime_adjustment
         is adapter
     )
+
+def test_pipeline_load_defaults_to_noop_global_regime_adjustment() -> None:
+    from lrp.regimes.integration import (
+        NoOpGlobalRegimeAdjustmentAdapter,
+    )
+
+    pipeline = PredictionPipeline.load()
+
+    assert isinstance(
+        pipeline.global_regime_adjustment,
+        NoOpGlobalRegimeAdjustmentAdapter,
+    )
+
+
+def test_pipeline_load_builds_repository_backed_active_adjustment(
+    tmp_path,
+) -> None:
+    from lrp.regimes.integration import (
+        ActiveGlobalRegimeAdjustmentAdapter,
+        RepositoryRegimeCalibrationProvider,
+    )
+
+    root = tmp_path / "regime-calibration"
+
+    pipeline = PredictionPipeline.load(
+        regime_calibration_snapshot_root=root,
+    )
+
+    adapter = pipeline.global_regime_adjustment
+
+    assert isinstance(
+        adapter,
+        ActiveGlobalRegimeAdjustmentAdapter,
+    )
+    assert isinstance(
+        adapter.calibration_provider,
+        RepositoryRegimeCalibrationProvider,
+    )
+    assert (
+        adapter.calibration_provider.repository.root
+        == root
+    )
+
+
+def test_explicit_global_regime_adjustment_overrides_calibration_root(
+    tmp_path,
+) -> None:
+    from lrp.regimes.integration import (
+        NoOpGlobalRegimeAdjustmentAdapter,
+    )
+
+    explicit = NoOpGlobalRegimeAdjustmentAdapter()
+
+    pipeline = PredictionPipeline.load(
+        global_regime_adjustment=explicit,
+        regime_calibration_snapshot_root=(
+            tmp_path / "regime-calibration"
+        ),
+    )
+
+    assert (
+        pipeline.global_regime_adjustment
+        is explicit
+    )

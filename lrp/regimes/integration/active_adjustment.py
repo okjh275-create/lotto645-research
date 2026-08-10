@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from lrp.regimes.integration.calibration_provider import (
+    RegimeCalibrationProvider,
+)
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +152,9 @@ class ActiveGlobalRegimeAdjustmentAdapter:
     def __init__(
         self,
         config: RegimeAdjustmentConfig | None = None,
+        calibration_provider: (
+            RegimeCalibrationProvider | None
+        ) = None,
     ) -> None:
         self._config = (
             config
@@ -163,9 +170,31 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                 "config must be a RegimeAdjustmentConfig"
             )
 
+        if (
+            calibration_provider is not None
+            and not isinstance(
+                calibration_provider,
+                RegimeCalibrationProvider,
+            )
+        ):
+            raise TypeError(
+                "calibration_provider must implement "
+                "RegimeCalibrationProvider"
+            )
+
+        self._calibration_provider = (
+            calibration_provider
+        )
+
     @property
     def config(self) -> RegimeAdjustmentConfig:
         return self._config
+
+    @property
+    def calibration_provider(
+        self,
+    ) -> RegimeCalibrationProvider | None:
+        return self._calibration_provider
 
     def adjust(
         self,
@@ -215,6 +244,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
         multipliers = self._multipliers(
             probability_vector,
             global_regime,
+            round_no=round_no,
         )
 
         return ProbabilityVectorAdjuster.adjust(
@@ -226,6 +256,8 @@ class ActiveGlobalRegimeAdjustmentAdapter:
         self,
         probability_vector: object,
         global_regime: object,
+        *,
+        round_no: int,
     ) -> dict[int, float]:
         from lrp.prediction.probability import (
             ProbabilityVector,
@@ -253,6 +285,21 @@ class ActiveGlobalRegimeAdjustmentAdapter:
         regime = global_regime.primary
         confidence = global_regime.confidence
 
+        calibration_factor = 1.0
+
+        if self.calibration_provider is not None:
+            calibration = (
+                self.calibration_provider
+                .get_calibration(
+                    round_no=round_no
+                )
+            )
+
+            if calibration is not None:
+                calibration_factor = (
+                    calibration.get(regime)
+                )
+
         multipliers: dict[int, float] = {}
 
         for item in probability_vector.probabilities:
@@ -270,6 +317,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     .gap_recovery_max_boost
                     * confidence
                     * strength
+                    * calibration_factor
                 )
 
             elif regime == "cluster_rotation":
@@ -284,6 +332,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     .cluster_rotation_max_boost
                     * confidence
                     * strength
+                    * calibration_factor
                 )
 
             elif (
@@ -294,6 +343,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     self._config
                     .high_band_max_boost
                     * confidence
+                    * calibration_factor
                 )
 
             elif (
@@ -304,6 +354,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     self._config
                     .low_band_max_boost
                     * confidence
+                    * calibration_factor
                 )
 
             multipliers[item.number] = 1.0 + boost

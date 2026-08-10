@@ -269,3 +269,192 @@ def test_same_input_is_deterministic() -> None:
     )
 
     assert first.as_dict() == second.as_dict()
+
+
+def test_neutral_calibration_preserves_active_adjustment() -> None:
+    from lrp.evolution.contracts.regime_calibration import (
+        RegimeCalibration,
+    )
+    from lrp.regimes.integration.calibration_provider import (
+        StaticRegimeCalibrationProvider,
+    )
+
+    baseline = ActiveGlobalRegimeAdjustmentAdapter()
+    calibrated = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration.neutral()
+            )
+        )
+    )
+
+    vector = make_vector()
+    regime = make_regime(
+        "gap_recovery",
+        confidence=0.8,
+    )
+
+    baseline_result = baseline.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+    calibrated_result = calibrated.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+
+    assert calibrated_result == baseline_result
+
+
+def test_higher_calibration_strengthens_regime_adjustment() -> None:
+    from lrp.evolution.contracts.regime_calibration import (
+        RegimeCalibration,
+    )
+    from lrp.regimes.integration.calibration_provider import (
+        StaticRegimeCalibrationProvider,
+    )
+
+    neutral = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration.neutral()
+            )
+        )
+    )
+    stronger = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration(
+                    gap_recovery=1.20,
+                )
+            )
+        )
+    )
+
+    vector = make_vector()
+    regime = make_regime(
+        "gap_recovery",
+        confidence=0.8,
+    )
+
+    neutral_result = neutral.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+    stronger_result = stronger.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+
+    assert (
+        stronger_result.get(45).raw_score
+        > neutral_result.get(45).raw_score
+    )
+
+
+def test_lower_calibration_weakens_regime_adjustment() -> None:
+    from lrp.evolution.contracts.regime_calibration import (
+        RegimeCalibration,
+    )
+    from lrp.regimes.integration.calibration_provider import (
+        StaticRegimeCalibrationProvider,
+    )
+
+    neutral = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration.neutral()
+            )
+        )
+    )
+    weaker = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration(
+                    gap_recovery=0.80,
+                )
+            )
+        )
+    )
+
+    vector = make_vector()
+    regime = make_regime(
+        "gap_recovery",
+        confidence=0.8,
+    )
+
+    neutral_result = neutral.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+    weaker_result = weaker.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+
+    assert (
+        weaker_result.get(45).raw_score
+        < neutral_result.get(45).raw_score
+    )
+
+
+def test_unrelated_calibration_does_not_change_current_regime() -> None:
+    from lrp.evolution.contracts.regime_calibration import (
+        RegimeCalibration,
+    )
+    from lrp.regimes.integration.calibration_provider import (
+        StaticRegimeCalibrationProvider,
+    )
+
+    neutral = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration.neutral()
+            )
+        )
+    )
+    unrelated = ActiveGlobalRegimeAdjustmentAdapter(
+        calibration_provider=(
+            StaticRegimeCalibrationProvider(
+                RegimeCalibration(
+                    gap_recovery=1.0,
+                    cluster_rotation=1.20,
+                    high_band_expansion=0.80,
+                    low_band_expansion=1.10,
+                )
+            )
+        )
+    )
+
+    vector = make_vector()
+    regime = make_regime(
+        "gap_recovery",
+        confidence=0.8,
+    )
+
+    neutral_result = neutral.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+    unrelated_result = unrelated.adjust(
+        vector,
+        global_regime=regime,
+        round_no=1221,
+        seed=20260810,
+    )
+
+    assert unrelated_result == neutral_result
