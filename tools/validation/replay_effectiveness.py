@@ -336,6 +336,50 @@ def load_replay_rows(
                         ]
                     )
                 ),
+                regime_calibration_revision=(
+                    None
+                    if payload.get(
+                        "regime_calibration_revision"
+                    ) is None
+                    else int(
+                        payload[
+                            "regime_calibration_revision"
+                        ]
+                    )
+                ),
+                regime_calibration_sample_size=(
+                    None
+                    if payload.get(
+                        "regime_calibration_sample_size"
+                    ) is None
+                    else int(
+                        payload[
+                            "regime_calibration_sample_size"
+                        ]
+                    )
+                ),
+                regime_bayesian_revision=(
+                    None
+                    if payload.get(
+                        "regime_bayesian_revision"
+                    ) is None
+                    else int(
+                        payload[
+                            "regime_bayesian_revision"
+                        ]
+                    )
+                ),
+                regime_bayesian_sample_size=(
+                    None
+                    if payload.get(
+                        "regime_bayesian_sample_size"
+                    ) is None
+                    else int(
+                        payload[
+                            "regime_bayesian_sample_size"
+                        ]
+                    )
+                ),
                 elapsed_seconds=float(
                     payload["elapsed_seconds"]
                 ),

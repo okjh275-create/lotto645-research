@@ -159,7 +159,12 @@ class ReplayRoundResult:
     profile_revision: int | None
     profile_sample_size: int | None
 
-    elapsed_seconds: float
+    regime_calibration_revision: int | None = None
+    regime_calibration_sample_size: int | None = None
+    regime_bayesian_revision: int | None = None
+    regime_bayesian_sample_size: int | None = None
+
+    elapsed_seconds: float = 0.0
 
     def __post_init__(self) -> None:
         if self.round_no <= 1:
@@ -221,6 +226,10 @@ class ReplayRoundResult:
         for name in (
             "profile_revision",
             "profile_sample_size",
+            "regime_calibration_revision",
+            "regime_calibration_sample_size",
+            "regime_bayesian_revision",
+            "regime_bayesian_sample_size",
         ):
             value = getattr(self, name)
 

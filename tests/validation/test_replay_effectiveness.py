@@ -193,3 +193,48 @@ def test_duplicate_rounds_are_rejected() -> None:
         evaluate_effectiveness(
             (row, row)
         )
+
+
+def test_load_replay_rows_preserves_regime_learning_provenance(
+    tmp_path: Path,
+) -> None:
+    row = ReplayRoundResult(
+        round_no=1223,
+        seed=20262025,
+        history_draws=600,
+        noop_best_hits=2,
+        adaptive_best_hits=3,
+        noop_practical_hits=1,
+        adaptive_practical_hits=2,
+        noop_avg_jaccard=0.08,
+        adaptive_avg_jaccard=0.09,
+        probability_l1_delta=0.002,
+        probability_max_delta=0.0002,
+        changed_probability_count=45,
+        changed_set_count=5,
+        profile_applied=True,
+        profile_revision=2,
+        profile_sample_size=40,
+        regime_calibration_revision=1,
+        regime_calibration_sample_size=10,
+        regime_bayesian_revision=1,
+        regime_bayesian_sample_size=10,
+        elapsed_seconds=2.0,
+    )
+
+    path = tmp_path / "replay.jsonl"
+    path.write_text(
+        json.dumps(row.as_dict()) + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_replay_rows(path)
+
+    assert loaded == (row,)
+
+    restored = loaded[0]
+
+    assert restored.regime_calibration_revision == 1
+    assert restored.regime_calibration_sample_size == 10
+    assert restored.regime_bayesian_revision == 1
+    assert restored.regime_bayesian_sample_size == 10

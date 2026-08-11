@@ -197,3 +197,77 @@ def test_replay_regime_updater_uses_adaptive_learning_rate(
         updater.learning_rate_policy,
         AdaptiveLearningRatePolicy,
     )
+
+def test_executor_can_enable_regime_bayesian_root(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "regime-bayesian"
+
+    executor = HistoricalReplayExecutor(
+        history=(object(),),
+        config=ReplayConfig(
+            start_round=1132,
+            end_round=1231,
+            seed_base=20260802,
+            candidate_count=1000,
+            top_k=20,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_bayesian_root=root,
+    )
+
+    assert executor.regime_bayesian_root == root
+
+
+def test_learning_service_uses_regime_bayesian_repository(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    root = tmp_path / "regime-bayesian"
+
+    executor = HistoricalReplayExecutor(
+        history=(object(),),
+        config=ReplayConfig(
+            start_round=1132,
+            end_round=1231,
+            seed_base=20260802,
+            candidate_count=1000,
+            top_k=20,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_bayesian_root=root,
+    )
+
+    service = executor._build_learning_service()
+
+    assert isinstance(
+        service.regime_reward_calculator,
+        RegimeRewardCalculator,
+    )
+    assert isinstance(
+        service.regime_bayesian_updater,
+        RegimeBayesianUpdater,
+    )
+    assert isinstance(
+        service.regime_bayesian_repository,
+        RegimeBayesianRepository,
+    )
+    assert (
+        service.regime_bayesian_repository.root
+        == root
+    )

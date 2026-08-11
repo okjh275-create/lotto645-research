@@ -200,3 +200,302 @@ def test_two_round_replay_applies_previous_round_calibration_only(
     ]
 
     assert 1 in load_observations[2:]
+
+
+def test_replay_round_exposes_applied_regime_learning_revisions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeFeatureExtractor",
+        lambda: FixedFeatureExtractor(),
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeStabilityPolicy",
+        lambda: FixedStabilityPolicy(),
+    )
+
+    history = make_history()
+    by_round = {
+        row.round_no: row
+        for row in history
+    }
+
+    executor = HistoricalReplayExecutor(
+        history=history,
+        config=ReplayConfig(
+            start_round=1222,
+            end_round=1223,
+            candidate_count=100,
+            top_k=10,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_calibration_root=(
+            tmp_path / "regime-calibration"
+        ),
+        regime_bayesian_root=(
+            tmp_path / "regime-bayesian"
+        ),
+    )
+
+    state = None
+
+    first, state = executor(
+        1222,
+        executor.config.seed_for_round(1222),
+        by_round[1222],
+        state,
+    )
+
+    second, state = executor(
+        1223,
+        executor.config.seed_for_round(1223),
+        by_round[1223],
+        state,
+    )
+
+    assert first.regime_calibration_revision is None
+    assert first.regime_calibration_sample_size is None
+    assert first.regime_bayesian_revision is None
+    assert first.regime_bayesian_sample_size is None
+
+    assert second.regime_calibration_revision == 1
+    assert second.regime_calibration_sample_size == 10
+    assert second.regime_bayesian_revision == 1
+    assert second.regime_bayesian_sample_size == 10
+
+
+
+def test_two_round_replay_applies_previous_round_bayesian_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianNotFoundError,
+        RegimeBayesianRepository,
+    )
+
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeFeatureExtractor",
+        lambda: FixedFeatureExtractor(),
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeStabilityPolicy",
+        lambda: FixedStabilityPolicy(),
+    )
+
+    load_observations: list[int | None] = []
+
+    original_load_latest = (
+        RegimeBayesianRepository.load_latest
+    )
+
+    def observed_load_latest(
+        repository: RegimeBayesianRepository,
+        *,
+        skip_corrupt: bool = True,
+    ):
+        try:
+            snapshot = original_load_latest(
+                repository,
+                skip_corrupt=skip_corrupt,
+            )
+        except RegimeBayesianNotFoundError:
+            load_observations.append(None)
+            raise
+
+        load_observations.append(
+            snapshot.revision
+        )
+        return snapshot
+
+    monkeypatch.setattr(
+        RegimeBayesianRepository,
+        "load_latest",
+        observed_load_latest,
+    )
+
+    history = make_history()
+    by_round = {
+        row.round_no: row
+        for row in history
+    }
+
+    regime_root = (
+        tmp_path / "regime-bayesian"
+    )
+
+    executor = HistoricalReplayExecutor(
+        history=history,
+        config=ReplayConfig(
+            start_round=1222,
+            end_round=1223,
+            candidate_count=100,
+            top_k=10,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_bayesian_root=regime_root,
+    )
+
+    first_row, first_state = executor(
+        1222,
+        executor.config.seed_for_round(1222),
+        by_round[1222],
+        None,
+    )
+
+    repository = RegimeBayesianRepository(
+        regime_root
+    )
+
+    assert first_row.round_no == 1222
+    assert repository.revisions() == (1,)
+
+    second_row, second_state = executor(
+        1223,
+        executor.config.seed_for_round(1223),
+        by_round[1223],
+        first_state,
+    )
+
+    assert second_row.round_no == 1223
+    assert second_state is not None
+    assert repository.revisions() == (
+        1,
+        2,
+    )
+
+    assert load_observations[:2] == [
+        None,
+        None,
+    ]
+
+    assert 1 in load_observations[2:]
+
+
+def test_two_round_replay_combines_previous_calibration_and_bayesian(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeFeatureExtractor",
+        lambda: FixedFeatureExtractor(),
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeStabilityPolicy",
+        lambda: FixedStabilityPolicy(),
+    )
+
+    history = make_history()
+    by_round = {
+        row.round_no: row
+        for row in history
+    }
+
+    calibration_root = (
+        tmp_path / "regime-calibration"
+    )
+    bayesian_root = (
+        tmp_path / "regime-bayesian"
+    )
+
+    executor = HistoricalReplayExecutor(
+        history=history,
+        config=ReplayConfig(
+            start_round=1222,
+            end_round=1223,
+            candidate_count=100,
+            top_k=10,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_calibration_root=(
+            calibration_root
+        ),
+        regime_bayesian_root=(
+            bayesian_root
+        ),
+    )
+
+    first_row, first_state = executor(
+        1222,
+        executor.config.seed_for_round(1222),
+        by_round[1222],
+        None,
+    )
+
+    calibration_repository = (
+        RegimeCalibrationRepository(
+            calibration_root
+        )
+    )
+    bayesian_repository = (
+        RegimeBayesianRepository(
+            bayesian_root
+        )
+    )
+
+    assert first_row.round_no == 1222
+    assert (
+        calibration_repository.revisions()
+        == (1,)
+    )
+    assert (
+        bayesian_repository.revisions()
+        == (1,)
+    )
+
+    second_row, second_state = executor(
+        1223,
+        executor.config.seed_for_round(1223),
+        by_round[1223],
+        first_state,
+    )
+
+    assert second_row.round_no == 1223
+    assert second_state is not None
+
+    assert (
+        calibration_repository.revisions()
+        == (1, 2)
+    )
+    assert (
+        bayesian_repository.revisions()
+        == (1, 2)
+    )
+
+    calibration_latest = (
+        calibration_repository.load_latest()
+    )
+    bayesian_latest = (
+        bayesian_repository.load_latest()
+    )
+
+    assert calibration_latest.revision == 2
+    assert bayesian_latest.revision == 2
+
+    assert (
+        calibration_latest.sample_size
+        == bayesian_latest.sample_size
+    )

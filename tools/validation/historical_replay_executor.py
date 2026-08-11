@@ -39,6 +39,12 @@ from lrp.evolution.services.review_profile_evolution_service import (
     ReviewProfileEvolutionService,
 )
 from lrp.evolution.storage import SnapshotRepository
+from lrp.regimes.bayesian_repository import (
+    RegimeBayesianRepository,
+)
+from lrp.regimes.bayesian_updater import (
+    RegimeBayesianUpdater,
+)
 from lrp.regimes.calibration_repository import (
     RegimeCalibrationRepository,
 )
@@ -86,6 +92,7 @@ class HistoricalReplayExecutor:
     learning_root: Path
     profile_root: Path
     regime_calibration_root: Path | None = None
+    regime_bayesian_root: Path | None = None
     policy: str = "thompson"
     adaptive_calculator: (
         AdaptiveWeightCalculator | None
@@ -179,10 +186,80 @@ class HistoricalReplayExecutor:
         noop_pipeline = PredictionPipeline.load(
             evolution=NoOpEvolutionWeightAdapter()
         )
+        applied_calibration_revision = None
+        applied_calibration_sample_size = None
+        applied_bayesian_revision = None
+        applied_bayesian_sample_size = None
+
+        if self.regime_calibration_root is not None:
+            try:
+                snapshot = (
+                    RegimeCalibrationRepository(
+                        self.regime_calibration_root
+                    ).load_latest()
+                )
+            except Exception as exc:
+                from lrp.regimes.calibration_repository import (
+                    RegimeCalibrationNotFoundError,
+                )
+                from lrp.regimes.calibration_serializer import (
+                    RegimeCalibrationSerializationError,
+                )
+
+                if not isinstance(
+                    exc,
+                    (
+                        RegimeCalibrationNotFoundError,
+                        RegimeCalibrationSerializationError,
+                    ),
+                ):
+                    raise
+            else:
+                applied_calibration_revision = (
+                    snapshot.revision
+                )
+                applied_calibration_sample_size = (
+                    snapshot.sample_size
+                )
+
+        if self.regime_bayesian_root is not None:
+            try:
+                snapshot = (
+                    RegimeBayesianRepository(
+                        self.regime_bayesian_root
+                    ).load_latest()
+                )
+            except Exception as exc:
+                from lrp.regimes.bayesian_repository import (
+                    RegimeBayesianNotFoundError,
+                )
+                from lrp.regimes.bayesian_serializer import (
+                    RegimeBayesianSerializationError,
+                )
+
+                if not isinstance(
+                    exc,
+                    (
+                        RegimeBayesianNotFoundError,
+                        RegimeBayesianSerializationError,
+                    ),
+                ):
+                    raise
+            else:
+                applied_bayesian_revision = (
+                    snapshot.revision
+                )
+                applied_bayesian_sample_size = (
+                    snapshot.sample_size
+                )
+
         adaptive_pipeline = PredictionPipeline.load(
             evolution_snapshot_root=self.profile_root,
             regime_calibration_snapshot_root=(
                 self.regime_calibration_root
+            ),
+            regime_bayesian_snapshot_root=(
+                self.regime_bayesian_root
             ),
         )
 
@@ -324,6 +401,18 @@ class HistoricalReplayExecutor:
                 if evolution.decision.applied
                 else None
             ),
+            regime_calibration_revision=(
+                applied_calibration_revision
+            ),
+            regime_calibration_sample_size=(
+                applied_calibration_sample_size
+            ),
+            regime_bayesian_revision=(
+                applied_bayesian_revision
+            ),
+            regime_bayesian_sample_size=(
+                applied_bayesian_sample_size
+            ),
             elapsed_seconds=(
                 perf_counter() - started
             ),
@@ -372,8 +461,38 @@ class HistoricalReplayExecutor:
         runner = PersistentLearningRunner(
             persistence
         )
-        if self.regime_calibration_root is None:
+        if (
+            self.regime_calibration_root is None
+            and self.regime_bayesian_root is None
+        ):
             return ReviewLearningService(runner)
+
+        calibration_updater = None
+        calibration_repository = None
+        bayesian_updater = None
+        bayesian_repository = None
+
+        if self.regime_calibration_root is not None:
+            calibration_updater = (
+                RegimeCalibrationUpdater(
+                    learning_rate_policy=(
+                        AdaptiveLearningRatePolicy()
+                    )
+                )
+            )
+            calibration_repository = (
+                RegimeCalibrationRepository(
+                    self.regime_calibration_root
+                )
+            )
+
+        if self.regime_bayesian_root is not None:
+            bayesian_updater = RegimeBayesianUpdater()
+            bayesian_repository = (
+                RegimeBayesianRepository(
+                    self.regime_bayesian_root
+                )
+            )
 
         return ReviewLearningService(
             runner,
@@ -381,16 +500,16 @@ class HistoricalReplayExecutor:
                 RegimeRewardCalculator()
             ),
             regime_calibration_updater=(
-                RegimeCalibrationUpdater(
-                    learning_rate_policy=(
-                        AdaptiveLearningRatePolicy()
-                    )
-                )
+                calibration_updater
             ),
             regime_calibration_repository=(
-                RegimeCalibrationRepository(
-                    self.regime_calibration_root
-                )
+                calibration_repository
+            ),
+            regime_bayesian_updater=(
+                bayesian_updater
+            ),
+            regime_bayesian_repository=(
+                bayesian_repository
             ),
         )
 
