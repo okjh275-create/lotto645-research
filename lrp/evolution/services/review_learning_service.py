@@ -22,6 +22,16 @@ from lrp.evolution.integration.prediction_reward_mapper import (
 from lrp.evolution.services.persistent_learning_runner import (
     PersistentLearningRunner,
 )
+from lrp.regimes.bayesian_repository import (
+    RegimeBayesianNotFoundError,
+    RegimeBayesianRepository,
+)
+from lrp.regimes.bayesian_state import (
+    RegimeBayesianState,
+)
+from lrp.regimes.bayesian_updater import (
+    RegimeBayesianUpdater,
+)
 from lrp.regimes.calibration_repository import (
     RegimeCalibrationNotFoundError,
     RegimeCalibrationRepository,
@@ -29,6 +39,7 @@ from lrp.regimes.calibration_repository import (
 from lrp.regimes.calibration_updater import (
     RegimeCalibrationUpdater,
 )
+from lrp.regimes.reward import RegimeReward
 from lrp.regimes.reward_calculator import (
     RegimeRewardCalculator,
 )
@@ -51,6 +62,12 @@ class ReviewLearningService:
         ) = None,
         regime_calibration_repository: (
             RegimeCalibrationRepository | None
+        ) = None,
+        regime_bayesian_updater: (
+            RegimeBayesianUpdater | None
+        ) = None,
+        regime_bayesian_repository: (
+            RegimeBayesianRepository | None
         ) = None,
     ) -> None:
         if not isinstance(
@@ -122,6 +139,30 @@ class ReviewLearningService:
                 "RegimeCalibrationRepository"
             )
 
+        if (
+            regime_bayesian_updater is not None
+            and not isinstance(
+                regime_bayesian_updater,
+                RegimeBayesianUpdater,
+            )
+        ):
+            raise TypeError(
+                "regime_bayesian_updater must be a "
+                "RegimeBayesianUpdater"
+            )
+
+        if (
+            regime_bayesian_repository is not None
+            and not isinstance(
+                regime_bayesian_repository,
+                RegimeBayesianRepository,
+            )
+        ):
+            raise TypeError(
+                "regime_bayesian_repository must be a "
+                "RegimeBayesianRepository"
+            )
+
         self._runner = runner
         self._reward_mapper = (
             reward_mapper
@@ -141,6 +182,12 @@ class ReviewLearningService:
         )
         self._regime_calibration_repository = (
             regime_calibration_repository
+        )
+        self._regime_bayesian_updater = (
+            regime_bayesian_updater
+        )
+        self._regime_bayesian_repository = (
+            regime_bayesian_repository
         )
 
     @property
@@ -164,6 +211,18 @@ class ReviewLearningService:
         self,
     ) -> RegimeCalibrationRepository | None:
         return self._regime_calibration_repository
+
+    @property
+    def regime_bayesian_updater(
+        self,
+    ) -> RegimeBayesianUpdater | None:
+        return self._regime_bayesian_updater
+
+    @property
+    def regime_bayesian_repository(
+        self,
+    ) -> RegimeBayesianRepository | None:
+        return self._regime_bayesian_repository
 
     @property
     def reward_mapper(
@@ -380,16 +439,44 @@ class ReviewLearningService:
             overwrite=overwrite,
         )
 
-        self._apply_regime_learning(
+        regime_reward = self._calculate_regime_reward(
             reward_vector=reward_vector,
             global_regime=global_regime,
-            review_set_count=review_set_count,
         )
+
+        if regime_reward is not None:
+            self._apply_regime_calibration_learning(
+                regime_reward=regime_reward,
+                review_set_count=review_set_count,
+            )
+            self._apply_regime_bayesian_learning(
+                regime_reward=regime_reward,
+                review_set_count=review_set_count,
+            )
 
         return ReviewLearningResult(
             run_result=run_result,
             feedback_count=len(feedbacks),
             policy=policy,
+        )
+
+    def _calculate_regime_reward(
+        self,
+        *,
+        reward_vector: object,
+        global_regime: Mapping[str, Any] | None,
+    ) -> RegimeReward | None:
+        calculator = self.regime_reward_calculator
+
+        if (
+            calculator is None
+            or global_regime is None
+        ):
+            return None
+
+        return calculator.calculate(
+            reward_vector,
+            global_regime=global_regime,
         )
 
     def _apply_regime_learning(
@@ -399,22 +486,41 @@ class ReviewLearningService:
         global_regime: Mapping[str, Any] | None,
         review_set_count: int,
     ) -> dict[str, Any] | None:
-        calculator = self.regime_reward_calculator
+        regime_reward = self._calculate_regime_reward(
+            reward_vector=reward_vector,
+            global_regime=global_regime,
+        )
+
+        if regime_reward is None:
+            return None
+
+        return self._apply_regime_calibration_learning(
+            regime_reward=regime_reward,
+            review_set_count=review_set_count,
+        )
+
+    def _apply_regime_calibration_learning(
+        self,
+        *,
+        regime_reward: RegimeReward,
+        review_set_count: int,
+    ) -> dict[str, Any] | None:
         updater = self.regime_calibration_updater
         repository = self.regime_calibration_repository
 
         if (
-            calculator is None
-            or updater is None
+            updater is None
             or repository is None
-            or global_regime is None
         ):
             return None
 
-        regime_reward = calculator.calculate(
-            reward_vector,
-            global_regime=global_regime,
-        )
+        if not isinstance(
+            regime_reward,
+            RegimeReward,
+        ):
+            raise TypeError(
+                "regime_reward must be a RegimeReward"
+            )
 
         try:
             previous = repository.load_latest()
@@ -465,6 +571,66 @@ class ReviewLearningService:
                 regime_reward.effective_reward
             ),
         }
+
+    def _apply_regime_bayesian_learning(
+        self,
+        *,
+        regime_reward: RegimeReward,
+        review_set_count: int,
+    ) -> dict[str, Any] | None:
+        updater = self.regime_bayesian_updater
+        repository = self.regime_bayesian_repository
+
+        if (
+            updater is None
+            or repository is None
+        ):
+            return None
+
+        if not isinstance(
+            regime_reward,
+            RegimeReward,
+        ):
+            raise TypeError(
+                "regime_reward must be a RegimeReward"
+            )
+
+        try:
+            previous = repository.load_latest()
+        except RegimeBayesianNotFoundError:
+            current_state = (
+                RegimeBayesianState.default()
+            )
+            next_revision = 1
+            previous_sample_size = 0
+        else:
+            current_state = previous.state
+            next_revision = previous.revision + 1
+            previous_sample_size = (
+                previous.sample_size
+            )
+
+        updated_state = updater.update(
+            current_state,
+            regime_reward,
+        )
+
+        snapshot = repository.save(
+            updated_state,
+            revision=next_revision,
+            sample_size=(
+                previous_sample_size
+                + review_set_count
+            ),
+        )
+
+        return {
+            "applied": True,
+            "revision": snapshot.revision,
+            "sample_size": snapshot.sample_size,
+            "regime": regime_reward.regime,
+        }
+
     @staticmethod
     def _global_regime_metadata(
         *,

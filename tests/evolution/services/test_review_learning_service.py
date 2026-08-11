@@ -1205,3 +1205,354 @@ def test_regime_learning_adaptive_rate_reduces_mature_update(
     assert first_delta > 0.0
     assert second_delta > 0.0
     assert second_delta < first_delta
+
+def test_review_learning_service_accepts_bayesian_dependencies(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+
+    updater = RegimeBayesianUpdater()
+    repository = RegimeBayesianRepository(
+        tmp_path / "regime-bayesian"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_bayesian_updater=updater,
+        regime_bayesian_repository=repository,
+    )
+
+    assert service.regime_bayesian_updater is updater
+    assert (
+        service.regime_bayesian_repository
+        is repository
+    )
+
+
+def test_apply_regime_bayesian_learning_creates_first_snapshot(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.reward import RegimeReward
+
+    repository = RegimeBayesianRepository(
+        tmp_path / "regime-bayesian"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_bayesian_updater=(
+            RegimeBayesianUpdater()
+        ),
+        regime_bayesian_repository=repository,
+    )
+
+    result = service._apply_regime_bayesian_learning(
+        regime_reward=RegimeReward(
+            regime="gap_recovery",
+            reward=0.8,
+            confidence=1.0,
+            sample_weight=1.0,
+        ),
+        review_set_count=10,
+    )
+
+    assert result is not None
+    assert result["applied"] is True
+    assert result["revision"] == 1
+    assert result["sample_size"] == 10
+    assert result["regime"] == "gap_recovery"
+
+    snapshot = repository.load_latest()
+
+    assert snapshot.revision == 1
+    assert snapshot.sample_size == 10
+
+    posterior = snapshot.state.posteriors[
+        "gap_recovery"
+    ]
+
+    assert posterior.alpha > 1.0
+    assert posterior.beta == 1.0
+
+
+def test_apply_regime_bayesian_learning_increments_revision(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.reward import RegimeReward
+
+    repository = RegimeBayesianRepository(
+        tmp_path / "regime-bayesian"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_bayesian_updater=(
+            RegimeBayesianUpdater()
+        ),
+        regime_bayesian_repository=repository,
+    )
+
+    reward = RegimeReward(
+        regime="gap_recovery",
+        reward=0.8,
+        confidence=1.0,
+        sample_weight=1.0,
+    )
+
+    service._apply_regime_bayesian_learning(
+        regime_reward=reward,
+        review_set_count=10,
+    )
+
+    result = service._apply_regime_bayesian_learning(
+        regime_reward=reward,
+        review_set_count=5,
+    )
+
+    assert result is not None
+    assert result["revision"] == 2
+    assert result["sample_size"] == 15
+    assert repository.revisions() == (1, 2)
+
+
+def test_apply_regime_bayesian_learning_disabled_without_dependencies(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.reward import RegimeReward
+
+    service = make_service(tmp_path)
+
+    result = service._apply_regime_bayesian_learning(
+        regime_reward=RegimeReward(
+            regime="gap_recovery",
+            reward=0.8,
+            confidence=1.0,
+            sample_weight=1.0,
+        ),
+        review_set_count=10,
+    )
+
+    assert result is None
+
+
+def test_learn_persists_regime_calibration_and_bayesian(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    calibration_repository = (
+        RegimeCalibrationRepository(
+            tmp_path / "regime-calibration"
+        )
+    )
+    bayesian_repository = (
+        RegimeBayesianRepository(
+            tmp_path / "regime-bayesian"
+        )
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=(
+            calibration_repository
+        ),
+        regime_bayesian_updater=(
+            RegimeBayesianUpdater()
+        ),
+        regime_bayesian_repository=(
+            bayesian_repository
+        ),
+    )
+
+    review = make_review()
+    review["prediction_metadata"] = {
+        "global_regime": {
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+            "secondary": None,
+            "secondary_confidence": None,
+            "scores": {
+                "gap_recovery": 1.0,
+            },
+            "features": {
+                "average_gap_reversion": 0.8,
+            },
+            "mode": "active",
+        }
+    }
+
+    result = service.learn(
+        context=make_context(),
+        review_payload=review,
+        snapshot_id="review-1220",
+        policy="thompson",
+    )
+
+    assert result.snapshot_id == "review-1220"
+
+    calibration_snapshot = (
+        calibration_repository.load_latest()
+    )
+    bayesian_snapshot = (
+        bayesian_repository.load_latest()
+    )
+
+    assert calibration_snapshot.revision == 1
+    assert calibration_snapshot.sample_size == 10
+
+    assert bayesian_snapshot.revision == 1
+    assert bayesian_snapshot.sample_size == 10
+
+    assert (
+        calibration_snapshot
+        .calibration
+        .gap_recovery
+        > 1.0
+    )
+
+    posterior = bayesian_snapshot.state.posteriors[
+        "gap_recovery"
+    ]
+
+    assert posterior.alpha > 1.0
+    assert posterior.beta == 1.0
+
+    assert (
+        bayesian_snapshot.state.posteriors[
+            "cluster_rotation"
+        ].alpha
+        == 1.0
+    )
+    assert (
+        bayesian_snapshot.state.posteriors[
+            "cluster_rotation"
+        ].beta
+        == 1.0
+    )
+
+
+def test_review_learning_service_defaults_bayesian_dependencies_to_none(
+    tmp_path: Path,
+) -> None:
+    service = make_service(tmp_path)
+
+    assert service.regime_bayesian_updater is None
+    assert service.regime_bayesian_repository is None
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "regime_bayesian_updater",
+        "regime_bayesian_repository",
+    ],
+)
+def test_review_learning_service_rejects_invalid_bayesian_dependency(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(tmp_path),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    with pytest.raises(
+        TypeError,
+        match=field_name,
+    ):
+        ReviewLearningService(
+            runner,
+            **{
+                field_name: object(),
+            },
+        )
