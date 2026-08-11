@@ -9,6 +9,9 @@ from lrp.regimes.calibration_repository import (
     RegimeCalibrationNotFoundError,
     RegimeCalibrationRepository,
 )
+from lrp.regimes.calibration_serializer import (
+    RegimeCalibrationSerializationError,
+)
 
 
 @runtime_checkable
@@ -107,7 +110,10 @@ class RepositoryRegimeCalibrationProvider:
 
         try:
             snapshot = self.repository.load_latest()
-        except RegimeCalibrationNotFoundError:
+        except (
+            RegimeCalibrationNotFoundError,
+            RegimeCalibrationSerializationError,
+        ):
             return None
 
         return snapshot.calibration

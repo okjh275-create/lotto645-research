@@ -154,3 +154,75 @@ def test_repository_provider_rejects_invalid_repository() -> None:
         RepositoryRegimeCalibrationProvider(
             object()  # type: ignore[arg-type]
         )
+def test_repository_provider_returns_none_when_all_snapshots_corrupt(
+    tmp_path,
+) -> None:
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    root = tmp_path / "regime-calibration"
+    root.mkdir(parents=True, exist_ok=True)
+
+    (
+        root / "revision-00000001.json"
+    ).write_text(
+        "{broken",
+        encoding="utf-8",
+    )
+
+    (
+        root / "revision-00000002.json"
+    ).write_text(
+        "{also-broken",
+        encoding="utf-8",
+    )
+
+    provider = RepositoryRegimeCalibrationProvider(
+        repository
+    )
+
+    assert (
+        provider.get_calibration(round_no=1221)
+        is None
+    )
+
+
+def test_repository_provider_falls_back_from_corrupt_latest(
+    tmp_path,
+) -> None:
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    expected = RegimeCalibration.neutral()
+
+    repository.save(
+        expected,
+        revision=1,
+        sample_size=10,
+        saved_at=datetime(
+            2026,
+            8,
+            11,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    (
+        tmp_path
+        / "regime-calibration"
+        / "revision-00000002.json"
+    ).write_text(
+        "{broken",
+        encoding="utf-8",
+    )
+
+    provider = RepositoryRegimeCalibrationProvider(
+        repository
+    )
+
+    assert (
+        provider.get_calibration(round_no=1221)
+        == expected
+    )

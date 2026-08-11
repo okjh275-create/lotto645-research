@@ -151,3 +151,76 @@ def test_bayesian_provider_rejects_invalid_round(
         provider.get_bayesian_state(
             round_no=round_no
         )
+
+def test_repository_bayesian_provider_returns_none_when_all_snapshots_corrupt(
+    tmp_path,
+) -> None:
+    repository = RegimeBayesianRepository(
+        tmp_path / "regime-bayesian"
+    )
+
+    root = tmp_path / "regime-bayesian"
+    root.mkdir(parents=True, exist_ok=True)
+
+    (
+        root / "revision-00000001.json"
+    ).write_text(
+        "{broken",
+        encoding="utf-8",
+    )
+
+    (
+        root / "revision-00000002.json"
+    ).write_text(
+        "{also-broken",
+        encoding="utf-8",
+    )
+
+    provider = RepositoryRegimeBayesianProvider(
+        repository
+    )
+
+    assert (
+        provider.get_bayesian_state(round_no=1220)
+        is None
+    )
+
+
+def test_repository_bayesian_provider_falls_back_from_corrupt_latest(
+    tmp_path,
+) -> None:
+    repository = RegimeBayesianRepository(
+        tmp_path / "regime-bayesian"
+    )
+
+    expected = RegimeBayesianState.default()
+
+    repository.save(
+        expected,
+        revision=1,
+        sample_size=10,
+        saved_at=datetime(
+            2026,
+            8,
+            11,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    (
+        tmp_path
+        / "regime-bayesian"
+        / "revision-00000002.json"
+    ).write_text(
+        "{broken",
+        encoding="utf-8",
+    )
+
+    provider = RepositoryRegimeBayesianProvider(
+        repository
+    )
+
+    assert (
+        provider.get_bayesian_state(round_no=1220)
+        == expected
+    )

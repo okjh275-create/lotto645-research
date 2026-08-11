@@ -6,6 +6,9 @@ from lrp.regimes.bayesian_repository import (
     RegimeBayesianNotFoundError,
     RegimeBayesianRepository,
 )
+from lrp.regimes.bayesian_serializer import (
+    RegimeBayesianSerializationError,
+)
 from lrp.regimes.bayesian_state import (
     RegimeBayesianState,
 )
@@ -107,7 +110,10 @@ class RepositoryRegimeBayesianProvider:
 
         try:
             snapshot = self.repository.load_latest()
-        except RegimeBayesianNotFoundError:
+        except (
+            RegimeBayesianNotFoundError,
+            RegimeBayesianSerializationError,
+        ):
             return None
 
         return snapshot.state
