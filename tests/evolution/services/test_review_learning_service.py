@@ -1102,3 +1102,106 @@ def test_learn_persists_regime_calibration_end_to_end(
         .low_band_expansion
         == 1.0
     )
+
+def test_regime_learning_adaptive_rate_reduces_mature_update(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.learning_rate import (
+        AdaptiveLearningRatePolicy,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    repository = RegimeCalibrationRepository(
+        tmp_path / "regime-calibration"
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+    runner = PersistentLearningRunner(
+        persistence
+    )
+
+    service = ReviewLearningService(
+        runner,
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater(
+                learning_rate_policy=(
+                    AdaptiveLearningRatePolicy()
+                )
+            )
+        ),
+        regime_calibration_repository=repository,
+    )
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.5,
+        practical_hit=0.2,
+        rank_quality=0.1,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    first = repository.load_revision(1)
+
+    service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "gap_recovery",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    second = repository.load_revision(2)
+
+    first_delta = (
+        first.calibration.gap_recovery
+        - 1.0
+    )
+
+    second_delta = (
+        second.calibration.gap_recovery
+        - first.calibration.gap_recovery
+    )
+
+    assert first.revision == 1
+    assert first.sample_size == 10
+
+    assert second.revision == 2
+    assert second.sample_size == 20
+
+    assert first_delta > 0.0
+    assert second_delta > 0.0
+    assert second_delta < first_delta

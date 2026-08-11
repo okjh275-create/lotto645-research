@@ -45,6 +45,9 @@ from lrp.regimes.calibration_repository import (
 from lrp.regimes.calibration_updater import (
     RegimeCalibrationUpdater,
 )
+from lrp.regimes.learning_rate import (
+    AdaptiveLearningRatePolicy,
+)
 from lrp.regimes.reward_calculator import (
     RegimeRewardCalculator,
 )
@@ -378,7 +381,11 @@ class HistoricalReplayExecutor:
                 RegimeRewardCalculator()
             ),
             regime_calibration_updater=(
-                RegimeCalibrationUpdater()
+                RegimeCalibrationUpdater(
+                    learning_rate_policy=(
+                        AdaptiveLearningRatePolicy()
+                    )
+                )
             ),
             regime_calibration_repository=(
                 RegimeCalibrationRepository(

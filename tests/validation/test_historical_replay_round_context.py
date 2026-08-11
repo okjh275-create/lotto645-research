@@ -162,3 +162,38 @@ def test_learning_service_keeps_regime_learning_disabled_by_default(
     assert service.regime_reward_calculator is None
     assert service.regime_calibration_updater is None
     assert service.regime_calibration_repository is None
+
+def test_replay_regime_updater_uses_adaptive_learning_rate(
+    tmp_path: Path,
+) -> None:
+    from lrp.regimes.learning_rate import (
+        AdaptiveLearningRatePolicy,
+    )
+
+    root = tmp_path / "regime-calibration"
+
+    executor = HistoricalReplayExecutor(
+        history=(object(),),
+        config=ReplayConfig(
+            start_round=1132,
+            end_round=1231,
+            seed_base=20260802,
+            candidate_count=1000,
+            top_k=20,
+            practical_k=5,
+            mode="fast",
+        ),
+        learning_root=tmp_path / "learning",
+        profile_root=tmp_path / "profiles",
+        regime_calibration_root=root,
+    )
+
+    service = executor._build_learning_service()
+
+    updater = service.regime_calibration_updater
+
+    assert updater is not None
+    assert isinstance(
+        updater.learning_rate_policy,
+        AdaptiveLearningRatePolicy,
+    )

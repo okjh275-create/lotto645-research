@@ -422,11 +422,15 @@ class ReviewLearningService:
             current_calibration = (
                 RegimeCalibration.neutral()
             )
+            previous_revision = 0
             next_revision = 1
             previous_sample_size = 0
         else:
             current_calibration = (
                 previous.calibration
+            )
+            previous_revision = (
+                previous.revision
             )
             next_revision = (
                 previous.revision + 1
@@ -438,6 +442,8 @@ class ReviewLearningService:
         updated_calibration = updater.update(
             current_calibration,
             regime_reward,
+            revision=previous_revision,
+            sample_size=previous_sample_size,
         )
 
         snapshot = repository.save(

@@ -5,6 +5,9 @@ from dataclasses import replace
 from lrp.evolution.contracts.regime_calibration import (
     RegimeCalibration,
 )
+from lrp.regimes.learning_rate import (
+    AdaptiveLearningRatePolicy,
+)
 from lrp.regimes.reward import RegimeReward
 
 
@@ -15,6 +18,9 @@ class RegimeCalibrationUpdater:
         self,
         *,
         learning_rate: float = 0.10,
+        learning_rate_policy: (
+            AdaptiveLearningRatePolicy | None
+        ) = None,
     ) -> None:
         if isinstance(learning_rate, bool):
             raise TypeError(
@@ -33,16 +39,40 @@ class RegimeCalibrationUpdater:
                 "learning_rate must be greater than 0 and less than or equal to 1"
             )
 
+        if (
+            learning_rate_policy is not None
+            and not isinstance(
+                learning_rate_policy,
+                AdaptiveLearningRatePolicy,
+            )
+        ):
+            raise TypeError(
+                "learning_rate_policy must be an "
+                "AdaptiveLearningRatePolicy or None"
+            )
+
         self._learning_rate = normalized
+        self._learning_rate_policy = (
+            learning_rate_policy
+        )
 
     @property
     def learning_rate(self) -> float:
         return self._learning_rate
 
+    @property
+    def learning_rate_policy(
+        self,
+    ) -> AdaptiveLearningRatePolicy | None:
+        return self._learning_rate_policy
+
     def update(
         self,
         calibration: RegimeCalibration,
         reward: RegimeReward,
+        *,
+        revision: int = 0,
+        sample_size: int = 0,
     ) -> RegimeCalibration:
         if not isinstance(
             calibration,
@@ -64,9 +94,21 @@ class RegimeCalibrationUpdater:
 
         current = calibration.get(regime)
 
+        effective_learning_rate = (
+            self.learning_rate
+        )
+
+        if self.learning_rate_policy is not None:
+            effective_learning_rate = (
+                self.learning_rate_policy.rate(
+                    revision=revision,
+                    sample_size=sample_size,
+                )
+            )
+
         updated = (
             current
-            + self.learning_rate
+            + effective_learning_rate
             * reward.effective_reward
         )
 
