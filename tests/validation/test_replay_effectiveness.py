@@ -19,11 +19,15 @@ from tools.validation.replay_effectiveness import (
 def make_row(
     *,
     round_no: int,
-    noop_best: int,
-    adaptive_best: int,
-    noop_practical: int,
-    adaptive_practical: int,
-    revision: int,
+    noop_best: int = 2,
+    adaptive_best: int = 3,
+    noop_practical: int = 1,
+    adaptive_practical: int = 2,
+    revision: int = 1,
+    regime_calibration_revision: int | None = None,
+    regime_calibration_sample_size: int | None = None,
+    regime_bayesian_revision: int | None = None,
+    regime_bayesian_sample_size: int | None = None,
 ) -> ReplayRoundResult:
     return ReplayRoundResult(
         round_no=round_no,
@@ -44,6 +48,18 @@ def make_row(
         profile_applied=True,
         profile_revision=revision,
         profile_sample_size=20 * revision,
+        regime_calibration_revision=(
+            regime_calibration_revision
+        ),
+        regime_calibration_sample_size=(
+            regime_calibration_sample_size
+        ),
+        regime_bayesian_revision=(
+            regime_bayesian_revision
+        ),
+        regime_bayesian_sample_size=(
+            regime_bayesian_sample_size
+        ),
         elapsed_seconds=2.0,
     )
 
@@ -238,3 +254,39 @@ def test_load_replay_rows_preserves_regime_learning_provenance(
     assert restored.regime_calibration_sample_size == 10
     assert restored.regime_bayesian_revision == 1
     assert restored.regime_bayesian_sample_size == 10
+
+
+def test_effectiveness_summary_exposes_regime_learning_provenance() -> None:
+    rows = (
+        make_row(
+            round_no=1222,
+            regime_calibration_revision=None,
+            regime_calibration_sample_size=None,
+            regime_bayesian_revision=None,
+            regime_bayesian_sample_size=None,
+        ),
+        make_row(
+            round_no=1223,
+            regime_calibration_revision=1,
+            regime_calibration_sample_size=10,
+            regime_bayesian_revision=1,
+            regime_bayesian_sample_size=10,
+        ),
+        make_row(
+            round_no=1224,
+            regime_calibration_revision=2,
+            regime_calibration_sample_size=20,
+            regime_bayesian_revision=2,
+            regime_bayesian_sample_size=20,
+        ),
+    )
+
+    summary = evaluate_effectiveness(rows)
+
+    assert summary.regime_calibration_applied_count == 2
+    assert summary.final_regime_calibration_revision == 2
+    assert summary.final_regime_calibration_sample_size == 20
+
+    assert summary.regime_bayesian_applied_count == 2
+    assert summary.final_regime_bayesian_revision == 2
+    assert summary.final_regime_bayesian_sample_size == 20

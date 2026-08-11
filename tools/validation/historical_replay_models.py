@@ -286,6 +286,14 @@ class ReplaySummary:
     final_profile_revision: int | None
     final_profile_sample_size: int | None
 
+    regime_calibration_applied_count: int
+    final_regime_calibration_revision: int | None
+    final_regime_calibration_sample_size: int | None
+
+    regime_bayesian_applied_count: int
+    final_regime_bayesian_revision: int | None
+    final_regime_bayesian_sample_size: int | None
+
     total_elapsed_seconds: float
 
     def as_dict(self) -> dict[str, Any]:
@@ -334,6 +342,48 @@ def summarize_replay(
         None,
     )
 
+    regime_calibration_applied_count = sum(
+        row.regime_calibration_revision is not None
+        for row in rows
+    )
+    final_regime_calibration_revision = next(
+        (
+            row.regime_calibration_revision
+            for row in reversed(rows)
+            if row.regime_calibration_revision is not None
+        ),
+        None,
+    )
+    final_regime_calibration_sample_size = next(
+        (
+            row.regime_calibration_sample_size
+            for row in reversed(rows)
+            if row.regime_calibration_sample_size is not None
+        ),
+        None,
+    )
+
+    regime_bayesian_applied_count = sum(
+        row.regime_bayesian_revision is not None
+        for row in rows
+    )
+    final_regime_bayesian_revision = next(
+        (
+            row.regime_bayesian_revision
+            for row in reversed(rows)
+            if row.regime_bayesian_revision is not None
+        ),
+        None,
+    )
+    final_regime_bayesian_sample_size = next(
+        (
+            row.regime_bayesian_sample_size
+            for row in reversed(rows)
+            if row.regime_bayesian_sample_size is not None
+        ),
+        None,
+    )
+
     return ReplaySummary(
         round_count=count,
         noop_average_best_hits=sum(
@@ -369,6 +419,24 @@ def summarize_replay(
         ),
         final_profile_revision=final_revision,
         final_profile_sample_size=final_sample_size,
+        regime_calibration_applied_count=(
+            regime_calibration_applied_count
+        ),
+        final_regime_calibration_revision=(
+            final_regime_calibration_revision
+        ),
+        final_regime_calibration_sample_size=(
+            final_regime_calibration_sample_size
+        ),
+        regime_bayesian_applied_count=(
+            regime_bayesian_applied_count
+        ),
+        final_regime_bayesian_revision=(
+            final_regime_bayesian_revision
+        ),
+        final_regime_bayesian_sample_size=(
+            final_regime_bayesian_sample_size
+        ),
         total_elapsed_seconds=sum(
             row.elapsed_seconds
             for row in rows
