@@ -6,6 +6,11 @@ from .active_adjustment import (
 from .adjustment import (
     GlobalRegimeAdjustmentAdapter,
 )
+from .bayesian_provider import (
+    RegimeBayesianProvider,
+    RepositoryRegimeBayesianProvider,
+    StaticRegimeBayesianProvider,
+)
 from .calibration_provider import (
     RegimeCalibrationProvider,
     RepositoryRegimeCalibrationProvider,
@@ -16,6 +21,9 @@ from .noop_adjustment import (
 )
 
 __all__ = [
+    "RegimeBayesianProvider",
+    "RepositoryRegimeBayesianProvider",
+    "StaticRegimeBayesianProvider",
     "ActiveGlobalRegimeAdjustmentAdapter",
     "GlobalRegimeAdjustmentAdapter",
     "NoOpGlobalRegimeAdjustmentAdapter",

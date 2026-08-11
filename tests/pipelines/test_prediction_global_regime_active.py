@@ -292,3 +292,130 @@ def test_repository_calibration_strengthens_active_pipeline(
         ]
         is True
     )
+
+def test_repository_bayesian_strengthens_active_pipeline(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from datetime import datetime, timezone
+
+    from lrp.evolution.contracts.bayesian import (
+        BayesianPosterior,
+    )
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_state import (
+        RegimeBayesianState,
+    )
+
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeFeatureExtractor",
+        lambda: FixedFeatureExtractor(),
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "GlobalRegimeStabilityPolicy",
+        lambda: FixedStabilityPolicy(),
+    )
+
+    root = tmp_path / "regime-bayesian"
+
+    repository = RegimeBayesianRepository(root)
+
+    repository.save(
+        RegimeBayesianState.from_posteriors(
+            {
+                "gap_recovery": BayesianPosterior(
+                    alpha=1.0,
+                    beta=1.0,
+                ),
+                "cluster_rotation": BayesianPosterior(
+                    alpha=1.0,
+                    beta=1.0,
+                ),
+                "high_band_expansion": BayesianPosterior(
+                    alpha=5.0,
+                    beta=1.0,
+                ),
+                "low_band_expansion": BayesianPosterior(
+                    alpha=1.0,
+                    beta=1.0,
+                ),
+            }
+        ),
+        revision=1,
+        sample_size=20,
+        saved_at=datetime(
+            2026,
+            8,
+            11,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    baseline = PredictionPipeline.load(
+        global_regime_adjustment=(
+            ActiveGlobalRegimeAdjustmentAdapter()
+        ),
+    )
+
+    learned = PredictionPipeline.load(
+        regime_bayesian_snapshot_root=root,
+    )
+
+    draws = build_draws(
+        baseline.statistics.module
+    )
+    request = make_request(
+        frozenset(draws[-1].numbers)
+    )
+
+    baseline_result = baseline.run(
+        draws,
+        request,
+    )
+    learned_result = learned.run(
+        draws,
+        request,
+    )
+
+    baseline_vector = (
+        baseline_result.generation
+        .probability_vector
+    )
+    learned_vector = (
+        learned_result.generation
+        .probability_vector
+    )
+
+    assert baseline_vector is not None
+    assert learned_vector is not None
+
+    assert (
+        learned_vector.get(45).raw_score
+        > baseline_vector.get(45).raw_score
+    )
+
+    assert abs(
+        sum(
+            item.probability
+            for item
+            in learned_vector.probabilities
+        )
+        - 1.0
+    ) < 1e-9
+
+    assert (
+        learned_result.generation
+        .global_regime_mode
+        == "active"
+    )
+
+    assert (
+        learned_vector.metadata[
+            "global_regime_adjusted"
+        ]
+        is True
+    )

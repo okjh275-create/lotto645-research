@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from lrp.regimes.integration.bayesian_provider import (
+    RegimeBayesianProvider,
+)
 from lrp.regimes.integration.calibration_provider import (
     RegimeCalibrationProvider,
 )
@@ -15,6 +18,7 @@ class RegimeAdjustmentConfig:
     cluster_rotation_max_boost: float = 0.01
     high_band_max_boost: float = 0.02
     low_band_max_boost: float = 0.02
+    bayesian_signal_limit: float = 0.25
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -22,6 +26,7 @@ class RegimeAdjustmentConfig:
             "cluster_rotation_max_boost",
             "high_band_max_boost",
             "low_band_max_boost",
+            "bayesian_signal_limit",
         ):
             value = getattr(self, field_name)
 
@@ -37,9 +42,16 @@ class RegimeAdjustmentConfig:
 
             normalized = float(value)
 
-            if not 0.0 <= normalized <= 0.10:
+            upper_bound = (
+                1.0
+                if field_name == "bayesian_signal_limit"
+                else 0.10
+            )
+
+            if not 0.0 <= normalized <= upper_bound:
                 raise ValueError(
-                    f"{field_name} must be between 0 and 0.10"
+                    f"{field_name} must be between "
+                    f"0 and {upper_bound:.2f}"
                 )
 
             object.__setattr__(
@@ -155,6 +167,9 @@ class ActiveGlobalRegimeAdjustmentAdapter:
         calibration_provider: (
             RegimeCalibrationProvider | None
         ) = None,
+        bayesian_provider: (
+            RegimeBayesianProvider | None
+        ) = None,
     ) -> None:
         self._config = (
             config
@@ -182,8 +197,23 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                 "RegimeCalibrationProvider"
             )
 
+        if (
+            bayesian_provider is not None
+            and not isinstance(
+                bayesian_provider,
+                RegimeBayesianProvider,
+            )
+        ):
+            raise TypeError(
+                "bayesian_provider must implement "
+                "RegimeBayesianProvider"
+            )
+
         self._calibration_provider = (
             calibration_provider
+        )
+        self._bayesian_provider = (
+            bayesian_provider
         )
 
     @property
@@ -195,6 +225,12 @@ class ActiveGlobalRegimeAdjustmentAdapter:
         self,
     ) -> RegimeCalibrationProvider | None:
         return self._calibration_provider
+
+    @property
+    def bayesian_provider(
+        self,
+    ) -> RegimeBayesianProvider | None:
+        return self._bayesian_provider
 
     def adjust(
         self,
@@ -300,6 +336,36 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     calibration.get(regime)
                 )
 
+        bayesian_factor = 1.0
+
+        if self.bayesian_provider is not None:
+            bayesian_state = (
+                self.bayesian_provider
+                .get_bayesian_state(
+                    round_no=round_no
+                )
+            )
+
+            if bayesian_state is not None:
+                signal = bayesian_state.to_signals().get(
+                    regime,
+                    0.0,
+                )
+
+                limit = (
+                    self._config
+                    .bayesian_signal_limit
+                )
+
+                bounded_signal = max(
+                    -limit,
+                    min(limit, float(signal)),
+                )
+
+                bayesian_factor = (
+                    1.0 + bounded_signal
+                )
+
         multipliers: dict[int, float] = {}
 
         for item in probability_vector.probabilities:
@@ -318,6 +384,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     * confidence
                     * strength
                     * calibration_factor
+                    * bayesian_factor
                 )
 
             elif regime == "cluster_rotation":
@@ -333,6 +400,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     * confidence
                     * strength
                     * calibration_factor
+                    * bayesian_factor
                 )
 
             elif (
@@ -344,6 +412,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     .high_band_max_boost
                     * confidence
                     * calibration_factor
+                    * bayesian_factor
                 )
 
             elif (
@@ -355,6 +424,7 @@ class ActiveGlobalRegimeAdjustmentAdapter:
                     .low_band_max_boost
                     * confidence
                     * calibration_factor
+                    * bayesian_factor
                 )
 
             multipliers[item.number] = 1.0 + boost

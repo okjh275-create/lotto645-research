@@ -31,6 +31,9 @@ from lrp.regimes import (
     RegimeFeatureExtractor as GlobalRegimeFeatureExtractor,
     RegimeStabilityPolicy as GlobalRegimeStabilityPolicy,
 )
+from lrp.regimes.bayesian_repository import (
+    RegimeBayesianRepository,
+)
 from lrp.regimes.calibration_repository import (
     RegimeCalibrationRepository,
 )
@@ -38,6 +41,7 @@ from lrp.regimes.integration import (
     ActiveGlobalRegimeAdjustmentAdapter,
     GlobalRegimeAdjustmentAdapter,
     NoOpGlobalRegimeAdjustmentAdapter,
+    RepositoryRegimeBayesianProvider,
     RepositoryRegimeCalibrationProvider,
 )
 from lrp.prediction import (
@@ -376,6 +380,9 @@ class PredictionPipeline:
         regime_calibration_snapshot_root: (
             str | Path | None
         ) = None,
+        regime_bayesian_snapshot_root: (
+            str | Path | None
+        ) = None,
     ) -> "PredictionPipeline":
         resolved_evolution = (
             EvolutionAdapterFactory.build(
@@ -390,22 +397,51 @@ class PredictionPipeline:
             resolved_global_regime_adjustment = (
                 global_regime_adjustment
             )
-        elif regime_calibration_snapshot_root is not None:
-            calibration_repository = (
-                RegimeCalibrationRepository(
-                    regime_calibration_snapshot_root
+        elif (
+            regime_calibration_snapshot_root is not None
+            or regime_bayesian_snapshot_root is not None
+        ):
+            calibration_provider = None
+            bayesian_provider = None
+
+            if (
+                regime_calibration_snapshot_root
+                is not None
+            ):
+                calibration_repository = (
+                    RegimeCalibrationRepository(
+                        regime_calibration_snapshot_root
+                    )
                 )
-            )
-            calibration_provider = (
-                RepositoryRegimeCalibrationProvider(
-                    calibration_repository
+                calibration_provider = (
+                    RepositoryRegimeCalibrationProvider(
+                        calibration_repository
+                    )
                 )
-            )
+
+            if (
+                regime_bayesian_snapshot_root
+                is not None
+            ):
+                bayesian_repository = (
+                    RegimeBayesianRepository(
+                        regime_bayesian_snapshot_root
+                    )
+                )
+                bayesian_provider = (
+                    RepositoryRegimeBayesianProvider(
+                        bayesian_repository
+                    )
+                )
+
             resolved_global_regime_adjustment = (
                 ActiveGlobalRegimeAdjustmentAdapter(
                     calibration_provider=(
                         calibration_provider
-                    )
+                    ),
+                    bayesian_provider=(
+                        bayesian_provider
+                    ),
                 )
             )
         else:

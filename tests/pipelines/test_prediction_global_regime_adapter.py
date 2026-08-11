@@ -251,3 +251,105 @@ def test_explicit_global_regime_adjustment_overrides_calibration_root(
         pipeline.global_regime_adjustment
         is explicit
     )
+
+def test_pipeline_load_builds_repository_backed_bayesian_adjustment(
+    tmp_path,
+) -> None:
+    from lrp.regimes.integration import (
+        ActiveGlobalRegimeAdjustmentAdapter,
+        RepositoryRegimeBayesianProvider,
+    )
+
+    root = tmp_path / "regime-bayesian"
+
+    pipeline = PredictionPipeline.load(
+        regime_bayesian_snapshot_root=root,
+    )
+
+    adapter = pipeline.global_regime_adjustment
+
+    assert isinstance(
+        adapter,
+        ActiveGlobalRegimeAdjustmentAdapter,
+    )
+    assert isinstance(
+        adapter.bayesian_provider,
+        RepositoryRegimeBayesianProvider,
+    )
+    assert (
+        adapter.bayesian_provider.repository.root
+        == root
+    )
+
+
+def test_pipeline_load_combines_calibration_and_bayesian_providers(
+    tmp_path,
+) -> None:
+    from lrp.regimes.integration import (
+        ActiveGlobalRegimeAdjustmentAdapter,
+        RepositoryRegimeBayesianProvider,
+        RepositoryRegimeCalibrationProvider,
+    )
+
+    calibration_root = (
+        tmp_path / "regime-calibration"
+    )
+    bayesian_root = (
+        tmp_path / "regime-bayesian"
+    )
+
+    pipeline = PredictionPipeline.load(
+        regime_calibration_snapshot_root=(
+            calibration_root
+        ),
+        regime_bayesian_snapshot_root=(
+            bayesian_root
+        ),
+    )
+
+    adapter = pipeline.global_regime_adjustment
+
+    assert isinstance(
+        adapter,
+        ActiveGlobalRegimeAdjustmentAdapter,
+    )
+
+    assert isinstance(
+        adapter.calibration_provider,
+        RepositoryRegimeCalibrationProvider,
+    )
+    assert isinstance(
+        adapter.bayesian_provider,
+        RepositoryRegimeBayesianProvider,
+    )
+
+    assert (
+        adapter.calibration_provider.repository.root
+        == calibration_root
+    )
+    assert (
+        adapter.bayesian_provider.repository.root
+        == bayesian_root
+    )
+
+
+def test_explicit_global_regime_adjustment_overrides_bayesian_root(
+    tmp_path,
+) -> None:
+    from lrp.regimes.integration import (
+        NoOpGlobalRegimeAdjustmentAdapter,
+    )
+
+    explicit = NoOpGlobalRegimeAdjustmentAdapter()
+
+    pipeline = PredictionPipeline.load(
+        global_regime_adjustment=explicit,
+        regime_bayesian_snapshot_root=(
+            tmp_path / "regime-bayesian"
+        ),
+    )
+
+    assert (
+        pipeline.global_regime_adjustment
+        is explicit
+    )
