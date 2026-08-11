@@ -171,3 +171,50 @@ def test_output_directory_is_rejected(
             report=report,
             output=output,
         )
+
+
+def test_render_contains_regime_learning_provenance(
+    tmp_path: Path,
+) -> None:
+    run = ValidationRunRecord(
+        run_type="replay",
+        root=tmp_path / "replay_100_109",
+        start_round=100,
+        end_round=109,
+        round_count=10,
+        policy_name=None,
+        files={},
+        missing_files=(),
+        status="PASS",
+        regime_calibration_applied_count=8,
+        regime_calibration_latest_revision=7,
+        regime_calibration_latest_sample_size=70,
+        regime_bayesian_applied_count=8,
+        regime_bayesian_latest_revision=7,
+        regime_bayesian_latest_sample_size=70,
+    )
+
+    report = ValidationReportBuilder().build(
+        source_root=tmp_path,
+        runs=(run,),
+        generated_at_utc=datetime(
+            2026,
+            8,
+            11,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    text = ValidationMarkdownRenderer().render(
+        report
+    )
+
+    assert "## Regime Learning" in text
+
+    assert "Calibration applied rounds: 8" in text
+    assert "Calibration final revision: 7" in text
+    assert "Calibration final sample size: 70" in text
+
+    assert "Bayesian applied rounds: 8" in text
+    assert "Bayesian final revision: 7" in text
+    assert "Bayesian final sample size: 70" in text

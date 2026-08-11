@@ -109,6 +109,64 @@ class ValidationMarkdownRenderer:
 
             lines.append("")
 
+        regime_runs = tuple(
+            run
+            for run in report.runs
+            if (
+                run.run_type == "replay"
+                and (
+                    run.regime_calibration_applied_count
+                    is not None
+                    or run.regime_bayesian_applied_count
+                    is not None
+                )
+            )
+        )
+
+        if regime_runs:
+            lines.extend(
+                [
+                    "## Regime Learning",
+                    "",
+                ]
+            )
+
+            for run in regime_runs:
+                lines.extend(
+                    [
+                        (
+                            "- Window: "
+                            f"{run.start_round}-"
+                            f"{run.end_round}"
+                        ),
+                        (
+                            "- Calibration applied rounds: "
+                            f"{self._optional(run.regime_calibration_applied_count)}"
+                        ),
+                        (
+                            "- Calibration final revision: "
+                            f"{self._optional(run.regime_calibration_latest_revision)}"
+                        ),
+                        (
+                            "- Calibration final sample size: "
+                            f"{self._optional(run.regime_calibration_latest_sample_size)}"
+                        ),
+                        (
+                            "- Bayesian applied rounds: "
+                            f"{self._optional(run.regime_bayesian_applied_count)}"
+                        ),
+                        (
+                            "- Bayesian final revision: "
+                            f"{self._optional(run.regime_bayesian_latest_revision)}"
+                        ),
+                        (
+                            "- Bayesian final sample size: "
+                            f"{self._optional(run.regime_bayesian_latest_sample_size)}"
+                        ),
+                        "",
+                    ]
+                )
+
         lines.extend(
             [
                 "## Duplicate Windows",

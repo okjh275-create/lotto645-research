@@ -198,3 +198,98 @@ def test_output_directory_is_rejected(
             report=report,
             output=output,
         )
+
+
+def test_json_report_preserves_regime_learning_provenance(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "replay_100_109"
+    run_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    (
+        run_root / "replay_summary.json"
+    ).write_text(
+        json.dumps(
+            {
+                "config": {
+                    "start_round": 100,
+                    "end_round": 109,
+                },
+                "summary": {
+                    "round_count": 10,
+                    "regime_calibration_applied_count": 8,
+                    "final_regime_calibration_revision": 7,
+                    "final_regime_calibration_sample_size": 70,
+                    "regime_bayesian_applied_count": 8,
+                    "final_regime_bayesian_revision": 7,
+                    "final_regime_bayesian_sample_size": 70,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    (
+        run_root / "replay_rounds.jsonl"
+    ).write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    writer = ValidationReportWriter()
+
+    report = writer.build(
+        source_root=tmp_path,
+        generated_at_utc=datetime(
+            2026,
+            8,
+            11,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    output = writer.write_json(
+        report=report,
+        output=tmp_path / "validation_report.json",
+    )
+
+    payload = json.loads(
+        output.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    run = payload["runs"][0]
+
+    assert (
+        run["regime_calibration_applied_count"]
+        == 8
+    )
+    assert (
+        run["regime_calibration_latest_revision"]
+        == 7
+    )
+    assert (
+        run[
+            "regime_calibration_latest_sample_size"
+        ]
+        == 70
+    )
+
+    assert (
+        run["regime_bayesian_applied_count"]
+        == 8
+    )
+    assert (
+        run["regime_bayesian_latest_revision"]
+        == 7
+    )
+    assert (
+        run[
+            "regime_bayesian_latest_sample_size"
+        ]
+        == 70
+    )

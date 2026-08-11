@@ -22,6 +22,14 @@ class ValidationRunRecord:
     missing_files: tuple[str, ...]
     status: str
 
+    regime_calibration_applied_count: int | None = None
+    regime_calibration_latest_revision: int | None = None
+    regime_calibration_latest_sample_size: int | None = None
+
+    regime_bayesian_applied_count: int | None = None
+    regime_bayesian_latest_revision: int | None = None
+    regime_bayesian_latest_sample_size: int | None = None
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "run_type": self.run_type,
@@ -35,6 +43,24 @@ class ValidationRunRecord:
                 self.missing_files
             ),
             "status": self.status,
+            "regime_calibration_applied_count": (
+                self.regime_calibration_applied_count
+            ),
+            "regime_calibration_latest_revision": (
+                self.regime_calibration_latest_revision
+            ),
+            "regime_calibration_latest_sample_size": (
+                self.regime_calibration_latest_sample_size
+            ),
+            "regime_bayesian_applied_count": (
+                self.regime_bayesian_applied_count
+            ),
+            "regime_bayesian_latest_revision": (
+                self.regime_bayesian_latest_revision
+            ),
+            "regime_bayesian_latest_sample_size": (
+                self.regime_bayesian_latest_sample_size
+            ),
         }
 
 
@@ -155,6 +181,56 @@ class ValidationRunDiscovery:
             "round_count",
         )
 
+        regime_calibration_applied_count = (
+            self._optional_integer(
+                summary,
+                "regime_calibration_applied_count",
+            )
+        )
+        regime_calibration_latest_revision = (
+            self._optional_integer(
+                summary,
+                "final_regime_calibration_revision",
+                fallback_key=(
+                    "regime_calibration_latest_revision"
+                ),
+            )
+        )
+        regime_calibration_latest_sample_size = (
+            self._optional_integer(
+                summary,
+                "final_regime_calibration_sample_size",
+                fallback_key=(
+                    "regime_calibration_latest_sample_size"
+                ),
+            )
+        )
+
+        regime_bayesian_applied_count = (
+            self._optional_integer(
+                summary,
+                "regime_bayesian_applied_count",
+            )
+        )
+        regime_bayesian_latest_revision = (
+            self._optional_integer(
+                summary,
+                "final_regime_bayesian_revision",
+                fallback_key=(
+                    "regime_bayesian_latest_revision"
+                ),
+            )
+        )
+        regime_bayesian_latest_sample_size = (
+            self._optional_integer(
+                summary,
+                "final_regime_bayesian_sample_size",
+                fallback_key=(
+                    "regime_bayesian_latest_sample_size"
+                ),
+            )
+        )
+
         self._validate_window(
             start_round=start_round,
             end_round=end_round,
@@ -170,6 +246,24 @@ class ValidationRunDiscovery:
             policy_name=None,
             required_files=(
                 self.REPLAY_REQUIRED_FILES
+            ),
+            regime_calibration_applied_count=(
+                regime_calibration_applied_count
+            ),
+            regime_calibration_latest_revision=(
+                regime_calibration_latest_revision
+            ),
+            regime_calibration_latest_sample_size=(
+                regime_calibration_latest_sample_size
+            ),
+            regime_bayesian_applied_count=(
+                regime_bayesian_applied_count
+            ),
+            regime_bayesian_latest_revision=(
+                regime_bayesian_latest_revision
+            ),
+            regime_bayesian_latest_sample_size=(
+                regime_bayesian_latest_sample_size
             ),
         )
 
@@ -230,6 +324,12 @@ class ValidationRunDiscovery:
         round_count: int,
         policy_name: str | None,
         required_files: tuple[str, ...],
+        regime_calibration_applied_count: int | None = None,
+        regime_calibration_latest_revision: int | None = None,
+        regime_calibration_latest_sample_size: int | None = None,
+        regime_bayesian_applied_count: int | None = None,
+        regime_bayesian_latest_revision: int | None = None,
+        regime_bayesian_latest_sample_size: int | None = None,
     ) -> ValidationRunRecord:
         files: dict[str, str] = {}
         missing: list[str] = []
@@ -258,6 +358,24 @@ class ValidationRunDiscovery:
                 "PASS"
                 if not missing
                 else "INCOMPLETE"
+            ),
+            regime_calibration_applied_count=(
+                regime_calibration_applied_count
+            ),
+            regime_calibration_latest_revision=(
+                regime_calibration_latest_revision
+            ),
+            regime_calibration_latest_sample_size=(
+                regime_calibration_latest_sample_size
+            ),
+            regime_bayesian_applied_count=(
+                regime_bayesian_applied_count
+            ),
+            regime_bayesian_latest_revision=(
+                regime_bayesian_latest_revision
+            ),
+            regime_bayesian_latest_sample_size=(
+                regime_bayesian_latest_sample_size
             ),
         )
 
@@ -318,6 +436,46 @@ class ValidationRunDiscovery:
         if not isinstance(value, dict):
             raise TypeError(
                 f"{key} must be an object"
+            )
+
+        return value
+
+    @staticmethod
+    def _optional_integer(
+        values: dict[str, Any],
+        key: str,
+        *,
+        fallback_key: str | None = None,
+    ) -> int | None:
+        selected_key = key
+
+        if key not in values:
+            if (
+                fallback_key is None
+                or fallback_key not in values
+            ):
+                return None
+
+            selected_key = fallback_key
+
+        value = values[selected_key]
+
+        if value is None:
+            return None
+
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+        ):
+            raise TypeError(
+                f"{selected_key} must be an integer "
+                "or None"
+            )
+
+        if value < 0:
+            raise ValueError(
+                f"{selected_key} must be "
+                "non-negative"
             )
 
         return value

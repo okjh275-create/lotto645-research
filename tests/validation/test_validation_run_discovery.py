@@ -227,3 +227,133 @@ def test_record_serialization(
     assert payload["run_type"] == "replay"
     assert payload["status"] == "PASS"
     assert payload["missing_files"] == []
+
+def test_replay_record_exposes_regime_learning_provenance(
+    tmp_path: Path,
+) -> None:
+    run_root = make_replay(tmp_path)
+
+    write_json(
+        run_root / "replay_summary.json",
+        {
+            "config": {
+                "start_round": 100,
+                "end_round": 109,
+            },
+            "summary": {
+                "round_count": 10,
+                "regime_calibration_applied_count": 8,
+                "regime_calibration_latest_revision": 7,
+                "regime_calibration_latest_sample_size": 70,
+                "regime_bayesian_applied_count": 8,
+                "regime_bayesian_latest_revision": 7,
+                "regime_bayesian_latest_sample_size": 70,
+            },
+        },
+    )
+
+    record = (
+        ValidationRunDiscovery()
+        .discover(tmp_path)[0]
+    )
+
+    assert (
+        record.regime_calibration_applied_count
+        == 8
+    )
+    assert (
+        record.regime_calibration_latest_revision
+        == 7
+    )
+    assert (
+        record.regime_calibration_latest_sample_size
+        == 70
+    )
+
+    assert (
+        record.regime_bayesian_applied_count
+        == 8
+    )
+    assert (
+        record.regime_bayesian_latest_revision
+        == 7
+    )
+    assert (
+        record.regime_bayesian_latest_sample_size
+        == 70
+    )
+
+    payload = record.as_dict()
+
+    assert (
+        payload[
+            "regime_calibration_applied_count"
+        ]
+        == 8
+    )
+    assert (
+        payload[
+            "regime_calibration_latest_revision"
+        ]
+        == 7
+    )
+    assert (
+        payload[
+            "regime_calibration_latest_sample_size"
+        ]
+        == 70
+    )
+    assert (
+        payload[
+            "regime_bayesian_applied_count"
+        ]
+        == 8
+    )
+    assert (
+        payload[
+            "regime_bayesian_latest_revision"
+        ]
+        == 7
+    )
+    assert (
+        payload[
+            "regime_bayesian_latest_sample_size"
+        ]
+        == 70
+    )
+
+
+def test_replay_record_allows_missing_regime_learning_provenance(
+    tmp_path: Path,
+) -> None:
+    make_replay(tmp_path)
+
+    record = (
+        ValidationRunDiscovery()
+        .discover(tmp_path)[0]
+    )
+
+    assert (
+        record.regime_calibration_applied_count
+        is None
+    )
+    assert (
+        record.regime_calibration_latest_revision
+        is None
+    )
+    assert (
+        record.regime_calibration_latest_sample_size
+        is None
+    )
+    assert (
+        record.regime_bayesian_applied_count
+        is None
+    )
+    assert (
+        record.regime_bayesian_latest_revision
+        is None
+    )
+    assert (
+        record.regime_bayesian_latest_sample_size
+        is None
+    )
