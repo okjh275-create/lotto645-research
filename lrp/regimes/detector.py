@@ -35,7 +35,7 @@ class RegimeDetectorConfig:
     """Thresholds for the deterministic baseline detector."""
 
     neutral_margin: float = 0.08
-    mixed_margin: float = 0.10
+    mixed_margin: float = 0.05
     secondary_min_score: float = 0.35
 
     def __post_init__(self) -> None:
@@ -80,63 +80,86 @@ class RegimeDetector:
 
         scores = self._scores(features)
 
-        ordered = sorted(
-            scores.items(),
+        substantive_names = (
+            "gap_recovery",
+            "cluster_rotation",
+            "high_band_expansion",
+            "low_band_expansion",
+        )
+
+        substantive = sorted(
+            (
+                (name, scores[name])
+                for name in substantive_names
+            ),
             key=lambda item: (-item[1], item[0]),
         )
 
-        primary, primary_score = ordered[0]
-        second_name, second_score = ordered[1]
+        first_name, first_score = substantive[0]
+        second_name, second_score = substantive[1]
 
-        gap = primary_score - second_score
+        substantive_gap = (
+            first_score - second_score
+        )
 
-        if gap <= self.config.mixed_margin:
-            primary = "mixed"
-            primary_score = max(
-                scores["mixed"],
-                1.0 - gap / max(
-                    self.config.mixed_margin,
-                    1e-12,
-                ),
-            )
-            scores["mixed"] = _unit(primary_score)
-            ordered = sorted(
-                scores.items(),
-                key=lambda item: (-item[1], item[0]),
-            )
-            primary, primary_score = ordered[0]
-            second_name, second_score = ordered[1]
-
-        if (
-            primary != "mixed"
-            and abs(
+        is_neutral = (
+            abs(
                 features.low_band_ratio
                 - features.high_band_ratio
             ) <= self.config.neutral_margin
             and features.average_gap_reversion < 0.55
             and features.pair_variance < 0.20
-        ):
-            neutral_score = max(
+        )
+
+        if is_neutral:
+            primary = "neutral"
+            primary_score = max(
                 scores["neutral"],
                 0.65,
             )
-            scores["neutral"] = _unit(neutral_score)
-            ordered = sorted(
-                scores.items(),
-                key=lambda item: (-item[1], item[0]),
+            scores["neutral"] = _unit(
+                primary_score
             )
-            primary, primary_score = ordered[0]
-            second_name, second_score = ordered[1]
 
-        secondary: str | None = None
-        secondary_confidence: float | None = None
+            secondary = first_name
+            secondary_confidence = first_score
 
-        if (
-            second_name != primary
-            and second_score >= self.config.secondary_min_score
+        elif (
+            substantive_gap
+            <= self.config.mixed_margin
         ):
+            primary = "mixed"
+
+            primary_score = max(
+                scores["mixed"],
+                1.0
+                - substantive_gap
+                / max(
+                    self.config.mixed_margin,
+                    1e-12,
+                ),
+            )
+
+            scores["mixed"] = _unit(
+                primary_score
+            )
+
+            secondary = first_name
+            secondary_confidence = first_score
+
+        else:
+            primary = first_name
+            primary_score = first_score
+
             secondary = second_name
             secondary_confidence = second_score
+
+        if (
+            secondary_confidence
+            < self.config.secondary_min_score
+        ):
+            secondary = None
+            secondary_confidence = None
 
         return RegimeDecision(
             primary=primary,

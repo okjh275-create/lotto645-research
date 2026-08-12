@@ -119,3 +119,57 @@ def test_ambiguous_state_exposes_mixed_score() -> None:
 def test_rejects_invalid_input() -> None:
     with pytest.raises(ContractError):
         RegimeDetector().detect(object())
+
+
+def test_real_scale_decisive_high_band_is_primary() -> None:
+    result = RegimeDetector().detect(
+        make_features(
+            average_recency=0.875,
+            average_frequency=0.13333333,
+            average_gap_reversion=0.125,
+            pair_density=0.531,
+            frequency_dispersion=0.0054,
+            recency_variance=0.0186,
+            pair_variance=0.0696,
+            low_band_ratio=0.405,
+            high_band_ratio=0.595,
+        )
+    )
+
+    assert result.primary == "high_band_expansion"
+
+
+def test_real_scale_decisive_low_band_is_primary() -> None:
+    result = RegimeDetector().detect(
+        make_features(
+            average_recency=0.875,
+            average_frequency=0.13333333,
+            average_gap_reversion=0.125,
+            pair_density=0.531,
+            frequency_dispersion=0.0054,
+            recency_variance=0.0186,
+            pair_variance=0.0696,
+            low_band_ratio=0.595,
+            high_band_ratio=0.405,
+        )
+    )
+
+    assert result.primary == "low_band_expansion"
+
+
+def test_real_scale_balanced_state_remains_neutral() -> None:
+    result = RegimeDetector().detect(
+        make_features(
+            average_recency=0.875,
+            average_frequency=0.13333333,
+            average_gap_reversion=0.125,
+            pair_density=0.531,
+            frequency_dispersion=0.0054,
+            recency_variance=0.0186,
+            pair_variance=0.0696,
+            low_band_ratio=0.50,
+            high_band_ratio=0.50,
+        )
+    )
+
+    assert result.primary == "neutral"
