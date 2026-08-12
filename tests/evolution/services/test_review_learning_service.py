@@ -1556,3 +1556,176 @@ def test_review_learning_service_rejects_invalid_bayesian_dependency(
                 field_name: object(),
             },
         )
+
+
+def test_neutral_global_regime_does_not_persist_regime_learning(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    calibration_repository = (
+        RegimeCalibrationRepository(
+            tmp_path / "regime-calibration"
+        )
+    )
+    bayesian_repository = (
+        RegimeBayesianRepository(
+            tmp_path / "regime-bayesian"
+        )
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+
+    service = ReviewLearningService(
+        PersistentLearningRunner(
+            persistence
+        ),
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=(
+            calibration_repository
+        ),
+        regime_bayesian_updater=(
+            RegimeBayesianUpdater()
+        ),
+        regime_bayesian_repository=(
+            bayesian_repository
+        ),
+    )
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.5,
+        practical_hit=0.2,
+        rank_quality=0.1,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "neutral",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    assert calibration_repository.revisions() == ()
+    assert bayesian_repository.revisions() == ()
+
+def test_mixed_global_regime_does_not_persist_regime_learning(
+    tmp_path: Path,
+) -> None:
+    from lrp.evolution.contracts.review_reward_vector import (
+        ReviewRewardVector,
+    )
+    from lrp.regimes.bayesian_repository import (
+        RegimeBayesianRepository,
+    )
+    from lrp.regimes.bayesian_updater import (
+        RegimeBayesianUpdater,
+    )
+    from lrp.regimes.calibration_repository import (
+        RegimeCalibrationRepository,
+    )
+    from lrp.regimes.calibration_updater import (
+        RegimeCalibrationUpdater,
+    )
+    from lrp.regimes.reward_calculator import (
+        RegimeRewardCalculator,
+    )
+
+    calibration_repository = (
+        RegimeCalibrationRepository(
+            tmp_path / "regime-calibration"
+        )
+    )
+    bayesian_repository = (
+        RegimeBayesianRepository(
+            tmp_path / "regime-bayesian"
+        )
+    )
+
+    persistence = PersistentLearningService(
+        FileSnapshotRepository(
+            tmp_path / "learning"
+        ),
+        snapshot_factory=SnapshotFactory(
+            clock=lambda: FIXED_TIME
+        ),
+    )
+
+    service = ReviewLearningService(
+        PersistentLearningRunner(
+            persistence
+        ),
+        regime_reward_calculator=(
+            RegimeRewardCalculator()
+        ),
+        regime_calibration_updater=(
+            RegimeCalibrationUpdater()
+        ),
+        regime_calibration_repository=(
+            calibration_repository
+        ),
+        regime_bayesian_updater=(
+            RegimeBayesianUpdater()
+        ),
+        regime_bayesian_repository=(
+            bayesian_repository
+        ),
+    )
+
+    reward_vector = ReviewRewardVector(
+        portfolio_hit=0.5,
+        practical_hit=0.2,
+        rank_quality=0.1,
+        coverage=0.0,
+        diversity=0.0,
+        stability=0.0,
+        sample_size=10,
+        metadata={},
+    )
+
+    service._apply_regime_learning(
+        reward_vector=reward_vector,
+        global_regime={
+            "primary": "mixed",
+            "confidence": 1.0,
+        },
+        review_set_count=10,
+    )
+
+    assert calibration_repository.revisions() == ()
+    assert bayesian_repository.revisions() == ()

@@ -505,6 +505,12 @@ class ReviewLearningService:
         regime_reward: RegimeReward,
         review_set_count: int,
     ) -> dict[str, Any] | None:
+        if regime_reward.regime in {
+            "neutral",
+            "mixed",
+        }:
+            return None
+
         updater = self.regime_calibration_updater
         repository = self.regime_calibration_repository
 
@@ -578,6 +584,12 @@ class ReviewLearningService:
         regime_reward: RegimeReward,
         review_set_count: int,
     ) -> dict[str, Any] | None:
+        if regime_reward.regime in {
+            "neutral",
+            "mixed",
+        }:
+            return None
+
         updater = self.regime_bayesian_updater
         repository = self.regime_bayesian_repository
 
