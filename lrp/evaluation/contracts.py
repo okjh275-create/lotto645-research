@@ -1,4 +1,4 @@
-﻿"""Prediction-model evaluation contracts for Project M."""
+"""Prediction-model evaluation contracts for Project M."""
 
 from __future__ import annotations
 
@@ -367,12 +367,14 @@ def build_model_evaluation(
             for window in normalized
         ),
         significant_best_window_count=sum(
-            window.best_sign_test_pvalue
+            window.baseline_best_hit_delta > 0.0
+            and window.best_sign_test_pvalue
             < significance_level
             for window in normalized
         ),
         significant_practical_window_count=sum(
-            window.practical_sign_test_pvalue
+            window.baseline_practical_hit_delta > 0.0
+            and window.practical_sign_test_pvalue
             < significance_level
             for window in normalized
         ),
