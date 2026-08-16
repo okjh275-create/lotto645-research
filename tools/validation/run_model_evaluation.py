@@ -17,6 +17,12 @@ from tools.validation.historical_replay_models import (
 from tools.validation.model_evaluation_orchestration_service import (
     HistoricalModelEvaluationOrchestrationService,
 )
+from tools.validation.model_evaluation_run_record import (
+    ModelEvaluationRunRecord,
+)
+from tools.validation.model_evaluation_run_record_writer import (
+    ModelEvaluationRunRecordWriter,
+)
 
 
 DEFAULT_MODELS = (
@@ -219,6 +225,33 @@ def run(
         base_config=config,
     )
 
+    run_record = ModelEvaluationRunRecord.build(
+        history_path=args.history,
+        model_names=tuple(args.models),
+        windows=windows,
+        replay_config=config,
+        ranking_champion=(
+            result.matrix.ranking.champion
+        ),
+        selected_model=(
+            result.champion.selection.selected_model
+        ),
+        promoted=(
+            result.champion.selection.promotion.promoted
+        ),
+        champion_artifact=result.artifact_path,
+    )
+
+    run_record_path = (
+        args.report_output
+        / "evaluation_run.json"
+    )
+
+    ModelEvaluationRunRecordWriter().write_json(
+        record=run_record,
+        output=run_record_path,
+    )
+
     payload = {
         "status": "PASS",
         "ranking_champion": (
@@ -232,6 +265,10 @@ def run(
         ),
         "artifact_path": str(
             result.artifact_path
+        ),
+        "run_id": run_record.run_id,
+        "run_record_path": str(
+            run_record_path
         ),
     }
 
