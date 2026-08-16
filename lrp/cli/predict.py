@@ -22,6 +22,9 @@ from lrp.pipelines import (
     PredictionRequest,
     prediction_to_dict,
 )
+from lrp.production import (
+    ProductionPredictionConfiguration,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -95,7 +98,58 @@ def _parser() -> argparse.ArgumentParser:
         help="Print full prediction JSON",
     )
 
+    parser.add_argument(
+        "--champion-decision",
+        type=Path,
+        default=None,
+        help=(
+            "Optional champion decision JSON "
+            "for production model activation"
+        ),
+    )
+    parser.add_argument(
+        "--production-snapshot-root",
+        type=Path,
+        default=None,
+        help=(
+            "Snapshot root used when production "
+            "champion activation is enabled"
+        ),
+    )
+
     return parser
+
+
+def _resolve_production_configuration(
+    *,
+    champion_decision: Path | None,
+    production_snapshot_root: Path | None,
+) -> ProductionPredictionConfiguration | None:
+    if (
+        champion_decision is None
+        and production_snapshot_root is None
+    ):
+        return None
+
+    if champion_decision is None:
+        raise ValueError(
+            "champion_decision is required when "
+            "production_snapshot_root is provided"
+        )
+
+    if production_snapshot_root is None:
+        raise ValueError(
+            "production_snapshot_root is required when "
+            "champion_decision is provided"
+        )
+
+    return (
+        ProductionPredictionConfiguration
+        .from_decision(
+            decision_path=champion_decision,
+            snapshot_root=production_snapshot_root,
+        )
+    )
 
 
 def _analysis_config(
@@ -136,7 +190,51 @@ def run_predict(
         target_round=arguments.round_no,
     )
 
-    pipeline = PredictionPipeline.load()
+    production_configuration = (
+        _resolve_production_configuration(
+            champion_decision=getattr(
+                arguments,
+                "champion_decision",
+                None,
+            ),
+            production_snapshot_root=getattr(
+                arguments,
+                "production_snapshot_root",
+                None,
+            ),
+        )
+    )
+
+    pipeline_kwargs = (
+        {}
+        if production_configuration is None
+        else production_configuration.pipeline_kwargs()
+    )
+
+    if production_configuration is None:
+        production_activation = {
+            "enabled": False,
+        }
+    else:
+        production_activation = {
+            "enabled": True,
+            "requested_model": (
+                production_configuration.requested_model
+            ),
+            "resolved_model": (
+                production_configuration.resolved_model
+            ),
+            "fallback_applied": (
+                production_configuration.fallback_applied
+            ),
+            "fallback_reason": (
+                production_configuration.fallback_reason
+            ),
+        }
+
+    pipeline = PredictionPipeline.load(
+        **pipeline_kwargs
+    )
     draw_type = getattr(
         pipeline.statistics.module,
         "DrawRecord",
@@ -201,6 +299,7 @@ def run_predict(
             "top5_practical"
         ],
         "diversity": payload["diversity"],
+        "production_activation": production_activation,
         "elapsed_seconds": round(elapsed, 3),
         "artifact": artifact,
         "payload": payload,
