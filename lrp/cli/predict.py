@@ -108,6 +108,15 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--production-registry",
+        type=Path,
+        default=None,
+        help=(
+            "Optional active champion registry "
+            "for production model activation"
+        ),
+    )
+    parser.add_argument(
         "--production-snapshot-root",
         type=Path,
         default=None,
@@ -124,32 +133,70 @@ def _resolve_production_configuration(
     *,
     champion_decision: Path | None,
     production_snapshot_root: Path | None,
+    production_registry: Path | None = None,
 ) -> ProductionPredictionConfiguration | None:
     if (
-        champion_decision is None
+        champion_decision is not None
+        and production_registry is not None
+    ):
+        raise ValueError(
+            "champion_decision and production_registry "
+            "are mutually exclusive"
+        )
+
+    activation_source_present = (
+        champion_decision is not None
+        or production_registry is not None
+    )
+
+    if (
+        not activation_source_present
         and production_snapshot_root is None
     ):
         return None
 
-    if champion_decision is None:
+    if (
+        activation_source_present
+        and production_snapshot_root is None
+    ):
         raise ValueError(
-            "champion_decision is required when "
+            "production_snapshot_root is required when "
+            "champion_decision or production_registry "
+            "is provided"
+        )
+
+    if (
+        not activation_source_present
+        and production_snapshot_root is not None
+    ):
+        raise ValueError(
+            "champion_decision or production_registry "
+            "is required when "
             "production_snapshot_root is provided"
         )
 
-    if production_snapshot_root is None:
-        raise ValueError(
-            "production_snapshot_root is required when "
-            "champion_decision is provided"
+    assert production_snapshot_root is not None
+
+    if champion_decision is not None:
+        return (
+            ProductionPredictionConfiguration
+            .from_decision(
+                decision_path=champion_decision,
+                snapshot_root=production_snapshot_root,
+            )
         )
+
+    assert production_registry is not None
 
     return (
         ProductionPredictionConfiguration
-        .from_decision(
-            decision_path=champion_decision,
+        .from_registry(
+            registry_root=production_registry,
             snapshot_root=production_snapshot_root,
         )
     )
+
+
 
 
 def _analysis_config(
@@ -195,6 +242,11 @@ def run_predict(
             champion_decision=getattr(
                 arguments,
                 "champion_decision",
+                None,
+            ),
+            production_registry=getattr(
+                arguments,
+                "production_registry",
                 None,
             ),
             production_snapshot_root=getattr(

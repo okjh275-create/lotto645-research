@@ -70,6 +70,27 @@ class ProductionPredictionConfiguration:
             ),
         )
 
+    @classmethod
+    def from_registry(
+        cls,
+        *,
+        registry_root: str | Path,
+        snapshot_root: str | Path,
+    ) -> "ProductionPredictionConfiguration":
+        from lrp.production.champion_registry import (
+            ProductionChampionRegistry,
+        )
+
+        registry = ProductionChampionRegistry(
+            registry_root
+        )
+
+        return cls.from_decision(
+            decision_path=registry.decision_path(),
+            snapshot_root=snapshot_root,
+        )
+
+
     def pipeline_kwargs(
         self,
     ) -> dict[str, Path | None]:
