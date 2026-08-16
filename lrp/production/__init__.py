@@ -13,6 +13,10 @@ from lrp.production.champion_decision_reader import (
 from lrp.production.champion_registry import (
     ProductionChampionRegistry,
 )
+from lrp.production.champion_registry_publisher import (
+    ProductionChampionPublicationResult,
+    ProductionChampionRegistryPublisher,
+)
 from lrp.production.champion_registry_reader import (
     ProductionChampionRegistryReader,
 )
@@ -30,7 +34,9 @@ __all__ = [
     "ProductionChampionActivation",
     "ProductionChampionDecision",
     "ProductionChampionDecisionReader",
+    "ProductionChampionPublicationResult",
     "ProductionChampionRegistry",
+    "ProductionChampionRegistryPublisher",
     "ProductionChampionRegistryReader",
     "ProductionModelActivation",
     "ProductionPredictionConfiguration",

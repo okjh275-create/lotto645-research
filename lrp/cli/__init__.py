@@ -9,6 +9,9 @@ from .backup import main as backup_main
 from .doctor import main as doctor_main
 from .export_history import main as export_history_main
 from .predict import main as predict_main
+from .publish_champion import (
+    main as publish_champion_main,
+)
 from .restore import main as restore_main
 from .review import main as review_main
 from .round_complete import main as round_complete_main
@@ -28,6 +31,7 @@ _COMMANDS = {
     "status": status_main,
     "doctor": doctor_main,
     "export-history": export_history_main,
+    "publish-champion": publish_champion_main,
 }
 
 
@@ -83,6 +87,10 @@ def main(
             "export-history",
             "Export draw history from SQLite",
         ),
+    (
+        "publish-champion",
+        "Publish evaluated champion to production registry",
+    ),
     ):
         subparsers.add_parser(
             name,
