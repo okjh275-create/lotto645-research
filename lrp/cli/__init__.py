@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from typing import Sequence
 
+from .audit_champion import main as audit_champion_main
 from .backup import main as backup_main
 from .doctor import main as doctor_main
 from .export_history import main as export_history_main
@@ -21,6 +22,7 @@ from .weekly import main as weekly_main
 
 
 _COMMANDS = {
+    "audit-champion": audit_champion_main,
     "predict": predict_main,
     "weekly": weekly_main,
     "review": review_main,
@@ -47,6 +49,10 @@ def main(
     )
 
     for name, help_text in (
+        (
+            "audit-champion",
+            "Audit active production champion state",
+        ),
         (
             "predict",
             "Generate prediction artifacts",

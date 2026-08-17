@@ -1,5 +1,11 @@
 """Production activation contracts."""
 
+from lrp.production.champion_audit import (
+    ProductionChampionAuditCheck,
+    ProductionChampionAuditIssue,
+    ProductionChampionAuditResult,
+    ProductionChampionAudit,
+)
 from lrp.production.champion_activation import (
     BASELINE_MODEL,
     ProductionChampionActivation,
@@ -30,6 +36,10 @@ from lrp.production.prediction_configuration import (
 
 
 __all__ = [
+    "ProductionChampionAudit",
+    "ProductionChampionAuditCheck",
+    "ProductionChampionAuditIssue",
+    "ProductionChampionAuditResult",
     "BASELINE_MODEL",
     "ProductionChampionActivation",
     "ProductionChampionDecision",
