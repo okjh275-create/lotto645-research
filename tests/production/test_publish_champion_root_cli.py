@@ -216,6 +216,7 @@ def test_existing_command_count_increases_by_one() -> None:
         "export-history",
         "publish-champion",
         "audit-champion",
+        "model-evaluation",
     }
 
     assert (

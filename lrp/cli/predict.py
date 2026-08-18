@@ -330,8 +330,62 @@ def run_predict(
 
     payload = prediction_to_dict(result)
 
+    artifact_activation = {
+        "enabled": bool(
+            production_activation["enabled"]
+        ),
+        "requested_model": (
+            production_activation.get(
+                "requested_model"
+            )
+        ),
+        "resolved_model": (
+            production_activation.get(
+                "resolved_model"
+            )
+        ),
+        "fallback_applied": bool(
+            production_activation.get(
+                "fallback_applied",
+                False,
+            )
+        ),
+        "fallback_reason": (
+            production_activation.get(
+                "fallback_reason"
+            )
+        ),
+    }
+
+    artifact_payload = dict(
+        payload
+    )
+
+    artifact_payload[
+        "production_activation"
+    ] = dict(
+        artifact_activation
+    )
+
+    artifact_metadata = dict(
+        payload.get(
+            "metadata",
+            {},
+        )
+    )
+
+    artifact_metadata[
+        "production_activation"
+    ] = dict(
+        artifact_activation
+    )
+
+    artifact_payload[
+        "metadata"
+    ] = artifact_metadata
+
     artifact = write_prediction_artifacts(
-        payload,
+        artifact_payload,
         output_root=arguments.output,
     )
 
