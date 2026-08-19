@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from typing import Sequence
 
+from .production_lifecycle import main as production_lifecycle_main
 from .audit_champion import main as audit_champion_main
 from .backup import main as backup_main
 from .doctor import main as doctor_main
@@ -36,6 +37,7 @@ _COMMANDS = {
     "doctor": doctor_main,
     "export-history": export_history_main,
     "publish-champion": publish_champion_main,
+    "production-lifecycle": production_lifecycle_main,
 }
 
 
@@ -103,6 +105,10 @@ def main(
         "publish-champion",
         "Publish evaluated champion to production registry",
     ),
+        (
+            "production-lifecycle",
+            "Run production release lifecycle orchestration",
+        ),
     ):
         subparsers.add_parser(
             name,
