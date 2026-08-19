@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import subprocess
 import sys
@@ -89,8 +89,8 @@ def test_existing_root_commands_are_preserved(
     )
 
 
-def test_root_command_count_becomes_fourteen(
+def test_root_command_count_becomes_fifteen(
 ) -> None:
     assert len(
         root_cli._COMMANDS
-    ) == 14
+    ) == 15

@@ -15,6 +15,7 @@ from .predict import main as predict_main
 from .publish_champion import (
     main as publish_champion_main,
 )
+from .rollback_champion import main as rollback_champion_main
 from .restore import main as restore_main
 from .review import main as review_main
 from .round_complete import main as round_complete_main
@@ -37,6 +38,7 @@ _COMMANDS = {
     "doctor": doctor_main,
     "export-history": export_history_main,
     "publish-champion": publish_champion_main,
+    "rollback-champion": rollback_champion_main,
     "production-lifecycle": production_lifecycle_main,
 }
 
@@ -105,6 +107,10 @@ def main(
         "publish-champion",
         "Publish evaluated champion to production registry",
     ),
+        (
+            "rollback-champion",
+            "Plan or execute production champion rollback",
+        ),
         (
             "production-lifecycle",
             "Run production release lifecycle orchestration",

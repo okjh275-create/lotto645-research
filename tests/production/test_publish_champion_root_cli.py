@@ -217,6 +217,7 @@ def test_existing_command_count_increases_by_one() -> None:
         "publish-champion",
         "audit-champion",
         "model-evaluation",
+        "rollback-champion",
         "production-lifecycle",
     }
 

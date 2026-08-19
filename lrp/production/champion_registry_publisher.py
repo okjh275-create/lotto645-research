@@ -214,7 +214,116 @@ class ProductionChampionRegistryPublisher:
             active_root=active_root,
         )
 
+        self._write_decision_revision(
+            source_bytes=source_bytes,
+            source_sha256=source_sha256,
+            registry_root=root,
+        )
+
+        self._write_publication_revision(
+            result=result,
+            registry_root=root,
+        )
+
         return result
+
+    @staticmethod
+    def _write_decision_revision(
+        *,
+        source_bytes: bytes,
+        source_sha256: str,
+        registry_root: Path,
+    ) -> None:
+        decision_history_root = (
+            registry_root
+            / "history"
+            / "decisions"
+        )
+
+        decision_history_root.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        revision_path = (
+            decision_history_root
+            / f"{source_sha256}.json"
+        )
+
+        if revision_path.exists():
+            if (
+                revision_path.read_bytes()
+                != source_bytes
+            ):
+                raise RuntimeError(
+                    "decision revision hash collision"
+                )
+
+            return
+
+        with revision_path.open(
+            "xb"
+        ) as revision:
+            revision.write(
+                source_bytes
+            )
+
+    @staticmethod
+    def _write_publication_revision(
+        *,
+        result: ProductionChampionPublicationResult,
+        registry_root: Path,
+    ) -> None:
+        history_root = (
+            registry_root
+            / "history"
+        )
+
+        history_root.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        payload = (
+            json.dumps(
+                result.as_dict(),
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n"
+        ).encode(
+            "utf-8"
+        )
+
+        revision_sha256 = (
+            hashlib.sha256(
+                payload
+            )
+            .hexdigest()
+        )
+
+        revision_path = (
+            history_root
+            / f"{revision_sha256}.json"
+        )
+
+        if revision_path.exists():
+            if (
+                revision_path.read_bytes()
+                != payload
+            ):
+                raise RuntimeError(
+                    "publication revision hash collision"
+                )
+
+            return
+
+        with revision_path.open(
+            "xb"
+        ) as revision:
+            revision.write(
+                payload
+            )
 
     @staticmethod
     def _write_publication_record(
