@@ -12,11 +12,14 @@ from lrp.production.champion_registry import (
     ProductionChampionRegistry,
 )
 from lrp.pipelines.prediction import PredictionPipeline
-from lrp.production.champion_registry_reader import (
-    ProductionChampionRegistryReader,
-)
 from lrp.production.prediction_configuration import (
     ProductionPredictionConfiguration,
+)
+from lrp.production.champion_active_snapshot import (
+    ProductionChampionActiveSnapshotReader,
+)
+from lrp.production.champion_decision import (
+    ProductionChampionDecision,
 )
 
 
@@ -350,10 +353,23 @@ class ProductionChampionAudit:
         # --------------------------------------------------
 
         try:
-            decision = (
-                ProductionChampionRegistryReader()
+            active_snapshot = (
+                ProductionChampionActiveSnapshotReader()
                 .read(
                     registry_root_path
+                )
+            )
+
+            decision_payload = json.loads(
+                active_snapshot.decision_bytes.decode(
+                    "utf-8-sig"
+                )
+            )
+
+            decision = (
+                ProductionChampionDecision
+                .from_payload(
+                    decision_payload
                 )
             )
         except Exception:
@@ -388,12 +404,11 @@ class ProductionChampionAudit:
 
         try:
             publication_object = json.loads(
-                publication_path.read_text(
-                    encoding="utf-8-sig"
+                active_snapshot.publication_bytes.decode(
+                    "utf-8-sig"
                 )
             )
         except (
-            OSError,
             UnicodeError,
             json.JSONDecodeError,
         ):
@@ -592,7 +607,7 @@ class ProductionChampionAudit:
 
         active_sha256 = (
             hashlib.sha256(
-                active_decision_path.read_bytes()
+                active_snapshot.decision_bytes
             )
             .hexdigest()
         )
