@@ -9,6 +9,9 @@ import tempfile
 from lrp.production.champion_rollback_history import (
     ChampionRollbackHistoryReader,
 )
+from lrp.production.production_registry_lock import (
+    ProductionRegistryWriterLock,
+)
 
 
 @dataclass(frozen=True)
@@ -91,103 +94,106 @@ class ChampionRollbackService:
                 "rollback plan is required"
             )
 
-        current_active_sha256 = (
-            self._read_active_source_sha256()
-        )
-
-        if (
-            current_active_sha256
-            != plan.active_source_sha256
+        with ProductionRegistryWriterLock(
+            self._registry_root,
         ):
-            raise ValueError(
-                "stale rollback plan"
+            current_active_sha256 = (
+                self._read_active_source_sha256()
             )
 
-        # Re-resolve immediately before any write.
-        # This revalidates both publication history
-        # and the immutable decision snapshot.
-        target = self._reader.resolve(
-            plan.target_revision_id,
-            reject_active=False,
-        )
+            if (
+                current_active_sha256
+                != plan.active_source_sha256
+            ):
+                raise ValueError(
+                    "stale rollback plan"
+                )
 
-        if (
-            target.source_sha256
-            != plan.target_source_sha256
-            or target.selected_model
-            != plan.target_selected_model
-        ):
-            raise ValueError(
-                "stale rollback target"
+            # Re-resolve immediately before any write.
+            # This revalidates both publication history
+            # and the immutable decision snapshot.
+            target = self._reader.resolve(
+                plan.target_revision_id,
+                reject_active=False,
             )
 
-        if (
-            target.source_sha256
-            == current_active_sha256
-        ):
-            raise ValueError(
-                "rollback target is already active"
+            if (
+                target.source_sha256
+                != plan.target_source_sha256
+                or target.selected_model
+                != plan.target_selected_model
+            ):
+                raise ValueError(
+                    "stale rollback target"
+                )
+
+            if (
+                target.source_sha256
+                == current_active_sha256
+            ):
+                raise ValueError(
+                    "rollback target is already active"
+                )
+
+            decision_bytes = (
+                target.decision_path
+                .read_bytes()
             )
 
-        decision_bytes = (
-            target.decision_path
-            .read_bytes()
-        )
-
-        publication_bytes = (
-            target.publication_path
-            .read_bytes()
-        )
-
-        active_root = (
-            self._registry_root
-            / "active"
-        )
-
-        previous_decision_bytes = (
-            active_root
-            / "champion_decision.json"
-        ).read_bytes()
-
-        previous_publication_bytes = (
-            active_root
-            / "publication.json"
-        ).read_bytes()
-
-        self._replace_active_pair(
-            decision_bytes=(
-                decision_bytes
-            ),
-            publication_bytes=(
-                publication_bytes
-            ),
-        )
-
-        try:
-            self._write_rollback_provenance(
-                from_source_sha256=(
-                    plan.active_source_sha256
-                ),
-                to_source_sha256=(
-                    target.source_sha256
-                ),
-                target_revision_id=(
-                    target.revision_id
-                ),
-                selected_model=(
-                    target.selected_model
-                ),
+            publication_bytes = (
+                target.publication_path
+                .read_bytes()
             )
-        except Exception:
+
+            active_root = (
+                self._registry_root
+                / "active"
+            )
+
+            previous_decision_bytes = (
+                active_root
+                / "champion_decision.json"
+            ).read_bytes()
+
+            previous_publication_bytes = (
+                active_root
+                / "publication.json"
+            ).read_bytes()
+
             self._replace_active_pair(
                 decision_bytes=(
-                    previous_decision_bytes
+                    decision_bytes
                 ),
                 publication_bytes=(
-                    previous_publication_bytes
+                    publication_bytes
                 ),
             )
-            raise
+
+            try:
+                self._write_rollback_provenance(
+                    from_source_sha256=(
+                        plan.active_source_sha256
+                    ),
+                    to_source_sha256=(
+                        target.source_sha256
+                    ),
+                    target_revision_id=(
+                        target.revision_id
+                    ),
+                    selected_model=(
+                        target.selected_model
+                    ),
+                )
+            except Exception:
+                self._replace_active_pair(
+                    decision_bytes=(
+                        previous_decision_bytes
+                    ),
+                    publication_bytes=(
+                        previous_publication_bytes
+                    ),
+                )
+                raise
 
 
         return ChampionRollbackResult(

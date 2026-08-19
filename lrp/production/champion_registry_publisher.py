@@ -19,6 +19,9 @@ from lrp.production.champion_registry import (
 from lrp.production.champion_registry_reader import (
     ProductionChampionRegistryReader,
 )
+from lrp.production.production_registry_lock import (
+    ProductionRegistryWriterLock,
+)
 
 
 _KST = timezone(
@@ -123,107 +126,110 @@ class ProductionChampionRegistryPublisher:
             .hexdigest()
         )
 
-        root.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        active_root = (
-            root
-            / "active"
-        )
-
-        active_root.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        target = registry.active_decision_path
-
-        temporary_path: Path | None = None
-
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="wb",
-                dir=target.parent,
-                prefix=(
-                    f".{target.name}."
-                ),
-                suffix=".tmp",
-                delete=False,
-            ) as temporary:
-                temporary.write(
-                    source_bytes
-                )
-                temporary.flush()
-                os.fsync(
-                    temporary.fileno()
-                )
-
-                temporary_path = Path(
-                    temporary.name
-                )
-
-            os.replace(
-                temporary_path,
-                target,
+        with ProductionRegistryWriterLock(
+            root,
+        ):
+            root.mkdir(
+                parents=True,
+                exist_ok=True,
             )
 
-            temporary_path = None
-
-            verified = (
-                ProductionChampionRegistryReader()
-                .read(root)
+            active_root = (
+                root
+                / "active"
             )
 
-            if (
-                verified.selected_model
-                != decision.selected_model
-            ):
-                raise RuntimeError(
-                    "published champion decision "
-                    "verification failed"
-                )
+            active_root.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
 
-        finally:
-            if (
-                temporary_path is not None
-                and temporary_path.exists()
-            ):
-                temporary_path.unlink()
+            target = registry.active_decision_path
 
-        result = (
-            ProductionChampionPublicationResult(
-                source_path=source,
-                source_sha256=source_sha256,
-                published_path=target,
-                published_at_kst=(
-                    datetime.now(
-                        _KST
+            temporary_path: Path | None = None
+
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=target.parent,
+                    prefix=(
+                        f".{target.name}."
+                    ),
+                    suffix=".tmp",
+                    delete=False,
+                ) as temporary:
+                    temporary.write(
+                        source_bytes
                     )
-                    .isoformat()
-                ),
-                selected_model=(
-                    decision.selected_model
-                ),
+                    temporary.flush()
+                    os.fsync(
+                        temporary.fileno()
+                    )
+
+                    temporary_path = Path(
+                        temporary.name
+                    )
+
+                os.replace(
+                    temporary_path,
+                    target,
+                )
+
+                temporary_path = None
+
+                verified = (
+                    ProductionChampionRegistryReader()
+                    .read(root)
+                )
+
+                if (
+                    verified.selected_model
+                    != decision.selected_model
+                ):
+                    raise RuntimeError(
+                        "published champion decision "
+                        "verification failed"
+                    )
+
+            finally:
+                if (
+                    temporary_path is not None
+                    and temporary_path.exists()
+                ):
+                    temporary_path.unlink()
+
+            result = (
+                ProductionChampionPublicationResult(
+                    source_path=source,
+                    source_sha256=source_sha256,
+                    published_path=target,
+                    published_at_kst=(
+                        datetime.now(
+                            _KST
+                        )
+                        .isoformat()
+                    ),
+                    selected_model=(
+                        decision.selected_model
+                    ),
+                )
             )
-        )
 
-        self._write_publication_record(
-            result=result,
-            active_root=active_root,
-        )
+            self._write_publication_record(
+                result=result,
+                active_root=active_root,
+            )
 
-        self._write_decision_revision(
-            source_bytes=source_bytes,
-            source_sha256=source_sha256,
-            registry_root=root,
-        )
+            self._write_decision_revision(
+                source_bytes=source_bytes,
+                source_sha256=source_sha256,
+                registry_root=root,
+            )
 
-        self._write_publication_revision(
-            result=result,
-            registry_root=root,
-        )
+            self._write_publication_revision(
+                result=result,
+                registry_root=root,
+            )
 
         return result
 
