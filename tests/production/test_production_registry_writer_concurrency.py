@@ -184,6 +184,7 @@ from lrp.production.production_registry_lock import (
 
 registry = Path(sys.argv[1])
 ready = Path(sys.argv[2])
+release = Path(sys.argv[3])
 
 with ProductionRegistryWriterLock(
     registry,
@@ -193,7 +194,25 @@ with ProductionRegistryWriterLock(
         "ready",
         encoding="utf-8",
     )
-    time.sleep(1.0)
+
+    deadline = (
+        time.monotonic()
+        + 10.0
+    )
+
+    while (
+        not release.exists()
+        and time.monotonic()
+        < deadline
+    ):
+        time.sleep(
+            0.02
+        )
+
+    if not release.exists():
+        raise RuntimeError(
+            "holder release signal timed out"
+        )
 """
 
     contender = r"""
@@ -225,6 +244,11 @@ raise SystemExit(0)
         / "ready.txt"
     )
 
+    release = (
+        tmp_path
+        / "release.txt"
+    )
+
     first = subprocess.Popen(
         [
             sys.executable,
@@ -232,6 +256,7 @@ raise SystemExit(0)
             holder,
             str(registry),
             str(ready),
+            str(release),
         ],
         cwd=Path.cwd(),
     )
@@ -267,6 +292,11 @@ raise SystemExit(0)
         assert second.returncode == 23
 
     finally:
+        release.write_text(
+            "release",
+            encoding="utf-8",
+        )
+
         first.wait(
             timeout=5.0
         )

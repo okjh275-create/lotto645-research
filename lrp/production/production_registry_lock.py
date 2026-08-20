@@ -6,7 +6,7 @@ import errno
 import json
 import os
 from pathlib import Path
-import platform
+import sys
 import threading
 import time
 from typing import BinaryIO
@@ -24,6 +24,21 @@ _REGISTRY_LOCKS: dict[
     Path,
     threading.Lock,
 ] = {}
+
+
+def _runtime_system() -> str:
+    if os.name == "nt":
+        return "Windows"
+
+    if sys.platform.startswith(
+        "linux"
+    ):
+        return "Linux"
+
+    if sys.platform == "darwin":
+        return "Darwin"
+
+    return sys.platform
 
 
 def _registry_thread_lock(
@@ -264,7 +279,7 @@ class ProductionRegistryWriterLock:
         self,
         deadline: float,
     ) -> bool:
-        system = platform.system()
+        system = _runtime_system()
 
         while True:
             try:
@@ -310,7 +325,7 @@ class ProductionRegistryWriterLock:
     def _release_os_lock(
         self,
     ) -> None:
-        system = platform.system()
+        system = _runtime_system()
 
         if system == "Windows":
             self._release_windows_lock()
