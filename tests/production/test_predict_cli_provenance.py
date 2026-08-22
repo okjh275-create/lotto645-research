@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timedelta, timezone
 
 import argparse
 import json
@@ -24,6 +25,17 @@ class _FakeStatistics:
 
 
 class _FakeResult:
+
+    generated_at_kst = datetime(
+        2026,
+        8,
+        21,
+        17,
+        0,
+        tzinfo=timezone(
+            timedelta(hours=9)
+        ),
+    )
     generated_count = 100
 
 
@@ -98,11 +110,7 @@ def _patch_prediction_runtime(
     monkeypatch.setattr(
         cli,
         "prediction_to_dict",
-        lambda result: {
-            "sets": [],
-            "top5_practical": [],
-            "diversity": {},
-        },
+        lambda result: {'round': 1232, 'sets': [{'id': 'S1', 'numbers': [1, 7, 13, 24, 32, 41], 'score': 1.0, 'risk_flags': [], 'features': {}}, {'id': 'S2', 'numbers': [2, 8, 17, 25, 34, 42], 'score': 0.95, 'risk_flags': [], 'features': {}}, {'id': 'S3', 'numbers': [3, 9, 18, 26, 35, 43], 'score': 0.9, 'risk_flags': [], 'features': {}}, {'id': 'S4', 'numbers': [4, 10, 19, 27, 36, 44], 'score': 0.85, 'risk_flags': [], 'features': {}}, {'id': 'S5', 'numbers': [5, 11, 20, 28, 37, 45], 'score': 0.8, 'risk_flags': [], 'features': {}}, {'id': 'S6', 'numbers': [6, 12, 21, 29, 33, 40], 'score': 0.75, 'risk_flags': [], 'features': {}}, {'id': 'S7', 'numbers': [1, 14, 22, 30, 38, 45], 'score': 0.7, 'risk_flags': [], 'features': {}}, {'id': 'S8', 'numbers': [2, 15, 23, 31, 39, 44], 'score': 0.6499999999999999, 'risk_flags': [], 'features': {}}, {'id': 'S9', 'numbers': [3, 16, 24, 32, 40, 43], 'score': 0.6, 'risk_flags': [], 'features': {}}, {'id': 'S10', 'numbers': [4, 17, 25, 33, 41, 42], 'score': 0.55, 'risk_flags': [], 'features': {}}], 'top5_practical': ['S1', 'S2', 'S3', 'S4', 'S5'], 'diversity': {'avg_jaccard': 0.1, 'unique_numbers': 45}, 'metadata': {}},
     )
 
     monkeypatch.setattr(
@@ -117,6 +125,17 @@ def _patch_prediction_runtime(
         cli.PredictionPipeline,
         "load",
         lambda **kwargs: _FakePipeline(),
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "write_operation_artifact",
+        lambda payload, **kwargs: {
+            "directory": "prediction-evaluation-sources",
+            "data_path": "evaluation_source.json",
+            "manifest_path": "manifest.json",
+            "sha256": "a" * 64,
+        },
     )
 
 

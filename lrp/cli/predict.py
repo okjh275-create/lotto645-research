@@ -22,6 +22,11 @@ from lrp.pipelines import (
     PredictionRequest,
     prediction_to_dict,
 )
+from lrp.pipelines.durable_prediction_evaluation_source import (
+    DurablePredictionEvaluationSource,
+    source_to_dict,
+)
+from lrp.operations import write_operation_artifact
 from lrp.production import (
     ProductionPredictionConfiguration,
 )
@@ -389,6 +394,25 @@ def run_predict(
         output_root=arguments.output,
     )
 
+    durable_evaluation_source = DurablePredictionEvaluationSource(
+        schema_version="1.0",
+        round_no=request.round_no,
+        top_k=request.top_k,
+        selected_sets=tuple(
+            tuple(item["numbers"])
+            for item in payload["sets"]
+        ),
+        generated_at_kst=result.generated_at_kst,
+    )
+
+    evaluation_source_artifact = write_operation_artifact(
+        source_to_dict(durable_evaluation_source),
+        output_root=arguments.output,
+        artifact_type="prediction-evaluation-sources",
+        round_no=request.round_no,
+        filename="evaluation_source.json",
+    )
+
     elapsed = time.perf_counter() - started
 
     return {
@@ -408,6 +432,7 @@ def run_predict(
         "production_activation": production_activation,
         "elapsed_seconds": round(elapsed, 3),
         "artifact": artifact,
+        "evaluation_source_artifact": evaluation_source_artifact,
         "payload": payload,
     }
 
