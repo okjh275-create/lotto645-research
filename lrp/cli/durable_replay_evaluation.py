@@ -12,6 +12,12 @@ from lrp.operations.durable_replay_execution import (
 )
 
 
+from lrp.operations.durable_replay_artifact_discovery import DurableReplayArtifactSelector
+from lrp.operations.durable_replay_composition import (
+    DurableReplayCompositionRequest,
+    DurableReplayCompositionService,
+)
+
 def _parse_source(
     value: str,
 ) -> DurableReplayExecutionSource:
@@ -55,6 +61,33 @@ def _parse_source(
         strategy_name=strategy_name,
     )
 
+def _parse_selector(value: str) -> DurableReplayArtifactSelector:
+    fields = value.split("|")
+
+    if not 2 <= len(fields) <= 4:
+        raise argparse.ArgumentTypeError(
+            "selector descriptor must contain 2 to 4 fields"
+        )
+
+    round_text = fields[0]
+
+    if not round_text.isdecimal():
+        raise argparse.ArgumentTypeError(
+            "selector round_no must be an integer"
+        )
+
+    round_no = int(round_text)
+    model_name = fields[1]
+    regime_id = fields[2] if len(fields) >= 3 and fields[2] != "" else None
+    strategy_name = fields[3] if len(fields) >= 4 and fields[3] != "" else None
+
+    return DurableReplayArtifactSelector(
+        round_no=round_no,
+        model_name=model_name,
+        regime_id=regime_id,
+        strategy_name=strategy_name,
+    )
+
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -85,18 +118,21 @@ def _parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--candidate",
-        required=True,
+        required=False,
         action="append",
         type=_parse_source,
     )
 
     parser.add_argument(
         "--baseline",
-        required=True,
+        required=False,
         action="append",
         type=_parse_source,
     )
 
+    parser.add_argument("--artifact-root", required=False)
+    parser.add_argument("--candidate-selector", action="append", type=_parse_selector, required=False)
+    parser.add_argument("--baseline-selector", action="append", type=_parse_selector, required=False)
     return parser
 
 
@@ -172,41 +208,75 @@ def _result_to_dict(
     }
 
 
-def main(
-    argv: Sequence[str] | None = None,
-) -> int:
-    args = _parser().parse_args(argv)
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
 
-    request = DurableReplayExecutionRequest(
-        history_path=args.history,
-        window_name=args.window_name,
-        start_round=args.start_round,
-        end_round=args.end_round,
-        candidate_sources=tuple(
-            args.candidate
-        ),
-        baseline_sources=tuple(
-            args.baseline
-        ),
-    )
+    candidate_sources = tuple(args.candidate or ())
+    baseline_sources = tuple(args.baseline or ())
+    candidate_selectors = tuple(args.candidate_selector or ())
+    baseline_selectors = tuple(args.baseline_selector or ())
 
-    result = (
-        DurableReplayExecutionService()
-        .execute(
+    has_explicit_sources = bool(candidate_sources or baseline_sources)
+    has_selectors = bool(candidate_selectors or baseline_selectors)
+    has_artifact_root = args.artifact_root is not None
+
+    if has_explicit_sources and (has_selectors or has_artifact_root):
+        parser.error(
+            "explicit source mode and selector mode cannot be mixed"
+        )
+
+    if has_selectors and not has_artifact_root:
+        parser.error(
+            "--artifact-root is required with selector mode"
+        )
+
+    if has_artifact_root and not has_selectors:
+        parser.error(
+            "--artifact-root requires selector mode"
+        )
+
+    if not has_explicit_sources and not has_selectors:
+        parser.error(
+            "one explicit source or selector source is required"
+        )
+
+    if has_selectors:
+        request = DurableReplayCompositionRequest(
+            artifact_root=args.artifact_root,
+            history_path=args.history,
+            window_name=args.window_name,
+            start_round=args.start_round,
+            end_round=args.end_round,
+            candidate_selectors=candidate_selectors,
+            baseline_selectors=baseline_selectors,
+        )
+
+        result = DurableReplayCompositionService().execute(
             request=request
         )
-    )
+    else:
+        request = DurableReplayExecutionRequest(
+            history_path=args.history,
+            window_name=args.window_name,
+            start_round=args.start_round,
+            end_round=args.end_round,
+            candidate_sources=candidate_sources,
+            baseline_sources=baseline_sources,
+        )
 
-    payload = _result_to_dict(
-        result
-    )
+        result = DurableReplayExecutionService().execute(
+            request=request
+        )
+
+    payload = _result_to_dict(result)
 
     print(
-        json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
         )
-    )
 
     return 0

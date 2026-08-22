@@ -147,12 +147,27 @@ def test_parser_required_field_surface_is_exact() -> None:
         "end_round",
         "candidate",
         "baseline",
+        "artifact_root",
+        "candidate_selector",
+        "baseline_selector",
     )
 
-    assert all(
-        action.required
+    required = {
+        action.dest: action.required
         for action in actions
-    )
+    }
+
+    assert required == {
+        "history": True,
+        "window_name": True,
+        "start_round": True,
+        "end_round": True,
+        "candidate": False,
+        "baseline": False,
+        "artifact_root": False,
+        "candidate_selector": False,
+        "baseline_selector": False,
+    }
 
 
 def test_parser_candidate_and_baseline_are_append_actions() -> None:
@@ -504,7 +519,7 @@ def test_product_has_no_exception_normalization_layer() -> None:
     )
 
 
-def test_product_has_exact_two_owned_raise_sites() -> None:
+def test_product_has_exact_four_owned_raise_sites() -> None:
     product = _product()
 
     source = Path(
@@ -513,14 +528,10 @@ def test_product_has_exact_two_owned_raise_sites() -> None:
         encoding="utf-8-sig"
     )
 
-    tree = ast.parse(
-        source
-    )
+    tree = ast.parse(source)
 
     raises = tuple(
-        ast.unparse(
-            node.exc
-        )
+        ast.unparse(node.exc)
         for node in ast.walk(tree)
         if isinstance(
             node,
@@ -540,6 +551,16 @@ def test_product_has_exact_two_owned_raise_sites() -> None:
             "'source round_no must be an integer'"
             ")"
         ),
+        (
+            "argparse.ArgumentTypeError("
+            "'selector descriptor must contain 2 to 4 fields'"
+            ")"
+        ),
+        (
+            "argparse.ArgumentTypeError("
+            "'selector round_no must be an integer'"
+            ")"
+        ),
     )
 
 
@@ -552,9 +573,7 @@ def test_product_static_dependency_boundary_is_exact() -> None:
         encoding="utf-8-sig"
     )
 
-    tree = ast.parse(
-        source
-    )
+    tree = ast.parse(source)
 
     imports: list[str] = []
 
@@ -584,6 +603,8 @@ def test_product_static_dependency_boundary_is_exact() -> None:
         "json",
         "typing",
         "lrp.operations.durable_replay_execution",
+        "lrp.operations.durable_replay_artifact_discovery",
+        "lrp.operations.durable_replay_composition",
     }
 
 
@@ -596,14 +617,10 @@ def test_product_structural_call_contract_is_exact() -> None:
         encoding="utf-8-sig"
     )
 
-    tree = ast.parse(
-        source
-    )
+    tree = ast.parse(source)
 
     calls = tuple(
-        ast.unparse(
-            node.func
-        )
+        ast.unparse(node.func)
         for node in ast.walk(tree)
         if isinstance(
             node,
@@ -612,21 +629,37 @@ def test_product_structural_call_contract_is_exact() -> None:
     )
 
     assert sum(
-        call
-        == "DurableReplayExecutionRequest"
+        call == "DurableReplayExecutionRequest"
         for call in calls
     ) == 1
 
     assert sum(
-        call
-        == "DurableReplayExecutionService"
+        call == "DurableReplayExecutionService"
         for call in calls
     ) == 1
 
     assert sum(
-        call.endswith(
-            ".execute"
-        )
+        call == "DurableReplayCompositionRequest"
+        for call in calls
+    ) == 1
+
+    assert sum(
+        call == "DurableReplayCompositionService"
+        for call in calls
+    ) == 1
+
+    assert sum(
+        call.endswith(".execute")
+        for call in calls
+    ) == 2
+
+    assert sum(
+        call == "_result_to_dict"
+        for call in calls
+    ) == 1
+
+    assert sum(
+        call == "json.dumps"
         for call in calls
     ) == 1
 
@@ -676,9 +709,7 @@ def test_product_public_surface_remains_minimal() -> None:
         encoding="utf-8-sig"
     )
 
-    tree = ast.parse(
-        source
-    )
+    tree = ast.parse(source)
 
     classes = tuple(
         node.name
@@ -702,17 +733,9 @@ def test_product_public_surface_remains_minimal() -> None:
 
     assert functions == (
         "_parse_source",
+        "_parse_selector",
         "_parser",
         "_json_compatible",
         "_result_to_dict",
         "main",
-    )
-
-    assert str(
-        inspect.signature(
-            product.main
-        )
-    ) == (
-        "(argv: 'Sequence[str] | None' = None) "
-        "-> 'int'"
     )

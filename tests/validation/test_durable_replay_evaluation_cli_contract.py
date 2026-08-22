@@ -149,27 +149,32 @@ def test_parser_requires_end_round() -> None:
         product.main(argv)
 
 
-def test_parser_requires_candidate() -> None:
+def test_parser_candidate_is_mode_optional() -> None:
     product = _product()
-    argv = _argv()
 
-    while "--candidate" in argv:
-        index = argv.index("--candidate")
-        del argv[index:index + 2]
+    parser = product._parser()
 
-    with pytest.raises(SystemExit):
-        product.main(argv)
+    action = next(
+        action
+        for action in parser._actions
+        if "--candidate" in action.option_strings
+    )
+
+    assert action.required is False
 
 
-def test_parser_requires_baseline() -> None:
+def test_parser_baseline_is_mode_optional() -> None:
     product = _product()
-    argv = _argv()
 
-    index = argv.index("--baseline")
-    del argv[index:index + 2]
+    parser = product._parser()
 
-    with pytest.raises(SystemExit):
-        product.main(argv)
+    action = next(
+        action
+        for action in parser._actions
+        if "--baseline" in action.option_strings
+    )
+
+    assert action.required is False
 
 
 def test_candidate_source_descriptor_minimal_form() -> None:
