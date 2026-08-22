@@ -11,6 +11,7 @@ from .backup import main as backup_main
 from .doctor import main as doctor_main
 from .export_history import main as export_history_main
 from .model_evaluation import main as model_evaluation_main
+from .durable_replay_evaluation import main as durable_replay_evaluation_main
 from .predict import main as predict_main
 from .publish_champion import (
     main as publish_champion_main,
@@ -26,6 +27,7 @@ from .weekly import main as weekly_main
 
 _COMMANDS = {
     "model-evaluation": model_evaluation_main,
+    "durable-replay-evaluation": durable_replay_evaluation_main,
     "audit-champion": audit_champion_main,
     "predict": predict_main,
     "weekly": weekly_main,
