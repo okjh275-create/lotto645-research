@@ -380,3 +380,23 @@ Validation is fail-closed: bool values are rejected as numeric evidence, NaN is 
 The assessment result is immutable and its window projection is detached and read-only.
 
 This capability does not create a winner label, promotion recommendation, champion action, selector/discovery behavior, CLI command, database persistence, or production lifecycle mutation.
+
+## Durable replay result promotion eligibility
+
+The read-only DurableReplayResultPromotionEligibilityService consumes an existing DurableReplayResultComparisonAssessment.
+
+It returns the frozen DurableReplayResultPromotionEligibility model and preserves status, round_count, candidate_model_name, baseline_model_name, the three AX aggregate counts, and the window context.
+
+The recommendation policy uses AX aggregate counts only:
+
+- eligible: candidate_advantage_count > baseline_advantage_count and candidate_advantage_count >= 2
+- ineligible: baseline_advantage_count > candidate_advantage_count
+- insufficient_evidence: all remaining valid cases
+
+The aggregate counts must be non-negative integers, bool is rejected, and candidate_advantage_count + neutral_count + baseline_advantage_count must sum to 9.
+
+The window must be a mapping. The returned window is detached and read-only.
+
+This layer does not reinterpret raw delta magnitudes, does not declare a winner, and does not publish or roll back a champion.
+
+No production lifecycle mutation, CLI command, selector/discovery behavior, database persistence, or existing promotion.py modification is performed by this capability.
