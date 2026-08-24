@@ -265,3 +265,39 @@ Result artifact identity:
 The storage partition uses `end_round`. One replay invocation produces at most one result artifact.
 The manifest uses the existing operation artifact contract, including SHA256 and byte-count metadata.
 The replay evaluation algorithm, source discovery, actual-draw projection, selector semantics, and `artifact_key` behavior are unchanged.
+
+## Durable replay result artifact read-back
+
+Durable replay result artifacts can be consumed through the dedicated read-only
+`DurableReplayResultArtifactConsumer`.
+
+The consumer identity is explicit:
+
+```text
+artifact_root + end_round
+```
+
+The consumer resolves exactly:
+
+```text
+<artifact_root>/
+  durable-replay-evaluations/
+    round_<END_ROUND>/
+      evaluation_result.json
+      manifest.json
+```
+
+Before reading `evaluation_result.json`, the consumer calls the existing
+`verify_manifest` runtime verifier and requires a `PASS` verification status.
+The consumer does not duplicate runtime SHA256 verification ownership.
+
+On successful verification, the result JSON must contain a top-level object.
+The payload is returned as a read-only mapping. The consumer does not mutate
+the result artifact, manifest, or operation log.
+
+The consumer does not perform latest-result discovery, sibling-round scanning,
+cross-round search, candidate/baseline source selection, result rewriting,
+production champion mutation, or replay algorithm changes.
+
+Missing paths, manifest verification failures, invalid JSON, non-object payloads,
+and wrong-round requests fail closed.
