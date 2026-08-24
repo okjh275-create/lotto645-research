@@ -360,3 +360,23 @@ The existing evaluation.window mapping is copied into a detached read-only windo
 The comparison summary does not create a winner or loser label, does not make a promotion recommendation, does not change ranking weights, and does not add discovery, selector, CLI, filesystem, database, or production lifecycle behavior.
 
 Missing top-k blocks, missing frozen delta fields, non-mapping structures, or invalid numeric values fail closed rather than receiving synthetic defaults.
+
+## Durable replay result comparison assessment
+
+The deterministic, read-only DurableReplayResultComparisonAssessmentService consumes an existing DurableReplayResultComparisonSummary.
+
+It returns the frozen DurableReplayResultComparisonAssessment model and preserves status, round_count, candidate_model_name, baseline_model_name, and window context.
+
+Each of the nine existing AW comparison delta metrics is classified strictly by sign:
+
+- positive value => candidate_advantage
+- exact zero => neutral
+- negative value => baseline_advantage
+
+No epsilon band or custom threshold is applied. The three aggregate counts candidate_advantage_count, neutral_count, and baseline_advantage_count must sum to 9.
+
+Validation is fail-closed: bool values are rejected as numeric evidence, NaN is rejected, non-numeric delta evidence is rejected, and window must be a mapping.
+
+The assessment result is immutable and its window projection is detached and read-only.
+
+This capability does not create a winner label, promotion recommendation, champion action, selector/discovery behavior, CLI command, database persistence, or production lifecycle mutation.
