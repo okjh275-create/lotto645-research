@@ -519,7 +519,7 @@ def test_product_has_no_exception_normalization_layer() -> None:
     )
 
 
-def test_product_has_exact_four_owned_raise_sites() -> None:
+def test_product_has_exact_eight_owned_raise_sites() -> None:
     product = _product()
 
     source = Path(
@@ -541,26 +541,14 @@ def test_product_has_exact_four_owned_raise_sites() -> None:
     )
 
     assert raises == (
-        (
-            "argparse.ArgumentTypeError("
-            "'source descriptor must contain 3 to 5 fields'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'source round_no must be an integer'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'selector descriptor must contain 2 to 4 fields'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'selector round_no must be an integer'"
-            ")"
-        ),
+        "argparse.ArgumentTypeError('source descriptor must contain 3 to 5 fields')",
+        "argparse.ArgumentTypeError('source round_no must be an integer')",
+        "argparse.ArgumentTypeError('selector descriptor must contain 2 to 5 fields')",
+        "argparse.ArgumentTypeError('selector round_no must be an integer')",
+        "argparse.ArgumentTypeError('artifact_key must not be empty')",
+        "argparse.ArgumentTypeError('artifact_key must be at most 128 characters')",
+        "argparse.ArgumentTypeError('artifact_key contains invalid characters')",
+        "argparse.ArgumentTypeError('artifact_key must not be dot path')",
     )
 
 
@@ -601,6 +589,7 @@ def test_product_static_dependency_boundary_is_exact() -> None:
         "argparse",
         "dataclasses",
         "json",
+        "re",
         "typing",
         "lrp.operations.durable_replay_execution",
         "lrp.operations.durable_replay_artifact_discovery",

@@ -26,7 +26,7 @@ Until the repository-level entrypoint is proven, use the following form only as 
   --start-round <START_ROUND>
   --end-round <END_ROUND>
   --artifact-root <ARTIFACT_ROOT>
-  --candidate-selector "ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME]]"
+  --candidate-selector "ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME[|ARTIFACT_KEY]]]"
 ```
 
 This template is not claimed runnable. Placeholder values must be replaced only with verified repository inputs.
@@ -74,7 +74,7 @@ The composition layer delegates canonical artifact path projection to the discov
 The selector descriptor syntax is:
 
 ```text
-ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME]]
+ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME[|ARTIFACT_KEY]]]
 ```
 
 Fields:
@@ -86,6 +86,23 @@ Fields:
 
 The CLI does not infer model identity, candidate/baseline classification, regime identity, or strategy identity.
 
+
+### Artifact key
+
+`ARTIFACT_KEY` is an optional physical storage identity. It does not replace
+`MODEL_NAME`, and it is not inferred from the model name.
+
+Existing two- to four-field selector descriptors retain their prior meaning.
+A fifth field supplies the artifact key:
+
+```text
+ROUND_NO|MODEL_NAME|REGIME_ID|STRATEGY_NAME|ARTIFACT_KEY
+```
+
+The artifact key uses the same explicit validation policy as keyed prediction
+output: ASCII letters, digits, `.`, `_`, and `-`; maximum length 128; no path
+separators, absolute path forms, empty value, `.` or `..`.
+
 ## Artifact Root
 
 `--artifact-root` is the parent directory of `prediction-evaluation-sources/`.
@@ -94,6 +111,14 @@ For a selector round, the discovery layer derives the canonical artifact path:
 
 ```text
 <artifact_root>/prediction-evaluation-sources/round_<NNNN>/evaluation_source.json
+
+When `artifact_key` is explicit, the canonical keyed path is:
+
+```text
+<artifact_root>/prediction-evaluation-sources/round_<NNNN>/<artifact_key>/evaluation_source.json
+```
+
+When `artifact_key` is omitted, the legacy round-only path remains unchanged. Keyed lookup does not fall back to the legacy path, and legacy lookup does not scan keyed children.
 ```
 
 `evaluation_source.json` existence is not checked by the CLI, composition layer, or artifact-discovery path projection layer. Artifact reading and validation belong to lower layers.
@@ -145,6 +170,23 @@ The CLI does not add an exception-normalization layer.
 
 ## Examples
 
+The following repository-level selector-mode command shape is now verified.
+The placeholder values remain placeholders and must be replaced with real paths,
+rounds, model labels, and artifact keys:
+
+```text
+python -m lrp durable-replay-evaluation \
+  --history <HISTORY_PATH> \
+  --window-name <WINDOW_NAME> \
+  --start-round <START_ROUND> \
+  --end-round <END_ROUND> \
+  --artifact-root <ARTIFACT_ROOT> \
+  --candidate-selector "<ROUND>|<MODEL>|||<CANDIDATE_ARTIFACT_KEY>" \
+  --baseline-selector "<ROUND>|<MODEL>|||<BASELINE_ARTIFACT_KEY>"
+```
+
+
+
 ### Selector mode syntax template
 
 The following is a syntax-only template. It is not a verified executable command because the repository-level entrypoint, real durable replay artifact, and real selector model identity have not yet been proven for a production invocation.
@@ -156,7 +198,7 @@ The following is a syntax-only template. It is not a verified executable command
   --start-round <START_ROUND>
   --end-round <END_ROUND>
   --artifact-root <ARTIFACT_ROOT>
-  --candidate-selector "ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME]]"
+  --candidate-selector "ROUND_NO|MODEL_NAME[|REGIME_ID[|STRATEGY_NAME[|ARTIFACT_KEY]]]"
 ```
 
 `--candidate-selector` and `--baseline-selector` are repeatable. Add only verified selector values and preserve the desired CLI order.

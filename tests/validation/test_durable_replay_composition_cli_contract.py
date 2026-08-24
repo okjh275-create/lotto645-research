@@ -184,7 +184,7 @@ def test_parse_selector_valid_matrix(
     [
         "",
         "1",
-        "1|model|regime|strategy|extra",
+        "1|model|regime|strategy|artifact|extra",
     ],
 )
 def test_parse_selector_rejects_invalid_field_count(
@@ -196,12 +196,10 @@ def test_parse_selector_rejects_invalid_field_count(
         argparse.ArgumentTypeError,
         match=(
             "selector descriptor must contain "
-            "2 to 4 fields"
+            "2 to 5 fields"
         ),
     ):
-        module._parse_selector(
-            value
-        )
+        module._parse_selector(value)
 
 
 @pytest.mark.parametrize(
@@ -1054,12 +1052,18 @@ def test_product_public_surface_remains_main_only() -> None:
 
 
 def test_root_command_name_is_unchanged() -> None:
-    root_source = Path(
-        "lrp/cli/__init__.py"
-    ).read_text(
-        encoding="utf-8-sig"
-    )
+    root_source = Path("lrp/cli/__init__.py").read_text(encoding="utf-8-sig")
 
-    assert root_source.count(
-        "durable-replay-evaluation"
-    ) == 1
+    assert root_source.count("durable-replay-evaluation") == 2
+
+    tree = ast.parse(root_source)
+    commands_assignment = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "_COMMANDS" for target in node.targets)
+    )
+    commands_segment = ast.get_source_segment(root_source, commands_assignment) or ""
+    main = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main")
+    main_segment = ast.get_source_segment(root_source, main) or ""
+    assert commands_segment.count("durable-replay-evaluation") == 1
+    assert main_segment.count("durable-replay-evaluation") == 1

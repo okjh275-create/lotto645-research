@@ -209,7 +209,7 @@ def test_hardening_selector_parser_valid_matrix() -> None:
         "+1|model",
         "-1|model",
         "abc|model",
-        "1|model|regime|strategy|extra",
+        "1|model|regime|strategy|artifact|extra",
     ),
 )
 def test_hardening_selector_parser_rejects_invalid_descriptors(
@@ -738,6 +738,7 @@ def test_hardening_exact_dependency_boundary() -> None:
         "argparse",
         "dataclasses",
         "json",
+        "re",
         "typing",
         "lrp.operations.durable_replay_execution",
         "lrp.operations.durable_replay_artifact_discovery",
@@ -762,26 +763,14 @@ def test_hardening_exact_owned_raise_boundary() -> None:
     )
 
     assert raises == (
-        (
-            "argparse.ArgumentTypeError("
-            "'source descriptor must contain 3 to 5 fields'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'source round_no must be an integer'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'selector descriptor must contain 2 to 4 fields'"
-            ")"
-        ),
-        (
-            "argparse.ArgumentTypeError("
-            "'selector round_no must be an integer'"
-            ")"
-        ),
+        "argparse.ArgumentTypeError('source descriptor must contain 3 to 5 fields')",
+        "argparse.ArgumentTypeError('source round_no must be an integer')",
+        "argparse.ArgumentTypeError('selector descriptor must contain 2 to 5 fields')",
+        "argparse.ArgumentTypeError('selector round_no must be an integer')",
+        "argparse.ArgumentTypeError('artifact_key must not be empty')",
+        "argparse.ArgumentTypeError('artifact_key must be at most 128 characters')",
+        "argparse.ArgumentTypeError('artifact_key contains invalid characters')",
+        "argparse.ArgumentTypeError('artifact_key must not be dot path')",
     )
 
 

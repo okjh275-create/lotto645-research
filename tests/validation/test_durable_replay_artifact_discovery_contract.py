@@ -84,6 +84,7 @@ def test_selector_fields_are_exact() -> None:
         "model_name",
         "regime_id",
         "strategy_name",
+        "artifact_key",
     )
 
 
@@ -97,7 +98,8 @@ def test_selector_public_signature_is_exact() -> None:
     ) == (
         "(round_no: 'int', model_name: 'str', "
         "regime_id: 'str | None' = None, "
-        "strategy_name: 'str | None' = None) -> None"
+        "strategy_name: 'str | None' = None, "
+        "artifact_key: 'str | None' = None) -> None"
     )
 
 

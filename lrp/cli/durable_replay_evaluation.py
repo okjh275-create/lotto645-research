@@ -5,6 +5,7 @@ from dataclasses import asdict, is_dataclass
 import json
 from typing import Sequence
 
+import re
 from lrp.operations.durable_replay_execution import (
     DurableReplayExecutionRequest,
     DurableReplayExecutionService,
@@ -64,9 +65,9 @@ def _parse_source(
 def _parse_selector(value: str) -> DurableReplayArtifactSelector:
     fields = value.split("|")
 
-    if not 2 <= len(fields) <= 4:
+    if not 2 <= len(fields) <= 5:
         raise argparse.ArgumentTypeError(
-            "selector descriptor must contain 2 to 4 fields"
+            "selector descriptor must contain 2 to 5 fields"
         )
 
     round_text = fields[0]
@@ -78,14 +79,48 @@ def _parse_selector(value: str) -> DurableReplayArtifactSelector:
 
     round_no = int(round_text)
     model_name = fields[1]
-    regime_id = fields[2] if len(fields) >= 3 and fields[2] != "" else None
-    strategy_name = fields[3] if len(fields) >= 4 and fields[3] != "" else None
+    regime_id = (
+        fields[2]
+        if len(fields) >= 3 and fields[2] != ""
+        else None
+    )
+    strategy_name = (
+        fields[3]
+        if len(fields) >= 4 and fields[3] != ""
+        else None
+    )
+    artifact_key = fields[4] if len(fields) >= 5 else None
+
+    if artifact_key is not None:
+        if not artifact_key:
+            raise argparse.ArgumentTypeError(
+                "artifact_key must not be empty"
+            )
+        if len(artifact_key) > 128:
+            raise argparse.ArgumentTypeError(
+                "artifact_key must be at most 128 characters"
+            )
+        if (
+            re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._-]*",
+                artifact_key,
+            )
+            is None
+        ):
+            raise argparse.ArgumentTypeError(
+                "artifact_key contains invalid characters"
+            )
+        if artifact_key in {".", ".."}:
+            raise argparse.ArgumentTypeError(
+                "artifact_key must not be dot path"
+            )
 
     return DurableReplayArtifactSelector(
         round_no=round_no,
         model_name=model_name,
         regime_id=regime_id,
         strategy_name=strategy_name,
+        artifact_key=artifact_key,
     )
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from lrp.contracts.exceptions import ContractError
 from lrp.operations.durable_replay_execution import (
@@ -17,6 +18,31 @@ class DurableReplayArtifactSelector:
     model_name: str
     regime_id: str | None = None
     strategy_name: str | None = None
+    artifact_key: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.artifact_key is not None:
+            if not isinstance(self.artifact_key, str):
+                raise ContractError("artifact_key must be str or None")
+            if not self.artifact_key:
+                raise ContractError("artifact_key must not be empty")
+            if len(self.artifact_key) > 128:
+                raise ContractError(
+                    "artifact_key must be at most 128 characters"
+                )
+            if (
+                re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9._-]*",
+                    self.artifact_key,
+                )
+                is None
+            ):
+                raise ContractError(
+                    "artifact_key contains invalid characters"
+                )
+            if self.artifact_key in {".", ".."}:
+                raise ContractError("artifact_key must not be dot path")
+    artifact_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -83,10 +109,18 @@ class DurableReplayArtifactDiscoveryService:
                 "DurableReplayArtifactSelector"
             )
 
-        artifact_path = (
+        round_directory = (
             Path(artifact_root)
             / "prediction-evaluation-sources"
             / f"round_{selector.round_no:04d}"
+        )
+        if selector.artifact_key is not None:
+            round_directory = (
+                round_directory
+                / selector.artifact_key
+            )
+        artifact_path = (
+            round_directory
             / "evaluation_source.json"
         )
 

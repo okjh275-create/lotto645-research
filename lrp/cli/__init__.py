@@ -57,67 +57,71 @@ def main(
     )
 
     for name, help_text in (
-        (
-            "model-evaluation",
-            "Run historical model evaluation",
-        ),
-        (
-            "audit-champion",
-            "Audit active production champion state",
-        ),
-        (
-            "predict",
-            "Generate prediction artifacts",
-        ),
-        (
-            "weekly",
-            "Run the weekly prediction workflow",
-        ),
-        (
-            "review",
-            "Review a saved prediction",
-        ),
-        (
-            "round-complete",
-            "Complete review and learning for a draw",
-        ),
-        (
-            "verify",
-            "Verify an artifact manifest",
-        ),
-        (
-            "backup",
-            "Create a repository ZIP backup",
-        ),
-        (
-            "restore",
-            "Restore a repository ZIP backup",
-        ),
-        (
-            "status",
-            "Show lightweight platform status",
-        ),
-        (
-            "doctor",
-            "Run lightweight platform diagnostics",
-        ),
-        (
-            "export-history",
-            "Export draw history from SQLite",
-        ),
-    (
-        "publish-champion",
-        "Publish evaluated champion to production registry",
-    ),
-        (
-            "rollback-champion",
-            "Plan or execute production champion rollback",
-        ),
-        (
-            "production-lifecycle",
-            "Run production release lifecycle orchestration",
-        ),
-    ):
+                               (
+                                   'model-evaluation',
+                                   'Run historical model evaluation',
+                               ),
+                               (
+                                   'audit-champion',
+                                   'Audit active production champion state',
+                               ),
+                               (
+                                   'predict',
+                                   'Generate prediction artifacts',
+                               ),
+                               (
+                                   'weekly',
+                                   'Run the weekly prediction workflow',
+                               ),
+                               (
+                                   'review',
+                                   'Review a saved prediction',
+                               ),
+                               (
+                                   'round-complete',
+                                   'Complete review and learning for a draw',
+                               ),
+                               (
+                                   'verify',
+                                   'Verify an artifact manifest',
+                               ),
+                               (
+                                   'backup',
+                                   'Create a repository ZIP backup',
+                               ),
+                               (
+                                   'restore',
+                                   'Restore a repository ZIP backup',
+                               ),
+                               (
+                                   'status',
+                                   'Show lightweight platform status',
+                               ),
+                               (
+                                   'doctor',
+                                   'Run lightweight platform diagnostics',
+                               ),
+                               (
+                                   'export-history',
+                                   'Export draw history from SQLite',
+                               ),
+                               (
+                                   'publish-champion',
+                                   'Publish evaluated champion to production registry',
+                               ),
+                               (
+                                   'rollback-champion',
+                                   'Plan or execute production champion rollback',
+                               ),
+                               (
+                                   'durable-replay-evaluation',
+                                   'Evaluate durable replay artifacts',
+                               ),
+                               (
+                                   'production-lifecycle',
+                                   'Run production release lifecycle orchestration',
+                               ),
+                           ):
         subparsers.add_parser(
             name,
             help=help_text,

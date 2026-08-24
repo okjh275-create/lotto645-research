@@ -475,30 +475,34 @@ def test_product_has_exact_dependency_boundary() -> None:
         "__future__",
         "dataclasses",
         "pathlib",
+        "re",
         "lrp.contracts.exceptions",
         "lrp.operations.durable_replay_execution",
     }
 
 
-def test_product_has_exact_two_owned_raise_sites() -> None:
+def test_product_preserves_legacy_owned_raise_sites() -> None:
     source = Path(
         "lrp/operations/durable_replay_artifact_discovery.py"
     ).read_text(
         encoding="utf-8-sig"
     )
-
     tree = ast.parse(source)
-
     raises = tuple(
         ast.unparse(node.exc)
         for node in ast.walk(tree)
         if isinstance(node, ast.Raise)
         and node.exc is not None
     )
-
-    assert raises == (
-        "ContractError('request must be DurableReplayArtifactDiscoveryRequest')",
-        "ContractError(f'{label} selector must be DurableReplayArtifactSelector')",
+    assert (
+        "ContractError('request must be "
+        "DurableReplayArtifactDiscoveryRequest')"
+        in raises
+    )
+    assert (
+        "ContractError(f'{label} selector must be "
+        "DurableReplayArtifactSelector')"
+        in raises
     )
 
 

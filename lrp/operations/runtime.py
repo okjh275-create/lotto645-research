@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 import hashlib
@@ -51,8 +52,15 @@ def write_operation_artifact(
     artifact_type: str,
     round_no: int,
     filename: str,
+    artifact_key: str | None = None,
 ) -> dict[str, Any]:
     directory = Path(output_root) / artifact_type / f"round_{round_no:04d}"
+    if artifact_key is not None:
+        if not isinstance(artifact_key, str):
+            raise ValueError("artifact_key must be str or None")
+        if (not artifact_key or len(artifact_key) > 128 or artifact_key in {".", ".."} or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", artifact_key) is None):
+            raise ValueError("invalid artifact_key")
+        directory = directory / artifact_key
     data_path = atomic_write(directory / filename, _json_bytes(payload))
     manifest = {
         "schema_version": "1.0",
@@ -66,6 +74,8 @@ def write_operation_artifact(
             }
         },
     }
+    if artifact_key is not None:
+        manifest["artifact_key"] = artifact_key
     manifest_path = atomic_write(directory / "manifest.json", _json_bytes(manifest))
     append_operation_log(
         Path(output_root) / "operation_log.jsonl",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 import time
 from typing import Sequence
@@ -131,6 +132,12 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "--artifact-key",
+        type=_validate_artifact_key,
+        default=None,
+        help="Optional durable evaluation-source artifact identity",
+    )
     return parser
 
 
@@ -411,6 +418,11 @@ def run_predict(
         artifact_type="prediction-evaluation-sources",
         round_no=request.round_no,
         filename="evaluation_source.json",
+        artifact_key=getattr(
+            arguments,
+            "artifact_key",
+            None,
+        ),
     )
 
     elapsed = time.perf_counter() - started
@@ -436,6 +448,15 @@ def run_predict(
         "payload": payload,
     }
 
+
+def _validate_artifact_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if (not value or len(value) > 128 or value in {".", ".."} or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None):
+        raise argparse.ArgumentTypeError(
+            "invalid artifact_key"
+        )
+    return value
 
 def main(
     argv: Sequence[str] | None = None,
