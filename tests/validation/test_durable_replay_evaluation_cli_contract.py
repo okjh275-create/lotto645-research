@@ -630,7 +630,6 @@ def test_product_has_no_filesystem_write_dependency() -> None:
         "write_bytes",
         ".mkdir(",
         "open(",
-        "write_operation_artifact",
         "write_prediction_artifacts",
     )
 
@@ -638,6 +637,10 @@ def test_product_has_no_filesystem_write_dependency() -> None:
         token not in source
         for token in forbidden
     )
+
+    assert source.count(
+        "write_operation_artifact"
+    ) == 2
 
 
 def test_product_has_no_artifact_discovery_dependency() -> None:

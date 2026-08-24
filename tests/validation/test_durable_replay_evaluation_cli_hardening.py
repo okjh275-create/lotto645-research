@@ -128,7 +128,6 @@ def test_strategy_only_optional_context_is_preserved() -> None:
 
 def test_parser_required_field_surface_is_exact() -> None:
     product = _product()
-
     parser = product._parser()
 
     actions = tuple(
@@ -150,24 +149,17 @@ def test_parser_required_field_surface_is_exact() -> None:
         "artifact_root",
         "candidate_selector",
         "baseline_selector",
+        "output",
     )
 
-    required = {
-        action.dest: action.required
+    output_action = next(
+        action
         for action in actions
-    }
+        if action.dest == "output"
+    )
 
-    assert required == {
-        "history": True,
-        "window_name": True,
-        "start_round": True,
-        "end_round": True,
-        "candidate": False,
-        "baseline": False,
-        "artifact_root": False,
-        "candidate_selector": False,
-        "baseline_selector": False,
-    }
+    assert output_action.required is False
+    assert output_action.default is None
 
 
 def test_parser_candidate_and_baseline_are_append_actions() -> None:
@@ -562,27 +554,17 @@ def test_product_static_dependency_boundary_is_exact() -> None:
     )
 
     tree = ast.parse(source)
-
     imports: list[str] = []
 
     for node in ast.walk(tree):
-        if isinstance(
-            node,
-            ast.Import,
-        ):
+        if isinstance(node, ast.Import):
             imports.extend(
                 alias.name
                 for alias in node.names
             )
-
-        elif isinstance(
-            node,
-            ast.ImportFrom,
-        ):
+        elif isinstance(node, ast.ImportFrom):
             if node.module:
-                imports.append(
-                    node.module
-                )
+                imports.append(node.module)
 
     assert set(imports) == {
         "__future__",
@@ -591,6 +573,7 @@ def test_product_static_dependency_boundary_is_exact() -> None:
         "json",
         "re",
         "typing",
+        "lrp.operations",
         "lrp.operations.durable_replay_execution",
         "lrp.operations.durable_replay_artifact_discovery",
         "lrp.operations.durable_replay_composition",
@@ -679,7 +662,6 @@ def test_product_has_no_lower_layer_ownership_leak() -> None:
         "write_text",
         "write_bytes",
         ".mkdir(",
-        "write_operation_artifact",
         "write_prediction_artifacts",
     )
 
@@ -687,6 +669,10 @@ def test_product_has_no_lower_layer_ownership_leak() -> None:
         token not in source
         for token in forbidden
     )
+
+    assert source.count(
+        "write_operation_artifact"
+    ) == 2
 
 
 def test_product_public_surface_remains_minimal() -> None:

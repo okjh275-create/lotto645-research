@@ -227,3 +227,41 @@ This documentation does not introduce or promise:
 - product-code changes
 
 The current operational contract remains explicit-input and deterministic.
+
+## Durable replay result artifact persistence
+
+`durable-replay-evaluation` keeps its deterministic JSON stdout behavior by default.
+Result persistence is opt-in through `--output`.
+
+Example:
+
+```powershell
+python -m lrp durable-replay-evaluation `
+  --history "artifacts/validation/project_r_release_readiness/r04_real_model_evaluation_e2e/history.json" `
+  --window-name "round_1231" `
+  --start-round 1231 `
+  --end-round 1231 `
+  --artifact-root "artifacts/validation/project_as_same_round_artifact_identity/as07_distinct_same_round_selector_e2e" `
+  --candidate-selector "1231|candidate-model|||candidate-a" `
+  --baseline-selector "1231|baseline-model|||baseline-a" `
+  --output "artifacts/replay-results"
+```
+
+When `--output` is omitted, no result artifact is written and the existing stdout-only behavior is preserved.
+
+When `--output` is supplied, the CLI persists the same JSON-compatible payload that is emitted to stdout by reusing the existing operation artifact writer.
+
+Result artifact identity:
+
+```text
+<output_root>/
+  durable-replay-evaluations/
+    round_<END_ROUND>/
+      evaluation_result.json
+      manifest.json
+  operation_log.jsonl
+```
+
+The storage partition uses `end_round`. One replay invocation produces at most one result artifact.
+The manifest uses the existing operation artifact contract, including SHA256 and byte-count metadata.
+The replay evaluation algorithm, source discovery, actual-draw projection, selector semantics, and `artifact_key` behavior are unchanged.

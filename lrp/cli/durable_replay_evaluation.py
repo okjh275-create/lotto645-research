@@ -18,6 +18,7 @@ from lrp.operations.durable_replay_composition import (
     DurableReplayCompositionRequest,
     DurableReplayCompositionService,
 )
+from lrp.operations import write_operation_artifact
 
 def _parse_source(
     value: str,
@@ -168,6 +169,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-root", required=False)
     parser.add_argument("--candidate-selector", action="append", type=_parse_selector, required=False)
     parser.add_argument("--baseline-selector", action="append", type=_parse_selector, required=False)
+    parser.add_argument(
+        "--output",
+        default=None,
+        help=(
+            "Optional output root for durable replay "
+            "evaluation result artifact"
+        ),
+    )
+
     return parser
 
 
@@ -305,6 +315,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     payload = _result_to_dict(result)
+
+    if args.output is not None:
+        write_operation_artifact(
+            payload,
+            output_root=args.output,
+            artifact_type="durable-replay-evaluations",
+            round_no=args.end_round,
+            filename="evaluation_result.json",
+        )
 
     print(
             json.dumps(

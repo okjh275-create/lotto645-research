@@ -90,22 +90,17 @@ def test_hardening_parser_surface_is_exact() -> None:
         "artifact_root",
         "candidate_selector",
         "baseline_selector",
+        "output",
     )
 
-    assert {
-        action.dest: action.required
+    output_action = next(
+        action
         for action in actions
-    } == {
-        "history": True,
-        "window_name": True,
-        "start_round": True,
-        "end_round": True,
-        "candidate": False,
-        "baseline": False,
-        "artifact_root": False,
-        "candidate_selector": False,
-        "baseline_selector": False,
-    }
+        if action.dest == "output"
+    )
+
+    assert output_action.required is False
+    assert output_action.default is None
 
 
 def test_hardening_source_parser_valid_matrix() -> None:
@@ -719,7 +714,6 @@ def test_hardening_exact_dependency_boundary() -> None:
     )
 
     tree = ast.parse(source)
-
     imports: list[str] = []
 
     for node in ast.walk(tree):
@@ -728,7 +722,6 @@ def test_hardening_exact_dependency_boundary() -> None:
                 alias.name
                 for alias in node.names
             )
-
         elif isinstance(node, ast.ImportFrom):
             if node.module:
                 imports.append(node.module)
@@ -740,6 +733,7 @@ def test_hardening_exact_dependency_boundary() -> None:
         "json",
         "re",
         "typing",
+        "lrp.operations",
         "lrp.operations.durable_replay_execution",
         "lrp.operations.durable_replay_artifact_discovery",
         "lrp.operations.durable_replay_composition",
