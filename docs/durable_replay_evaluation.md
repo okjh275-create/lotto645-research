@@ -333,3 +333,30 @@ There is no auto-discovery, latest-result selection, cross-round scanning, sourc
 artifact reconstruction, CLI command, or production lifecycle integration in this
 capability. Missing or invalid artifacts remain fail-closed through the lower-layer
 consumer contract.
+
+## Durable replay result comparison summary
+
+Persisted durable replay evaluation results can be summarized through the deterministic, read-only DurableReplayResultComparisonSummaryService.
+
+The service accepts an existing DurableReplayResultArtifactInspection and returns the frozen DurableReplayResultComparisonSummary model.
+
+The summary preserves the inspection identity/context fields:
+
+- status
+- round_count
+- candidate_model_name
+- baseline_model_name
+
+It projects only the existing comparison deltas already present in evaluation.top3, evaluation.top5, and evaluation.top10:
+
+- baseline_delta_mean_best_hits
+- baseline_delta_3plus_rate
+- baseline_delta_4plus_rate
+
+This produces nine exact top-k delta fields in total: three metrics for each of top3, top5, and top10.
+
+The existing evaluation.window mapping is copied into a detached read-only window projection.
+
+The comparison summary does not create a winner or loser label, does not make a promotion recommendation, does not change ranking weights, and does not add discovery, selector, CLI, filesystem, database, or production lifecycle behavior.
+
+Missing top-k blocks, missing frozen delta fields, non-mapping structures, or invalid numeric values fail closed rather than receiving synthetic defaults.
