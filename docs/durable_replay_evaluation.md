@@ -301,3 +301,35 @@ production champion mutation, or replay algorithm changes.
 
 Missing paths, manifest verification failures, invalid JSON, non-object payloads,
 and wrong-round requests fail closed.
+
+## Durable replay result artifact inspection
+
+Persisted durable replay evaluation results can be inspected through the read-only
+`DurableReplayResultArtifactInspectionService`.
+
+The service accepts the existing
+`DurableReplayResultArtifactConsumerRequest` identity:
+
+- `artifact_root`
+- `end_round`
+
+It reuses `DurableReplayResultArtifactConsumer`, so manifest verification remains
+mandatory before the result payload is accepted.
+
+The inspection result is the frozen
+`DurableReplayResultArtifactInspection` dataclass with exactly these fields:
+
+- `status`
+- `round_count`
+- `candidate_model_name`
+- `baseline_model_name`
+- `evaluation`
+
+The `evaluation` subtree is preserved as a read-only mapping. The inspection layer
+does not derive new metrics, reconstruct source replay inputs, infer history windows,
+or mutate the result artifact.
+
+There is no auto-discovery, latest-result selection, cross-round scanning, source
+artifact reconstruction, CLI command, or production lifecycle integration in this
+capability. Missing or invalid artifacts remain fail-closed through the lower-layer
+consumer contract.
