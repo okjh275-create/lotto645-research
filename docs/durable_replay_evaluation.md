@@ -420,3 +420,27 @@ The window must be mapping-compatible. The returned window is detached and read-
 This capability does not access raw deltas or AX aggregate counts, does not execute publication or rollback, and does not mutate the champion registry.
 
 No production lifecycle invocation, CLI command, artifact persistence, latest-result discovery, or cross-round search is introduced by this capability.
+
+## Durable replay promotion publication request
+
+The read-only DurableReplayPromotionPublicationRequestService binds a DurableReplayResultPromotionActionPlan to explicitly supplied publication identity.
+
+The service accepts:
+
+- action_plan
+- source_decision
+- registry_root
+
+A request is allowed only when action equals prepare_publish.
+
+The output DurableReplayPromotionPublicationRequest preserves status, round_count, candidate_model_name, baseline_model_name, recommendation, action, window, source_decision, and registry_root.
+
+source_decision and registry_root are never auto-discovered. Empty or invalid publication identity values fail closed.
+
+The window must be mapping-compatible and is returned as a detached read-only projection.
+
+Direct composability with ProductionChampionRegistryPublisher.publish is verified because the request exposes the exact required publisher inputs: source_decision and registry_root, with matching str | Path annotations.
+
+This capability does not publish, does not write the champion registry, does not invoke production lifecycle orchestration, and does not add a CLI command.
+
+Actual production mutation remains owned by the existing production publication layer.
