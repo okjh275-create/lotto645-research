@@ -460,3 +460,17 @@ The execution adapter does not discover publication identity, recompute promotio
 Malformed request identity is rejected before the publisher is invoked. Publisher exceptions are propagated rather than converted into success. The adapter does not duplicate registry write logic.
 
 The real E2E validation uses an isolated temporary registry root. Publication is performed by the real publisher only inside that temporary location; the production registry remains untouched.
+
+### Durable replay publication lifecycle adaptation
+
+`DurableReplayPublicationLifecycleAdaptationService` is the reusable boundary between the typed durable-replay publication request/execution flow and the existing production lifecycle stage-result contract.
+
+The service accepts a `DurableReplayPromotionPublicationRequest` and delegates publication execution exactly once to `DurableReplayPromotionPublicationExecutionService`. The BB execution service remains the execution owner, while `ProductionChampionRegistryPublisher` remains the registry-mutation owner.
+
+The BC adapter returns the existing `ProductionLifecycleStageResult` rather than introducing another result model. The stage result uses `name = "publication"` and `status = "PASS"`.
+
+Its `detail` contains exactly the five existing publication-result fields: `source_path`, `source_sha256`, `published_path`, `published_at_kst`, and `selected_model`.
+
+The BC adapter does not call `ProductionChampionRegistryPublisher.publish` directly, does not call `run_publication_stage`, and does not own `publish-champion` CLI behavior. It does not discover publication identity, recompute eligibility or promotion policy, perform rollback, or duplicate registry-write logic.
+
+Real E2E validation used an existing repository champion-decision artifact as read-only source input and published only to an isolated temporary registry. The resulting `ProductionLifecycleStageResult` preserved the five publication-result fields and source SHA-256 identity, while the production registry remained untouched.
