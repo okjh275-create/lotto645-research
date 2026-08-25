@@ -474,3 +474,37 @@ Its `detail` contains exactly the five existing publication-result fields: `sour
 The BC adapter does not call `ProductionChampionRegistryPublisher.publish` directly, does not call `run_publication_stage`, and does not own `publish-champion` CLI behavior. It does not discover publication identity, recompute eligibility or promotion policy, perform rollback, or duplicate registry-write logic.
 
 Real E2E validation used an existing repository champion-decision artifact as read-only source input and published only to an isolated temporary registry. The resulting `ProductionLifecycleStageResult` preserved the five publication-result fields and source SHA-256 identity, while the production registry remained untouched.
+
+### Durable replay publication lifecycle entrypoint
+
+`DurableReplayPublicationLifecycleEntrypoint` is the additive typed operational
+entrypoint for the durable-replay publication flow. It accepts an explicit
+`DurableReplayPromotionPublicationRequest` and delegates that exact request,
+unchanged, to `DurableReplayPublicationLifecycleAdaptationService`.
+
+The entrypoint returns the existing `ProductionLifecycleStageResult` produced
+by the BC adaptation layer directly and unchanged. On a successful publication
+stage, the existing lifecycle result semantics remain `name = "publication"`
+and `status = "PASS"` with the same five publication detail fields:
+`source_path`, `source_sha256`, `published_path`, `published_at_kst`, and
+`selected_model`.
+
+This entrypoint is additive. It does not consume `argparse.Namespace`, does not
+replace or call `run_publication_stage`, does not own `publish-champion` CLI
+behavior, and does not call `ProductionChampionRegistryPublisher.publish`
+directly. Publication mutation remains owned by
+`ProductionChampionRegistryPublisher` through the existing BB execution and BC
+adaptation layers.
+
+The entrypoint performs only boundary validation before delegation: the input
+must be a `DurableReplayPromotionPublicationRequest`, the action must remain
+`prepare_publish`, and the BC result must be a
+`ProductionLifecycleStageResult`. BC exceptions propagate unchanged. The
+entrypoint does not discover publication identity, infer `source_decision` or
+`registry_root`, recompute eligibility or promotion policy, perform rollback,
+or duplicate lifecycle result construction or registry-write logic.
+
+Real E2E verification uses an existing valid champion-decision fixture and an
+explicit temporary registry. Publication mutation is confined to that temporary
+registry, source SHA256 is verified, and the temporary root is removed after
+the test; the production registry remains untouched.
