@@ -444,3 +444,19 @@ Direct composability with ProductionChampionRegistryPublisher.publish is verifie
 This capability does not publish, does not write the champion registry, does not invoke production lifecycle orchestration, and does not add a CLI command.
 
 Actual production mutation remains owned by the existing production publication layer.
+
+## Durable replay promotion publication execution
+
+`DurableReplayPromotionPublicationExecutionService` is the reusable execution boundary after `DurableReplayPromotionPublicationRequest`.
+
+The service consumes a `DurableReplayPromotionPublicationRequest` whose action is `prepare_publish` and delegates the exact explicit publication identity to `ProductionChampionRegistryPublisher.publish`:
+
+- `source_decision` is forwarded from the request unchanged.
+- `registry_root` is forwarded from the request unchanged.
+- the existing `ProductionChampionPublicationResult` is returned directly and unchanged.
+
+The execution adapter does not discover publication identity, recompute promotion policy, inspect raw deltas or AX aggregate counts, perform rollback, or add CLI behavior. Registry and filesystem mutation remain owned by `ProductionChampionRegistryPublisher`.
+
+Malformed request identity is rejected before the publisher is invoked. Publisher exceptions are propagated rather than converted into success. The adapter does not duplicate registry write logic.
+
+The real E2E validation uses an isolated temporary registry root. Publication is performed by the real publisher only inside that temporary location; the production registry remains untouched.
