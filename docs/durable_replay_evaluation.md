@@ -400,3 +400,23 @@ The window must be a mapping. The returned window is detached and read-only.
 This layer does not reinterpret raw delta magnitudes, does not declare a winner, and does not publish or roll back a champion.
 
 No production lifecycle mutation, CLI command, selector/discovery behavior, database persistence, or existing promotion.py modification is performed by this capability.
+
+## Durable replay promotion action plan
+
+The read-only DurableReplayResultPromotionActionPlanService consumes an existing DurableReplayResultPromotionEligibility.
+
+It returns the frozen DurableReplayResultPromotionActionPlan model and preserves status, round_count, candidate_model_name, baseline_model_name, recommendation, and window context.
+
+The action mapping is exact and uses AY recommendation only:
+
+- eligible -> prepare_publish
+- insufficient_evidence -> hold
+- ineligible -> block
+
+prepare_publish is a planning state only. It does not publish a champion.
+
+The window must be mapping-compatible. The returned window is detached and read-only.
+
+This capability does not access raw deltas or AX aggregate counts, does not execute publication or rollback, and does not mutate the champion registry.
+
+No production lifecycle invocation, CLI command, artifact persistence, latest-result discovery, or cross-round search is introduced by this capability.
