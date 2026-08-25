@@ -534,3 +534,17 @@ The verified execution composition remains:
 → `ProductionChampionRegistryPublisher`
 
 Real E2E verification uses only an isolated temporary registry. The production registry remains untouched by transport validation.
+
+## Durable replay publication invocation JSON presentation
+
+`DurableReplayPublicationInvocationJsonCodec` is the JSON-text presentation boundary above the closed BE invocation transport.
+
+- The authoritative transport remains `DurableReplayPublicationInvocationTransport`.
+- The JSON codec delegates structural and scalar validation to `DurableReplayPublicationInvocationTransportCodec`.
+- Encoding uses the exact BE nine-field mapping and produces deterministic canonical JSON with sorted keys, compact separators, `ensure_ascii=False`, and non-finite numeric rejection.
+- Decoding requires a JSON object root, rejects malformed JSON, rejects duplicate object keys recursively, and rejects `NaN`, `Infinity`, and `-Infinity`.
+- Unicode values are preserved losslessly.
+- The JSON layer does not normalize or reinterpret `source_decision`, `registry_root`, or `window`.
+- The JSON layer does not own file I/O, stdin/stdout, CLI parsing, BD lifecycle invocation, `run_publication_stage`, or `ProductionChampionRegistryPublisher.publish`.
+- Missing fields, unknown fields, scalar type validation, and window validation remain BE transport responsibilities.
+- The BF validation E2E uses real repository decision evidence only as read-only fixture input. No temporary registry is created, and the production registry remains untouched.
