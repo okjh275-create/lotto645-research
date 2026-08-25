@@ -508,3 +508,29 @@ Real E2E verification uses an existing valid champion-decision fixture and an
 explicit temporary registry. Publication mutation is confined to that temporary
 registry, source SHA256 is verified, and the temporary root is removed after
 the test; the production registry remains untouched.
+
+### Durable replay publication invocation transport
+
+`DurableReplayPublicationInvocationTransport` is the explicit presentation-safe carrier for a complete durable replay publication request. It preserves the exact nine request fields: `status`, `round_count`, `candidate_model_name`, `baseline_model_name`, `recommendation`, `action`, `window`, `source_decision`, and `registry_root`.
+
+`DurableReplayPublicationInvocationTransportCodec` owns only deterministic transport adaptation:
+
+- `encode(request)` converts a `DurableReplayPromotionPublicationRequest` into the immutable transport model.
+- `to_mapping(transport)` returns a detached mapping suitable for a later presentation layer.
+- `from_mapping(mapping)` requires the exact nine-field schema and fails closed on missing, unknown, malformed, or unsupported values.
+- `decode(transport)` restores a BA-equivalent `DurableReplayPromotionPublicationRequest`.
+
+Path values are preserved as caller-supplied text via `str(Path(...))` semantics. The transport does not normalize, resolve, discover, expand, or default `source_decision` or `registry_root`. The `window` is detached, top-level read-only after transport/decode, and recursively restricted to JSON-compatible content.
+
+The transport is mapping-composable for future presentation wiring, but it does not own file I/O, stdin/stdout behavior, CLI parsing, `DurableReplayPublicationLifecycleEntrypoint` invocation, lifecycle orchestration, `ProductionChampionRegistryPublisher.publish`, rollback, eligibility recomputation, or promotion-policy recomputation.
+
+The verified execution composition remains:
+
+`DurableReplayPromotionPublicationRequest`
+→ invocation transport encode/mapping/decode
+→ `DurableReplayPublicationLifecycleEntrypoint`
+→ lifecycle adaptation
+→ publication execution
+→ `ProductionChampionRegistryPublisher`
+
+Real E2E verification uses only an isolated temporary registry. The production registry remains untouched by transport validation.
