@@ -580,3 +580,23 @@ The CLI is intentionally read-only. It does not construct a transport from per-f
 Failure ownership is preserved. Argument-shape failures belong to argparse; physical carrier failures remain owned by BG; JSON presentation failures remain owned by BF; BE retains structural and type validation. The CLI does not swallow or replace these failures.
 
 This CLI remains independent from the existing `production-lifecycle`, `publish-champion`, and durable replay evaluation CLI surfaces. It is an additive inspection boundary, not a lifecycle replacement or a second publication path.
+
+## Durable replay invocation inspection root CLI registration
+
+The closed read-only invocation inspection command is exposed through the existing root CLI as `inspect-replay-invocation`.
+
+Invocation shape:
+
+`python -m lrp.cli inspect-replay-invocation --input <path>`
+
+The root CLI owns registration and dispatch only. It registers the command in the existing root subparser surface, forwards all argv after the command token unchanged, and returns the BH command exit code unchanged.
+
+The root adapter `_inspect_replay_invocation_main` resolves `lrp.cli.durable_replay_publication_invocation_json_file.main` at dispatch time. BH remains the authoritative owner of `--input` parsing, BG file reading, BF canonical JSON encoding, stdout emission, and failure behavior.
+
+Root help exposes the command name but does not duplicate BH `--input` option help.
+
+The root registration does not directly import or call the BG file carrier, BF JSON presentation codec, BE invocation transport, BA request model, or BD lifecycle entrypoint. It does not perform filesystem I/O, path discovery, path normalization, environment expansion, policy recomputation, publication execution, publisher invocation, registry mutation, or rollback.
+
+The registration introduces no packaging `project.scripts` or `console_scripts` entrypoint. Existing root commands remain independently owned and unchanged.
+
+This inspection path is read-only: root CLI -> BH inspection CLI -> BG physical carrier -> BF JSON presentation -> stdout. It does not invoke `DurableReplayPublicationLifecycleEntrypoint`, `run_publication_stage`, or `ProductionChampionRegistryPublisher`.

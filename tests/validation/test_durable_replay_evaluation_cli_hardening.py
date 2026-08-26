@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import ast
@@ -474,7 +474,7 @@ def test_root_dispatcher_handler_identity_is_exact() -> None:
 
     assert len(
         root._COMMANDS
-    ) == 16
+    ) == 17
 
     assert (
         root._COMMANDS[

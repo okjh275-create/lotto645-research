@@ -202,7 +202,7 @@ def test_existing_predict_command_remains_registered() -> None:
     assert "predict" in lrp.cli._COMMANDS
 
 
-def test_existing_command_count_increases_by_one() -> None:
+def test_existing_command_set_includes_inspection_registration() -> None:
     expected = {
         "predict",
         "weekly",
@@ -220,6 +220,7 @@ def test_existing_command_count_increases_by_one() -> None:
         "durable-replay-evaluation",
         "rollback-champion",
         "production-lifecycle",
+        "inspect-replay-invocation",
     }
 
     assert (

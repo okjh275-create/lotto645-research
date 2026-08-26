@@ -140,11 +140,11 @@ def test_root_commands_include_rollback_champion(
     )
 
 
-def test_root_command_count_increases_to_sixteen(
+def test_root_command_count_increases_to_seventeen(
 ) -> None:
     assert len(
         root_cli._COMMANDS
-    ) == 16
+    ) == 17
 
 
 def test_root_help_lists_rollback_champion(

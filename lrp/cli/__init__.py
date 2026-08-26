@@ -23,7 +23,11 @@ from .round_complete import main as round_complete_main
 from .status import main as status_main
 from .verify import main as verify_main
 from .weekly import main as weekly_main
+from . import durable_replay_publication_invocation_json_file
 
+
+def _inspect_replay_invocation_main(argv: Sequence[str] | None = None) -> int:
+    return durable_replay_publication_invocation_json_file.main(argv)
 
 _COMMANDS = {
     "model-evaluation": model_evaluation_main,
@@ -42,6 +46,7 @@ _COMMANDS = {
     "publish-champion": publish_champion_main,
     "rollback-champion": rollback_champion_main,
     "production-lifecycle": production_lifecycle_main,
+    "inspect-replay-invocation": _inspect_replay_invocation_main,
 }
 
 
@@ -128,6 +133,7 @@ def main(
             add_help=False,
         )
 
+    subparsers.add_parser("inspect-replay-invocation", help="Inspect durable replay publication invocation JSON file", add_help=False)
     namespace, remaining = parser.parse_known_args(
         argv
     )
