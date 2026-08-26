@@ -89,8 +89,8 @@ def test_existing_root_commands_are_preserved(
     )
 
 
-def test_root_command_count_becomes_seventeen(
+def test_root_command_count_becomes_eighteen(
 ) -> None:
     assert len(
         root_cli._COMMANDS
-    ) == 17
+    ) == 18

@@ -221,6 +221,7 @@ def test_existing_command_set_includes_inspection_registration() -> None:
         "rollback-champion",
         "production-lifecycle",
         "inspect-replay-invocation",
+        "execute-replay-invocation",
     }
 
     assert (

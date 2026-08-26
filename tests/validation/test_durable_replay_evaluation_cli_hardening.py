@@ -474,7 +474,7 @@ def test_root_dispatcher_handler_identity_is_exact() -> None:
 
     assert len(
         root._COMMANDS
-    ) == 17
+    ) == 18
 
     assert (
         root._COMMANDS[
@@ -486,6 +486,13 @@ def test_root_dispatcher_handler_identity_is_exact() -> None:
     assert (
         "model-evaluation"
         in root._COMMANDS
+    )
+
+    assert (
+        root._COMMANDS[
+            "execute-replay-invocation"
+        ]
+        is root._execute_replay_invocation_main
     )
 
 
