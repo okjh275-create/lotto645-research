@@ -612,3 +612,13 @@ The adapter does not perform filesystem I/O, JSON parsing, manifest verification
 The adapter also does not duplicate comparison summary, assessment, promotion eligibility, action-plan, or publication-request logic. The downstream chain remains `DurableReplayResultArtifactInspection` -> `DurableReplayResultComparisonSummary` -> `DurableReplayResultComparisonAssessment` -> `DurableReplayResultPromotionEligibility` -> `DurableReplayResultPromotionActionPlan` -> `DurableReplayPromotionPublicationRequest`.
 
 The adapter has no CLI ownership, publication lifecycle execution, direct publisher invocation, production registry mutation, rollback, or hidden source discovery responsibilities.
+
+### Durable replay result artifact comparison source adapter
+
+`DurableReplayResultArtifactComparisonSourceAdapter` is the operations-layer composition owner for the explicit durable replay result artifact comparison source boundary. It accepts `artifact_root` and `end_round`, forwards both values unchanged to `DurableReplayResultArtifactSourceAdapter`, forwards the resulting inspection unchanged to `DurableReplayResultComparisonSummaryService.summarize`, forwards the resulting summary unchanged to `DurableReplayResultComparisonAssessmentService.assess`, and returns the resulting `DurableReplayResultComparisonAssessment` unchanged.
+
+The adapter is composition-only. It does not construct `DurableReplayResultArtifactConsumerRequest`, call the artifact consumer or inspection service directly, perform filesystem I/O, parse JSON, verify manifests, discover artifact directories, normalize or expand paths, infer `end_round`, reconstruct comparison-summary fields, or recompute assessment labels.
+
+Promotion and publication remain outside this capability. The adapter does not evaluate `DurableReplayResultPromotionEligibility`, create `DurableReplayResultPromotionActionPlan`, build `DurableReplayPromotionPublicationRequest`, invoke publication lifecycle execution, call a production publisher, mutate the production registry, perform rollback, or expose CLI/stdin/stdout ownership.
+
+The dependency direction is intentionally narrow: comparison source adapter -> result artifact source adapter -> comparison summary service -> comparison assessment service. Existing lower-layer and downstream owners remain authoritative and unchanged.
