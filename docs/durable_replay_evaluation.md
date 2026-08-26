@@ -622,3 +622,9 @@ The adapter is composition-only. It does not construct `DurableReplayResultArtif
 Promotion and publication remain outside this capability. The adapter does not evaluate `DurableReplayResultPromotionEligibility`, create `DurableReplayResultPromotionActionPlan`, build `DurableReplayPromotionPublicationRequest`, invoke publication lifecycle execution, call a production publisher, mutate the production registry, perform rollback, or expose CLI/stdin/stdout ownership.
 
 The dependency direction is intentionally narrow: comparison source adapter -> result artifact source adapter -> comparison summary service -> comparison assessment service. Existing lower-layer and downstream owners remain authoritative and unchanged.
+
+### Durable replay result artifact promotion eligibility source adapter
+
+`DurableReplayResultArtifactPromotionEligibilitySourceAdapter` is a composition-only operations adapter. It accepts explicit `artifact_root` and `end_round`, forwards both values unchanged to `DurableReplayResultArtifactComparisonSourceAdapter.adapt`, forwards the returned assessment unchanged to `DurableReplayResultPromotionEligibilityService.evaluate`, and returns the resulting `DurableReplayResultPromotionEligibility` unchanged. It does not reconstruct eligibility fields or duplicate eligibility policy.
+
+The adapter does not construct lower-layer artifact consumer or comparison objects, does not perform filesystem I/O, parse JSON, verify manifests, discover artifact directories, normalize or expand paths, or infer `end_round`. It does not construct `DurableReplayResultPromotionActionPlan`, build `DurableReplayPromotionPublicationRequest`, execute publication lifecycle operations, mutate the production registry, perform rollback, or expose CLI/stdin/stdout behavior. Existing lower-layer and downstream owners remain authoritative and unchanged.
