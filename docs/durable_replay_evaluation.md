@@ -566,3 +566,17 @@ Ownership is intentionally narrow:
 - The carrier does not call `DurableReplayPublicationLifecycleEntrypoint`, `ProductionChampionRegistryPublisher.publish`, `run_publication_stage`, or any CLI surface.
 - The carrier does not discover `source_decision` or `registry_root`, recompute eligibility or promotion policy, perform rollback, or mutate the production registry.
 - Real end-to-end validation uses a temporary carrier file only; the production registry remains untouched.
+
+### Durable replay invocation JSON file inspection CLI
+
+The durable replay publication invocation stack exposes a read-only operator-facing inspection command in `lrp.cli.durable_replay_publication_invocation_json_file`.
+
+The command accepts one explicit `--input` path and delegates physical carrier loading to `DurableReplayPublicationInvocationJsonFileCarrier`. The CLI does not perform its own filesystem I/O, path discovery, path normalization, environment expansion, default-path selection, or carrier mutation.
+
+After BG returns a `DurableReplayPublicationInvocationTransport`, the CLI delegates presentation encoding to `DurableReplayPublicationInvocationJsonCodec` and writes exactly one canonical BF JSON payload plus one terminal newline to stdout. The transport remains the exact nine-field BE transport shape.
+
+The CLI is intentionally read-only. It does not construct a transport from per-field flags, reconstruct a `DurableReplayPromotionPublicationRequest`, invoke `DurableReplayPublicationLifecycleEntrypoint`, call `run_publication_stage`, invoke `ProductionChampionRegistryPublisher`, mutate the production registry, recompute eligibility or promotion policy, perform rollback, or read transport input from stdin.
+
+Failure ownership is preserved. Argument-shape failures belong to argparse; physical carrier failures remain owned by BG; JSON presentation failures remain owned by BF; BE retains structural and type validation. The CLI does not swallow or replace these failures.
+
+This CLI remains independent from the existing `production-lifecycle`, `publish-champion`, and durable replay evaluation CLI surfaces. It is an additive inspection boundary, not a lifecycle replacement or a second publication path.
