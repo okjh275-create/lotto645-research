@@ -600,3 +600,15 @@ The root registration does not directly import or call the BG file carrier, BF J
 The registration introduces no packaging `project.scripts` or `console_scripts` entrypoint. Existing root commands remain independently owned and unchanged.
 
 This inspection path is read-only: root CLI -> BH inspection CLI -> BG physical carrier -> BF JSON presentation -> stdout. It does not invoke `DurableReplayPublicationLifecycleEntrypoint`, `run_publication_stage`, or `ProductionChampionRegistryPublisher`.
+
+## Durable replay result artifact source adapter
+
+`DurableReplayResultArtifactSourceAdapter` is the narrow operations-layer bridge from an explicit durable replay result artifact identity to the existing artifact inspection pipeline.
+
+Its input is exactly `artifact_root` plus `end_round`. The adapter constructs one `DurableReplayResultArtifactConsumerRequest` with those values unchanged and delegates exactly once to `DurableReplayResultArtifactInspectionService.inspect`. The returned `DurableReplayResultArtifactInspection` is passed through unchanged.
+
+The adapter does not perform filesystem I/O, JSON parsing, manifest verification, artifact-directory discovery, path normalization, environment expansion, or end-round inference. Those responsibilities remain with the existing artifact consumer or the caller that supplies the explicit identity.
+
+The adapter also does not duplicate comparison summary, assessment, promotion eligibility, action-plan, or publication-request logic. The downstream chain remains `DurableReplayResultArtifactInspection` -> `DurableReplayResultComparisonSummary` -> `DurableReplayResultComparisonAssessment` -> `DurableReplayResultPromotionEligibility` -> `DurableReplayResultPromotionActionPlan` -> `DurableReplayPromotionPublicationRequest`.
+
+The adapter has no CLI ownership, publication lifecycle execution, direct publisher invocation, production registry mutation, rollback, or hidden source discovery responsibilities.
