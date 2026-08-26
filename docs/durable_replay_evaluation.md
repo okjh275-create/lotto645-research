@@ -548,3 +548,21 @@ Real E2E verification uses only an isolated temporary registry. The production r
 - The JSON layer does not own file I/O, stdin/stdout, CLI parsing, BD lifecycle invocation, `run_publication_stage`, or `ProductionChampionRegistryPublisher.publish`.
 - Missing fields, unknown fields, scalar type validation, and window validation remain BE transport responsibilities.
 - The BF validation E2E uses real repository decision evidence only as read-only fixture input. No temporary registry is created, and the production registry remains untouched.
+
+### Durable replay publication invocation JSON file carrier
+
+`DurableReplayPublicationInvocationJsonFileCarrier` is the physical-file presentation boundary for the durable replay publication invocation transport.
+
+Ownership is intentionally narrow:
+
+- `DurableReplayPublicationInvocationJsonFileCarrier` owns only the explicit physical file carrier and file-envelope validation.
+- `DurableReplayPublicationInvocationJsonCodec` remains the owner of deterministic canonical JSON encoding and decoding.
+- `DurableReplayPublicationInvocationTransportCodec` remains the owner of the exact nine-field transport structure and field-type validation.
+- The carrier writes with exclusive create semantics, so an existing target fails closed instead of being overwritten.
+- The carrier writes UTF-8 without a BOM and appends exactly one terminal LF to the canonical JSON payload.
+- The carrier accepts an input file with no terminal newline, one LF, or one CRLF; a bare CR, a BOM, invalid UTF-8, or multiple trailing newlines fail closed.
+- Parent directories are not created by this capability, and path text is not normalized, resolved, expanded, discovered, or defaulted.
+- The carrier does not parse or reconstruct JSON fields itself; it delegates JSON syntax/canonicalization to `DurableReplayPublicationInvocationJsonCodec`.
+- The carrier does not call `DurableReplayPublicationLifecycleEntrypoint`, `ProductionChampionRegistryPublisher.publish`, `run_publication_stage`, or any CLI surface.
+- The carrier does not discover `source_decision` or `registry_root`, recompute eligibility or promotion policy, perform rollback, or mutate the production registry.
+- Real end-to-end validation uses a temporary carrier file only; the production registry remains untouched.
