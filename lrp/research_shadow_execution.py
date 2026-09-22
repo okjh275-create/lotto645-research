@@ -834,3 +834,405 @@ __all__ = [
     "validate_challenger_id",
     "validate_shadow_round",
 ]
+
+# === PHASE2_PARITY_HARNESS_V1 BEGIN ===
+# Frozen by OP-147/OP-147R2.
+#
+# This harness does NOT execute challengers, mutate production configuration,
+# register production CLI commands, or write to the database.
+#
+# It evaluates externally captured parity probe snapshots and fails closed.
+
+import base64 as _phase2_base64
+import json as _phase2_json
+from collections.abc import Mapping as _Phase2Mapping
+
+
+PARITY_CONFIRMED_BINDING_ELIGIBLE = "PARITY_CONFIRMED_BINDING_ELIGIBLE"
+PARITY_REJECTED_ADVISORY_ONLY = "PARITY_REJECTED_ADVISORY_ONLY"
+PARITY_UNRESOLVED_FAIL_CLOSED = "PARITY_UNRESOLVED_FAIL_CLOSED"
+
+
+class ParityValidationError(ValueError):
+    """Raised when a Phase-2 parity probe violates its frozen contract."""
+
+
+_PHASE2_SURFACE_AUDIT_B64 = "eyJzY2hlbWFfdmVyc2lvbiI6MSwiYXJ0aWZhY3RfdHlwZSI6InBoYXNlMl9hZGFwdGVyX3N1cmZhY2VfYXVkaXQiLCJvcGVyYXRpb24iOiJPUC0xNDciLCJiYXNlbGluZV9jb21taXQiOiI1ZmJlMDlkNGY3N2JkZWZiNjhlYzYwNzE3MmFlNjA2MWM3Y2ZiY2ZlIiwiYmFzZWxpbmVfdHJlZSI6ImEzZTQ1Yzg5ZDlhY2NkNDU2MGQ4YjFmMmExNDg1OTYwNzRiNDVlNzYiLCJsZXhpY2FsX3ByaW1hcnlfYXV0aG9yaXRhdGl2ZSI6ZmFsc2UsInByb2R1Y3Rpb25fYmluZGluZ19wb2xpY3kiOiJQQVJJVFlfVEVTVF9SRVFVSVJFRCIsInN1cmZhY2VfY291bnQiOjUsInN1cmZhY2VzIjpbeyJpZCI6IkNBTkRJREFURSIsIm1vZHVsZSI6ImxycC5hZGFwdGVycy5jYW5kaWRhdGUiLCJwYXRoIjoibHJwL2FkYXB0ZXJzL2NhbmRpZGF0ZS5weSIsImNhbGxhYmxlIjoiQ2FuZGlkYXRlQWRhcHRlci5nZW5lcmF0ZV9jYW5kaWRhdGVzIiwiZmlsZV9zaGEyNTYiOiJGQ0UwNjlEMzUxMDZDN0QyODdBQUNBREUxRkYzNTBBQjgzRDZGRDZFQTgwRDNENEQ3Nzk5NUJERDI5OENERTJCIiwiZ2l0X2Jsb2IiOiIwNWQ4YmY4OTY5YTE3ZDQ2NDZiNTFlNjJhOThlNWVhNDlkMTJkNTcxIiwiZGVmaW5pdGlvbiI6eyJjbGFzc19uYW1lIjoiQ2FuZGlkYXRlQWRhcHRlciIsImNsYXNzX2xpbmUiOjI2LCJjbGFzc190ZXh0IjoiY2xhc3MgQ2FuZGlkYXRlQWRhcHRlcjoiLCJuYW1lIjoiZ2VuZXJhdGVfY2FuZGlkYXRlcyIsImRlZmluaXRpb25fbGluZSI6MTE2LCJkZWZpbml0aW9uX3RleHQiOiJkZWYgZ2VuZXJhdGVfY2FuZGlkYXRlcygifSwiY2xhc3NpZmljYXRpb24iOiJFTElHSUJMRV9BRFZJU09SWV9DQU5ESURBVEUiLCJsZXhpY2FsX21hdGNoX2F1dGhvcml0YXRpdmUiOmZhbHNlLCJkaXJlY3RfYmluZGluZ19hdXRob3JpemVkIjpmYWxzZSwicGFyaXR5X3Rlc3RfcmVxdWlyZWQiOnRydWV9LHsiaWQiOiJTQ09SSU5HIiwibW9kdWxlIjoibHJwLmVuc2VtYmxlLmFkYXB0ZXJzIiwicGF0aCI6ImxycC9lbnNlbWJsZS9hZGFwdGVycy5weSIsImNhbGxhYmxlIjoid2VpZ2h0c19mcm9tX3JhbmtpbmdzIiwiZmlsZV9zaGEyNTYiOiJDMTAwOUNBQ0Y5NTEyN0EyOUQwMjgzODNDRUNBQjc5N0ZBQzU3QzBDRTExNzBGNTI5Mzc0NDFEMUI3NURCOEUxIiwiZ2l0X2Jsb2IiOiIxZWU4MmUyNzg4YjcyMGE1ZDVmMjY1NTJiMmY2ZWNlZDI1MDA1MzE2IiwiZGVmaW5pdGlvbiI6eyJjbGFzc19uYW1lIjpudWxsLCJjbGFzc19saW5lIjpudWxsLCJjbGFzc190ZXh0IjpudWxsLCJuYW1lIjoid2VpZ2h0c19mcm9tX3JhbmtpbmdzIiwiZGVmaW5pdGlvbl9saW5lIjo0NTUsImRlZmluaXRpb25fdGV4dCI6ImRlZiB3ZWlnaHRzX2Zyb21fcmFua2luZ3MoIn0sImNsYXNzaWZpY2F0aW9uIjoiTkFSUk9XX0hFTFBFUl9BRFZJU09SWV9PTkxZIiwibGV4aWNhbF9tYXRjaF9hdXRob3JpdGF0aXZlIjpmYWxzZSwiZGlyZWN0X2JpbmRpbmdfYXV0aG9yaXplZCI6ZmFsc2UsInBhcml0eV90ZXN0X3JlcXVpcmVkIjp0cnVlfSx7ImlkIjoiRklMVEVSX0ZFQVRVUkUiLCJtb2R1bGUiOiJscnAuaW8uZHJhd3MiLCJwYXRoIjoibHJwL2lvL2RyYXdzLnB5IiwiY2FsbGFibGUiOiJsb25nX2dhcF9udW1iZXJzIiwiZmlsZV9zaGEyNTYiOiI1NDVCQzc1QzdENDY2MUREOUVENzI0RjFBQkNENTU2NUUxRTU3Q0MxOUZCRkE3MTQ1OTI1OTU3NEQ4MTg5NEU2IiwiZ2l0X2Jsb2IiOiIxMGE2YTdhYzU1MmY3YzAzZWQ0OGYwZDRlNjI5YjA1ZTU0MjY2MzEwIiwiZGVmaW5pdGlvbiI6eyJjbGFzc19uYW1lIjpudWxsLCJjbGFzc19saW5lIjpudWxsLCJjbGFzc190ZXh0IjpudWxsLCJuYW1lIjoibG9uZ19nYXBfbnVtYmVycyIsImRlZmluaXRpb25fbGluZSI6MzIxLCJkZWZpbml0aW9uX3RleHQiOiJkZWYgbG9uZ19nYXBfbnVtYmVycygifSwiY2xhc3NpZmljYXRpb24iOiJGRUFUVVJFX0hFTFBFUl9OT1RfRklMVEVSX1BJUEVMSU5FIiwibGV4aWNhbF9tYXRjaF9hdXRob3JpdGF0aXZlIjpmYWxzZSwiZGlyZWN0X2JpbmRpbmdfYXV0aG9yaXplZCI6ZmFsc2UsInBhcml0eV90ZXN0X3JlcXVpcmVkIjp0cnVlfSx7ImlkIjoiUFJBQ1RJQ0FMX1NFTEVDVE9SIiwibW9kdWxlIjoibHJwLmNsaS5kdXJhYmxlX3JlcGxheV9ldmFsdWF0aW9uIiwicGF0aCI6ImxycC9jbGkvZHVyYWJsZV9yZXBsYXlfZXZhbHVhdGlvbi5weSIsImNhbGxhYmxlIjoiX3BhcnNlX3NlbGVjdG9yIiwiZmlsZV9zaGEyNTYiOiJDNzgxNjRGN0VENEIzODBCNDQzNzU3NjA0QTUxMTNDODEzOEJDRUFEREVDMTVGQzc1M0JDQkUyQjcxMEIzNjk4IiwiZ2l0X2Jsb2IiOiJlYmQ5MWFjMmJkMGRjZDgyZGI3ZGZlMWIzNmU5MTY1ODVlNTRkOTU0IiwiZGVmaW5pdGlvbiI6eyJjbGFzc19uYW1lIjpudWxsLCJjbGFzc19saW5lIjpudWxsLCJjbGFzc190ZXh0IjpudWxsLCJuYW1lIjoiX3BhcnNlX3NlbGVjdG9yIiwiZGVmaW5pdGlvbl9saW5lIjo2NiwiZGVmaW5pdGlvbl90ZXh0IjoiZGVmIF9wYXJzZV9zZWxlY3Rvcih2YWx1ZTogc3RyKSAtXHUwMDNlIER1cmFibGVSZXBsYXlBcnRpZmFjdFNlbGVjdG9yOiJ9LCJjbGFzc2lmaWNhdGlvbiI6IlBBUlNFUl9IRUxQRVJfTk9UX1NFTEVDVE9SX1BJUEVMSU5FIiwibGV4aWNhbF9tYXRjaF9hdXRob3JpdGF0aXZlIjpmYWxzZSwiZGlyZWN0X2JpbmRpbmdfYXV0aG9yaXplZCI6ZmFsc2UsInBhcml0eV90ZXN0X3JlcXVpcmVkIjp0cnVlfSx7ImlkIjoiUEFJUl9GRUFUVVJFIiwibW9kdWxlIjoiZW5naW5lLnBhaXIiLCJwYXRoIjoiZW5naW5lL3BhaXIucHkiLCJjYWxsYWJsZSI6IlBhaXJFbmdpbmUucGFpcl9mcmVxdWVuY3kiLCJmaWxlX3NoYTI1NiI6IjRGQUJFNTQ5NzgwNjM1RDlCQzIwNDg5NTY1QzdDRDE5REJCMjJBNUJENUJBQzBEMkFDRTJBQ0JCNzQwN0Q0MEEiLCJnaXRfYmxvYiI6IjA4ZjcwMzUzMWQwZDgxZDc4N2RlZmViOTA2NTU3MjhhN2I0ZjViZDEiLCJkZWZpbml0aW9uIjp7ImNsYXNzX25hbWUiOiJQYWlyRW5naW5lIiwiY2xhc3NfbGluZSI6NywiY2xhc3NfdGV4dCI6ImNsYXNzIFBhaXJFbmdpbmU6IiwibmFtZSI6InBhaXJfZnJlcXVlbmN5IiwiZGVmaW5pdGlvbl9saW5lIjozOSwiZGVmaW5pdGlvbl90ZXh0IjoiZGVmIHBhaXJfZnJlcXVlbmN5KHNlbGYsIGxhc3Rfbj1Ob25lLCB1bnRpbF9yb3VuZD1Ob25lKToifSwiY2xhc3NpZmljYXRpb24iOiJFTElHSUJMRV9GRUFUVVJFX0hFTFBFUl9BRFZJU09SWV9PTkxZIiwibGV4aWNhbF9tYXRjaF9hdXRob3JpdGF0aXZlIjpmYWxzZSwiZGlyZWN0X2JpbmRpbmdfYXV0aG9yaXplZCI6ZmFsc2UsInBhcml0eV90ZXN0X3JlcXVpcmVkIjp0cnVlfV0sImNvbmNsdXNpb24iOiJTVEFUSUMgRElTQ09WRVJZIE9OTFk7IE5PIFBST0RVQ1RJT04gSEVMUEVSIElTIEJPVU5EIiwiY2hhbGxlbmdlcl9nZW5lcmF0aW9uIjpmYWxzZSwiY2hhbGxlbmdlcl9leGVjdXRpb24iOmZhbHNlfQ=="
+
+_PHASE2_SURFACE_AUDIT = _phase2_json.loads(
+    _phase2_base64.b64decode(
+        _PHASE2_SURFACE_AUDIT_B64.encode("ascii")
+    ).decode("utf-8")
+)
+
+_PHASE2_SURFACE_ORDER = tuple(
+    str(item["id"])
+    for item in _PHASE2_SURFACE_AUDIT["surfaces"]
+)
+
+_PHASE2_SURFACES = {
+    str(item["id"]): item
+    for item in _PHASE2_SURFACE_AUDIT["surfaces"]
+}
+
+_PHASE2_DIRECT_PIPELINE_REJECTIONS = frozenset(
+    {
+        "SCORING",
+        "FILTER_FEATURE",
+        "PRACTICAL_SELECTOR",
+        "PAIR_FEATURE",
+    }
+)
+
+_PHASE2_IDENTITY_FIELDS = (
+    "module",
+    "path",
+    "callable",
+    "file_sha256",
+    "git_blob",
+)
+
+
+def _phase2_copy(value):
+    """Return a JSON-safe defensive copy."""
+    return _phase2_json.loads(
+        _phase2_json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+def _phase2_canonical(value):
+    return _phase2_json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def phase2_parity_surface_ids():
+    """Return frozen parity surface IDs in contract order."""
+    return tuple(_PHASE2_SURFACE_ORDER)
+
+
+def phase2_parity_contract(surface_id):
+    """Return a defensive copy of one frozen surface contract."""
+    surface_key = str(surface_id)
+
+    if surface_key not in _PHASE2_SURFACES:
+        raise ParityValidationError(
+            "unknown parity surface: "
+            + surface_key
+        )
+
+    return _phase2_copy(
+        _PHASE2_SURFACES[surface_key]
+    )
+
+
+def phase2_parity_authorization():
+    """Return the fail-closed Phase-2 execution authorization."""
+    return {
+        "production_prediction_regeneration": False,
+        "challenger_generation": False,
+        "challenger_execution": False,
+        "real_shadow_artifact_publish": False,
+        "production_helper_binding": False,
+        "database_write": False,
+        "production_cli_registration": False,
+    }
+
+
+def _phase2_expected_identity(surface_id):
+    contract = phase2_parity_contract(
+        surface_id
+    )
+
+    return {
+        field: contract[field]
+        for field in _PHASE2_IDENTITY_FIELDS
+    }
+
+
+def _phase2_validate_probe_snapshot(
+    surface_id,
+    snapshot,
+):
+    if not isinstance(snapshot, _Phase2Mapping):
+        raise ParityValidationError(
+            "probe snapshot must be a mapping"
+        )
+
+    identity = snapshot.get("identity")
+
+    if not isinstance(identity, _Phase2Mapping):
+        raise ParityValidationError(
+            "probe snapshot identity must be a mapping"
+        )
+
+    missing_identity = [
+        field
+        for field in _PHASE2_IDENTITY_FIELDS
+        if field not in identity
+    ]
+
+    if missing_identity:
+        raise ParityValidationError(
+            "probe identity missing fields: "
+            + ", ".join(missing_identity)
+        )
+
+    if "output_schema" not in snapshot:
+        raise ParityValidationError(
+            "probe snapshot missing output_schema"
+        )
+
+    if "output" not in snapshot:
+        raise ParityValidationError(
+            "probe snapshot missing output"
+        )
+
+    if "semantic_parity" not in snapshot:
+        raise ParityValidationError(
+            "probe snapshot missing semantic_parity"
+        )
+
+    return {
+        "identity": {
+            field: identity[field]
+            for field in _PHASE2_IDENTITY_FIELDS
+        },
+        "output_schema": _phase2_copy(
+            snapshot["output_schema"]
+        ),
+        "output": _phase2_copy(
+            snapshot["output"]
+        ),
+        "semantic_parity": bool(
+            snapshot["semantic_parity"]
+        ),
+    }
+
+
+def phase2_evaluate_probe_pair(
+    surface_id,
+    first_snapshot,
+    second_snapshot,
+):
+    """Evaluate two frozen-input observations for one advisory surface."""
+    surface_key = str(surface_id)
+
+    contract = phase2_parity_contract(
+        surface_key
+    )
+
+    first = _phase2_validate_probe_snapshot(
+        surface_key,
+        first_snapshot,
+    )
+
+    second = _phase2_validate_probe_snapshot(
+        surface_key,
+        second_snapshot,
+    )
+
+    expected_identity = (
+        _phase2_expected_identity(
+            surface_key
+        )
+    )
+
+    identity_match = (
+        first["identity"]
+        == expected_identity
+        and second["identity"]
+        == expected_identity
+    )
+
+    deterministic = (
+        _phase2_canonical(
+            first["output"]
+        )
+        == _phase2_canonical(
+            second["output"]
+        )
+    )
+
+    schema_match = (
+        _phase2_canonical(
+            first["output_schema"]
+        )
+        == _phase2_canonical(
+            second["output_schema"]
+        )
+    )
+
+    semantic_parity = (
+        first["semantic_parity"]
+        and second["semantic_parity"]
+    )
+
+    reasons = []
+
+    if not identity_match:
+        reasons.append(
+            "surface_identity_mismatch"
+        )
+
+    if not deterministic:
+        reasons.append(
+            "non_deterministic_output"
+        )
+
+    if not schema_match:
+        reasons.append(
+            "output_schema_drift"
+        )
+
+    if not semantic_parity:
+        reasons.append(
+            "semantic_parity_not_proven"
+        )
+
+    if not identity_match:
+        decision = (
+            PARITY_UNRESOLVED_FAIL_CLOSED
+        )
+        binding_eligible = False
+
+    elif surface_key in _PHASE2_DIRECT_PIPELINE_REJECTIONS:
+        decision = (
+            PARITY_REJECTED_ADVISORY_ONLY
+        )
+        binding_eligible = False
+
+        reasons.append(
+            "surface_is_not_complete_production_pipeline"
+        )
+
+    elif (
+        deterministic
+        and schema_match
+        and semantic_parity
+    ):
+        decision = (
+            PARITY_CONFIRMED_BINDING_ELIGIBLE
+        )
+        binding_eligible = True
+
+    else:
+        decision = (
+            PARITY_UNRESOLVED_FAIL_CLOSED
+        )
+        binding_eligible = False
+
+    return {
+        "surface_id": surface_key,
+        "classification": contract[
+            "classification"
+        ],
+        "decision": decision,
+        "binding_eligible": binding_eligible,
+        "binding_authorized": False,
+        "identity_match": identity_match,
+        "deterministic": deterministic,
+        "output_schema_match": schema_match,
+        "semantic_parity": semantic_parity,
+        "reasons": list(
+            dict.fromkeys(reasons)
+        ),
+    }
+
+
+def phase2_validate_probe_matrix(probes):
+    """Validate an exact five-surface probe matrix."""
+    if not isinstance(probes, _Phase2Mapping):
+        raise ParityValidationError(
+            "probe matrix must be a mapping"
+        )
+
+    actual_ids = set(
+        str(key)
+        for key in probes
+    )
+
+    expected_ids = set(
+        _PHASE2_SURFACE_ORDER
+    )
+
+    if actual_ids != expected_ids:
+        missing = sorted(
+            expected_ids - actual_ids
+        )
+        extra = sorted(
+            actual_ids - expected_ids
+        )
+
+        raise ParityValidationError(
+            "probe matrix surface mismatch; "
+            "missing="
+            + repr(missing)
+            + ", extra="
+            + repr(extra)
+        )
+
+    results = []
+
+    for surface_id in _PHASE2_SURFACE_ORDER:
+        payload = probes[surface_id]
+
+        if not isinstance(
+            payload,
+            _Phase2Mapping,
+        ):
+            raise ParityValidationError(
+                "probe pair must be a mapping: "
+                + surface_id
+            )
+
+        if (
+            "first" not in payload
+            or "second" not in payload
+        ):
+            raise ParityValidationError(
+                "probe pair requires first and second: "
+                + surface_id
+            )
+
+        results.append(
+            phase2_evaluate_probe_pair(
+                surface_id,
+                payload["first"],
+                payload["second"],
+            )
+        )
+
+    return tuple(results)
+
+
+def phase2_binding_decisions_fail_closed(results):
+    """True only when no evaluation silently authorizes production binding."""
+    for result in results:
+        if not isinstance(
+            result,
+            _Phase2Mapping,
+        ):
+            raise ParityValidationError(
+                "parity result must be a mapping"
+            )
+
+        if bool(
+            result.get(
+                "binding_authorized",
+                False,
+            )
+        ):
+            return False
+
+    return True
+
+
+# === PHASE2_PARITY_HARNESS_V1 END ===

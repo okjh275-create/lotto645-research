@@ -724,3 +724,285 @@ def test_module_has_no_challenger_execution_api():
         rse,
         "run_challengers",
     )
+
+# === PHASE2_PARITY_HARNESS_TESTS_V1 BEGIN ===
+
+import pytest as _phase2_pytest
+
+from lrp import research_shadow_execution as _phase2_product
+
+
+def _phase2_probe_snapshot(
+    surface_id,
+    *,
+    output=None,
+    output_schema=None,
+    semantic_parity=True,
+):
+    contract = (
+        _phase2_product.phase2_parity_contract(
+            surface_id
+        )
+    )
+
+    identity = {
+        key: contract[key]
+        for key in (
+            "module",
+            "path",
+            "callable",
+            "file_sha256",
+            "git_blob",
+        )
+    }
+
+    if output is None:
+        output = {
+            "value": surface_id,
+        }
+
+    if output_schema is None:
+        output_schema = {
+            "type": "mapping",
+            "keys": ["value"],
+        }
+
+    return {
+        "identity": identity,
+        "output_schema": output_schema,
+        "output": output,
+        "semantic_parity": semantic_parity,
+    }
+
+
+def test_phase2_surface_ids_are_exact():
+    assert (
+        _phase2_product.phase2_parity_surface_ids()
+        == (
+            "CANDIDATE",
+            "SCORING",
+            "FILTER_FEATURE",
+            "PRACTICAL_SELECTOR",
+            "PAIR_FEATURE",
+        )
+    )
+
+
+def test_phase2_authorization_is_fail_closed():
+    authorization = (
+        _phase2_product.phase2_parity_authorization()
+    )
+
+    assert authorization
+    assert all(
+        value is False
+        for value in authorization.values()
+    )
+
+
+def test_phase2_contract_returns_defensive_copy():
+    first = (
+        _phase2_product.phase2_parity_contract(
+            "CANDIDATE"
+        )
+    )
+
+    first["classification"] = "MUTATED"
+
+    second = (
+        _phase2_product.phase2_parity_contract(
+            "CANDIDATE"
+        )
+    )
+
+    assert second["classification"] != "MUTATED"
+
+
+def test_phase2_unknown_surface_fails_closed():
+    with _phase2_pytest.raises(
+        _phase2_product.ParityValidationError
+    ):
+        _phase2_product.phase2_parity_contract(
+            "UNKNOWN"
+        )
+
+
+def test_phase2_candidate_can_be_parity_eligible_but_not_authorized():
+    first = _phase2_probe_snapshot(
+        "CANDIDATE"
+    )
+
+    second = _phase2_probe_snapshot(
+        "CANDIDATE"
+    )
+
+    result = (
+        _phase2_product.phase2_evaluate_probe_pair(
+            "CANDIDATE",
+            first,
+            second,
+        )
+    )
+
+    assert (
+        result["decision"]
+        == _phase2_product.PARITY_CONFIRMED_BINDING_ELIGIBLE
+    )
+
+    assert result["binding_eligible"] is True
+    assert result["binding_authorized"] is False
+
+
+def test_phase2_candidate_output_drift_fails_closed():
+    first = _phase2_probe_snapshot(
+        "CANDIDATE",
+        output={"value": 1},
+    )
+
+    second = _phase2_probe_snapshot(
+        "CANDIDATE",
+        output={"value": 2},
+    )
+
+    result = (
+        _phase2_product.phase2_evaluate_probe_pair(
+            "CANDIDATE",
+            first,
+            second,
+        )
+    )
+
+    assert (
+        result["decision"]
+        == _phase2_product.PARITY_UNRESOLVED_FAIL_CLOSED
+    )
+
+    assert result["deterministic"] is False
+    assert result["binding_eligible"] is False
+
+
+def test_phase2_candidate_schema_drift_fails_closed():
+    first = _phase2_probe_snapshot(
+        "CANDIDATE",
+        output_schema={
+            "type": "mapping",
+            "keys": ["a"],
+        },
+    )
+
+    second = _phase2_probe_snapshot(
+        "CANDIDATE",
+        output_schema={
+            "type": "mapping",
+            "keys": ["b"],
+        },
+    )
+
+    result = (
+        _phase2_product.phase2_evaluate_probe_pair(
+            "CANDIDATE",
+            first,
+            second,
+        )
+    )
+
+    assert (
+        result["decision"]
+        == _phase2_product.PARITY_UNRESOLVED_FAIL_CLOSED
+    )
+
+    assert result["output_schema_match"] is False
+
+
+@_phase2_pytest.mark.parametrize(
+    "surface_id",
+    (
+        "SCORING",
+        "FILTER_FEATURE",
+        "PRACTICAL_SELECTOR",
+        "PAIR_FEATURE",
+    ),
+)
+def test_phase2_advisory_helpers_cannot_become_direct_pipeline_bindings(
+    surface_id,
+):
+    first = _phase2_probe_snapshot(
+        surface_id
+    )
+
+    second = _phase2_probe_snapshot(
+        surface_id
+    )
+
+    result = (
+        _phase2_product.phase2_evaluate_probe_pair(
+            surface_id,
+            first,
+            second,
+        )
+    )
+
+    assert (
+        result["decision"]
+        == _phase2_product.PARITY_REJECTED_ADVISORY_ONLY
+    )
+
+    assert result["binding_eligible"] is False
+    assert result["binding_authorized"] is False
+
+
+def test_phase2_probe_matrix_requires_all_five_surfaces():
+    probes = {}
+
+    for surface_id in (
+        _phase2_product.phase2_parity_surface_ids()
+    ):
+        snapshot = _phase2_probe_snapshot(
+            surface_id
+        )
+
+        probes[surface_id] = {
+            "first": snapshot,
+            "second": snapshot,
+        }
+
+    results = (
+        _phase2_product.phase2_validate_probe_matrix(
+            probes
+        )
+    )
+
+    assert len(results) == 5
+
+    assert (
+        _phase2_product.phase2_binding_decisions_fail_closed(
+            results
+        )
+        is True
+    )
+
+
+def test_phase2_probe_matrix_rejects_missing_surface():
+    probes = {}
+
+    for surface_id in (
+        _phase2_product.phase2_parity_surface_ids()[:-1]
+    ):
+        snapshot = _phase2_probe_snapshot(
+            surface_id
+        )
+
+        probes[surface_id] = {
+            "first": snapshot,
+            "second": snapshot,
+        }
+
+    with _phase2_pytest.raises(
+        _phase2_product.ParityValidationError
+    ):
+        _phase2_product.phase2_validate_probe_matrix(
+            probes
+        )
+
+
+# === PHASE2_PARITY_HARNESS_TESTS_V1 END ===
