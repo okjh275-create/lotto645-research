@@ -1672,3 +1672,435 @@ def test_phase4_does_not_open_phase2_or_phase3_execution_gates():
 
 
 # === PHASE4_RESEARCH_EXECUTOR_TESTS_V1 END ===
+
+# === PHASE5_REAL_ROUND_ADAPTER_TESTS_V1 BEGIN ===
+
+
+def _phase5_make_history_db(
+    tmp_path,
+    rounds=(1240, 1241, 1242),
+):
+    db_path = tmp_path / "phase5_history.sqlite"
+
+    connection = (
+        _phase2_product
+        ._phase5_sqlite3
+        .connect(str(db_path))
+    )
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE draw_history (
+                round INTEGER PRIMARY KEY,
+                n1 INTEGER NOT NULL,
+                n2 INTEGER NOT NULL,
+                n3 INTEGER NOT NULL,
+                n4 INTEGER NOT NULL,
+                n5 INTEGER NOT NULL,
+                n6 INTEGER NOT NULL,
+                bonus INTEGER
+            )
+            """
+        )
+
+        for round_no in rounds:
+            connection.execute(
+                """
+                INSERT INTO draw_history (
+                    round,
+                    n1,
+                    n2,
+                    n3,
+                    n4,
+                    n5,
+                    n6,
+                    bonus
+                )
+                VALUES (?, 1, 2, 3, 4, 5, 6, 7)
+                """,
+                (round_no,),
+            )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    return db_path
+
+
+def test_phase5_authorization_is_preparation_only():
+    auth = (
+        _phase2_product
+        .phase5_real_round_authorization()
+    )
+
+    assert auth["research_only"] is True
+    assert auth["real_round_adapter_implementation"] is True
+    assert auth["real_round_preparation"] is True
+
+    assert auth["real_round_execution"] is False
+    assert auth["challenger_execution"] is False
+    assert auth["real_database_shadow_execution"] is False
+    assert auth["real_shadow_publish"] is False
+    assert auth["database_write"] is False
+    assert auth["production_helper_binding"] is False
+    assert auth["production_learning"] is False
+
+
+def test_phase5_target_round_1243_snapshot_is_accepted(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    snapshot = (
+        _phase2_product
+        .phase5_load_history_snapshot(
+            db_path,
+            round_no=1243,
+        )
+    )
+
+    assert snapshot["target_round"] == 1243
+    assert snapshot["history_cutoff_max_round"] == 1242
+    assert snapshot["history_max_round"] == 1242
+    assert snapshot["database_max_round"] == 1242
+    assert snapshot["database_read_only"] is True
+    assert snapshot["database_query_only"] is True
+    assert snapshot["target_future_leakage"] is False
+
+
+def test_phase5_round_other_than_1243_is_rejected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_load_history_snapshot(
+            db_path,
+            round_no=1244,
+        )
+
+
+def test_phase5_unknown_challenger_is_rejected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase5_prepare_real_round_request(
+            db_path,
+            "UNKNOWN_CHALLENGER",
+        )
+
+
+def test_phase5_target_round_leakage_is_rejected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path,
+        rounds=(1241, 1242, 1243),
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_load_history_snapshot(
+            db_path
+        )
+
+
+def test_phase5_future_round_leakage_is_rejected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path,
+        rounds=(1241, 1242, 1244),
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_load_history_snapshot(
+            db_path
+        )
+
+
+def test_phase5_database_connection_is_query_only_and_read_only(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    connection = (
+        _phase2_product
+        ._phase5_open_read_only_database(
+            db_path
+        )
+    )
+
+    try:
+        query_only = connection.execute(
+            "PRAGMA query_only"
+        ).fetchone()
+
+        assert int(query_only[0]) == 1
+
+        with _phase2_pytest.raises(
+            _phase2_product._phase5_sqlite3.OperationalError
+        ):
+            connection.execute(
+                """
+                INSERT INTO draw_history (
+                    round,
+                    n1,
+                    n2,
+                    n3,
+                    n4,
+                    n5,
+                    n6,
+                    bonus
+                )
+                VALUES (1243, 1, 2, 3, 4, 5, 6, 7)
+                """
+            )
+
+    finally:
+        connection.close()
+
+
+def test_phase5_prepared_request_is_deterministic(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    first = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "CG00_RANDOM_FILTERED",
+        )
+    )
+
+    second = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "CG00_RANDOM_FILTERED",
+        )
+    )
+
+    assert first == second
+    assert first["round"] == 1243
+    assert (
+        first["challenger_id"]
+        == "CG00_RANDOM_FILTERED"
+    )
+    assert first["prepared_only"] is True
+    assert first["execution_authorized"] is False
+
+    assert (
+        _phase2_product
+        .phase5_validate_prepared_request(
+            first
+        )
+        is True
+    )
+
+
+def test_phase5_all_24_requests_preserve_frozen_identity(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    requests = (
+        _phase2_product
+        .phase5_prepare_all_real_round_requests(
+            db_path
+        )
+    )
+
+    assert len(requests) == 24
+
+    assert tuple(
+        item["challenger_id"]
+        for item in requests
+    ) == _phase2_product.phase3_challenger_ids()
+
+    assert len({
+        item["request_id"]
+        for item in requests
+    }) == 24
+
+    assert len({
+        item["seed"]
+        for item in requests
+    }) == 24
+
+    for item in requests:
+        assert (
+            item["seed"]
+            == _phase2_product.phase3_seed(
+                1243,
+                item["challenger_id"],
+            )
+        )
+
+        assert item["round"] == 1243
+        assert item["prepared_only"] is True
+        assert item["execution_authorized"] is False
+
+
+def test_phase5_history_tampering_is_detected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    request = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "CG01_TEMP_060",
+        )
+    )
+
+    request["history_snapshot"]["history_rows"][0][
+        "nums"
+    ][0] = 45
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_validate_prepared_request(
+            request
+        )
+
+
+def test_phase5_seed_tampering_is_detected(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    request = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "HF05_SOFT_ALL4",
+        )
+    )
+
+    request["seed"] += 1
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_validate_prepared_request(
+            request
+        )
+
+
+def test_phase5_real_execution_fails_closed(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    request = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "PS01_RANDOM5",
+        )
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.RealRoundAdapterError
+    ):
+        _phase2_product.phase5_execute_real_round(
+            request,
+            adapter=lambda plan: {
+                "should_not_run": True
+            },
+        )
+
+
+def test_phase5_does_not_reopen_phase4_real_execution(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    request = (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            "LG01_NO_GAP_SCORE",
+        )
+    )
+
+    phase4 = (
+        _phase2_product
+        .phase4_executor_authorization()
+    )
+
+    phase5 = (
+        _phase2_product
+        .phase5_real_round_authorization()
+    )
+
+    assert phase4["real_round_execution"] is False
+    assert phase4["real_shadow_publish"] is False
+
+    assert phase5["real_round_execution"] is False
+    assert phase5["challenger_execution"] is False
+    assert phase5["real_shadow_publish"] is False
+    assert phase5["database_write"] is False
+
+    assert request["execution_authorized"] is False
+
+
+def test_phase5_snapshot_does_not_mutate_database_file(
+    tmp_path,
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    before = db_path.read_bytes()
+
+    snapshot = (
+        _phase2_product
+        .phase5_load_history_snapshot(
+            db_path
+        )
+    )
+
+    after = db_path.read_bytes()
+
+    assert before == after
+    assert snapshot["history_max_round"] == 1242
+
+
+# === PHASE5_REAL_ROUND_ADAPTER_TESTS_V1 END ===

@@ -2144,3 +2144,648 @@ def phase4_validate_result(
 
 
 # === PHASE4_RESEARCH_EXECUTOR_V1 END ===
+
+# === PHASE5_REAL_ROUND_ADAPTER_V1 BEGIN ===
+
+import sqlite3 as _phase5_sqlite3
+from pathlib import Path as _phase5_Path
+
+
+PHASE5_REAL_ROUND_TARGET = 1243
+PHASE5_HISTORY_CUTOFF_MAX = 1242
+PHASE5_REAL_ROUND_PREPARED_MODE = "real_round_prepared"
+
+
+class RealRoundAdapterError(ValueError):
+    """Raised when the Phase-5 real-round preparation contract fails."""
+
+
+def phase5_real_round_authorization():
+    """Return the frozen Phase-5 preparation-only authorization."""
+    return {
+        "research_only": True,
+        "real_round_adapter_implementation": True,
+        "real_round_preparation": True,
+        "synthetic_fixture_execution": True,
+        "real_round_execution": False,
+        "challenger_execution": False,
+        "real_database_shadow_execution": False,
+        "real_shadow_publish": False,
+        "database_write": False,
+        "production_helper_binding": False,
+        "production_prediction_regeneration": False,
+        "production_cli_registration": False,
+        "production_learning": False,
+    }
+
+
+def _phase5_validate_target_round(round_no):
+    if isinstance(round_no, bool) or not isinstance(round_no, int):
+        raise RealRoundAdapterError(
+            "target round must be integer 1243"
+        )
+
+    if round_no != PHASE5_REAL_ROUND_TARGET:
+        raise RealRoundAdapterError(
+            "Phase-5 adapter is locked to round 1243"
+        )
+
+    return round_no
+
+
+def _phase5_database_path(db_path):
+    path = _phase5_Path(db_path).expanduser().resolve()
+
+    if not path.exists():
+        raise RealRoundAdapterError(
+            "database path does not exist"
+        )
+
+    if not path.is_file():
+        raise RealRoundAdapterError(
+            "database path is not a file"
+        )
+
+    return path
+
+
+def _phase5_database_sha256(db_path):
+    path = _phase5_database_path(db_path)
+
+    digest = _phase3_hashlib.sha256()
+
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+
+            if not chunk:
+                break
+
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def _phase5_open_read_only_database(db_path):
+    """Open SQLite strictly read-only and force query_only."""
+    path = _phase5_database_path(db_path)
+
+    uri = path.as_uri() + "?mode=ro"
+
+    try:
+        connection = _phase5_sqlite3.connect(
+            uri,
+            uri=True,
+        )
+    except _phase5_sqlite3.Error as exc:
+        raise RealRoundAdapterError(
+            "unable to open database read-only"
+        ) from exc
+
+    try:
+        connection.execute(
+            "PRAGMA query_only = ON"
+        )
+
+        row = connection.execute(
+            "PRAGMA query_only"
+        ).fetchone()
+
+        if not row or int(row[0]) != 1:
+            raise RealRoundAdapterError(
+                "SQLite query_only could not be enabled"
+            )
+
+        return connection
+
+    except Exception:
+        connection.close()
+        raise
+
+
+def phase5_load_history_snapshot(
+    db_path,
+    round_no=PHASE5_REAL_ROUND_TARGET,
+):
+    """Read the real history under a strict target-1 cutoff.
+
+    This function performs no generation, scoring, selection,
+    publication, or database mutation.
+    """
+    round_no = _phase5_validate_target_round(
+        round_no
+    )
+
+    cutoff = round_no - 1
+
+    if cutoff != PHASE5_HISTORY_CUTOFF_MAX:
+        raise RealRoundAdapterError(
+            "unexpected Phase-5 history cutoff"
+        )
+
+    database_sha256 = _phase5_database_sha256(
+        db_path
+    )
+
+    connection = _phase5_open_read_only_database(
+        db_path
+    )
+
+    try:
+        query_only_row = connection.execute(
+            "PRAGMA query_only"
+        ).fetchone()
+
+        if (
+            not query_only_row
+            or int(query_only_row[0]) != 1
+        ):
+            raise RealRoundAdapterError(
+                "database is not query-only"
+            )
+
+        try:
+            global_row = connection.execute(
+                """
+                SELECT
+                    MIN(round),
+                    MAX(round),
+                    COUNT(*)
+                FROM draw_history
+                """
+            ).fetchone()
+
+            leakage_row = connection.execute(
+                """
+                SELECT round
+                FROM draw_history
+                WHERE round >= ?
+                ORDER BY round ASC
+                LIMIT 1
+                """,
+                (round_no,),
+            ).fetchone()
+
+            rows = connection.execute(
+                """
+                SELECT
+                    round,
+                    n1,
+                    n2,
+                    n3,
+                    n4,
+                    n5,
+                    n6,
+                    bonus
+                FROM draw_history
+                WHERE round <= ?
+                ORDER BY round ASC
+                """,
+                (cutoff,),
+            ).fetchall()
+
+        except _phase5_sqlite3.Error as exc:
+            raise RealRoundAdapterError(
+                "draw_history query failed"
+            ) from exc
+
+    finally:
+        connection.close()
+
+    if leakage_row is not None:
+        raise RealRoundAdapterError(
+            "target/future leakage detected at round "
+            + str(int(leakage_row[0]))
+        )
+
+    if not rows:
+        raise RealRoundAdapterError(
+            "history snapshot is empty"
+        )
+
+    global_min = (
+        None
+        if global_row[0] is None
+        else int(global_row[0])
+    )
+
+    global_max = (
+        None
+        if global_row[1] is None
+        else int(global_row[1])
+    )
+
+    global_count = int(global_row[2])
+
+    if (
+        global_max is not None
+        and global_max > cutoff
+    ):
+        raise RealRoundAdapterError(
+            "database max round exceeds target-1 cutoff"
+        )
+
+    history_rows = [
+        {
+            "round": int(row[0]),
+            "nums": [
+                int(row[1]),
+                int(row[2]),
+                int(row[3]),
+                int(row[4]),
+                int(row[5]),
+                int(row[6]),
+            ],
+            "bonus": (
+                None
+                if row[7] is None
+                else int(row[7])
+            ),
+        }
+        for row in rows
+    ]
+
+    history_max = int(
+        history_rows[-1]["round"]
+    )
+
+    if history_max > cutoff:
+        raise RealRoundAdapterError(
+            "history snapshot exceeds target-1 cutoff"
+        )
+
+    history_digest = _phase4_digest(
+        history_rows
+    )
+
+    return {
+        "schema_version": 1,
+        "target_round": round_no,
+        "history_cutoff_max_round": cutoff,
+        "database_sha256": database_sha256,
+        "database_read_only": True,
+        "database_query_only": True,
+        "target_future_leakage": False,
+        "database_min_round": global_min,
+        "database_max_round": global_max,
+        "database_row_count": global_count,
+        "history_min_round": int(
+            history_rows[0]["round"]
+        ),
+        "history_max_round": history_max,
+        "history_row_count": len(
+            history_rows
+        ),
+        "history_digest": history_digest,
+        "history_rows": history_rows,
+    }
+
+
+def _phase5_prepare_request_from_snapshot(
+    snapshot,
+    challenger_id,
+):
+    if not isinstance(
+        snapshot,
+        _phase4_Mapping,
+    ):
+        raise RealRoundAdapterError(
+            "history snapshot must be a mapping"
+        )
+
+    round_no = _phase5_validate_target_round(
+        snapshot.get("target_round")
+    )
+
+    if (
+        snapshot.get("history_cutoff_max_round")
+        != PHASE5_HISTORY_CUTOFF_MAX
+    ):
+        raise RealRoundAdapterError(
+            "history cutoff mismatch"
+        )
+
+    if snapshot.get("database_read_only") is not True:
+        raise RealRoundAdapterError(
+            "database must be read-only"
+        )
+
+    if snapshot.get("database_query_only") is not True:
+        raise RealRoundAdapterError(
+            "database must be query-only"
+        )
+
+    if snapshot.get("target_future_leakage") is not False:
+        raise RealRoundAdapterError(
+            "leakage state is not clean"
+        )
+
+    if (
+        int(snapshot.get("history_max_round"))
+        > PHASE5_HISTORY_CUTOFF_MAX
+    ):
+        raise RealRoundAdapterError(
+            "history max exceeds cutoff"
+        )
+
+    rows = snapshot.get("history_rows")
+
+    if not isinstance(rows, list) or not rows:
+        raise RealRoundAdapterError(
+            "history rows missing"
+        )
+
+    if (
+        snapshot.get("history_row_count")
+        != len(rows)
+    ):
+        raise RealRoundAdapterError(
+            "history row count mismatch"
+        )
+
+    if (
+        snapshot.get("history_digest")
+        != _phase4_digest(rows)
+    ):
+        raise RealRoundAdapterError(
+            "history digest mismatch"
+        )
+
+    plan = phase3_build_challenger_plan(
+        round_no,
+        challenger_id,
+    )
+
+    identity = {
+        "schema_version": 1,
+        "round": round_no,
+        "challenger_id": plan["challenger_id"],
+        "seed": plan["seed"],
+        "execution_mode": (
+            PHASE5_REAL_ROUND_PREPARED_MODE
+        ),
+        "database_sha256": (
+            snapshot["database_sha256"]
+        ),
+        "history_digest": (
+            snapshot["history_digest"]
+        ),
+    }
+
+    request_id = _phase4_digest(
+        identity
+    )
+
+    return {
+        "schema_version": 1,
+        "request_id": request_id,
+        "round": round_no,
+        "challenger_id": plan["challenger_id"],
+        "seed": plan["seed"],
+        "category": plan["category"],
+        "execution_mode": (
+            PHASE5_REAL_ROUND_PREPARED_MODE
+        ),
+        "research_only": True,
+        "prepared_only": True,
+        "execution_authorized": False,
+        "plan": _phase3_copy(plan),
+        "history_snapshot": _phase3_copy(
+            dict(snapshot)
+        ),
+        "authorization": (
+            phase5_real_round_authorization()
+        ),
+    }
+
+
+def phase5_prepare_real_round_request(
+    db_path,
+    challenger_id,
+    *,
+    round_no=PHASE5_REAL_ROUND_TARGET,
+):
+    """Prepare one real-data request without executing it."""
+    snapshot = phase5_load_history_snapshot(
+        db_path,
+        round_no=round_no,
+    )
+
+    return _phase5_prepare_request_from_snapshot(
+        snapshot,
+        challenger_id,
+    )
+
+
+def phase5_prepare_all_real_round_requests(
+    db_path,
+    *,
+    round_no=PHASE5_REAL_ROUND_TARGET,
+):
+    """Prepare all 24 frozen challenger requests.
+
+    The database snapshot is loaded once and defensively copied
+    into each request. No challenger is actually executed.
+    """
+    snapshot = phase5_load_history_snapshot(
+        db_path,
+        round_no=round_no,
+    )
+
+    return tuple(
+        _phase5_prepare_request_from_snapshot(
+            snapshot,
+            challenger_id,
+        )
+        for challenger_id
+        in phase3_challenger_ids()
+    )
+
+
+def phase5_validate_prepared_request(
+    request,
+):
+    """Validate one prepared real-round request offline."""
+    if not isinstance(
+        request,
+        _phase4_Mapping,
+    ):
+        raise RealRoundAdapterError(
+            "prepared request must be a mapping"
+        )
+
+    required = (
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "execution_mode",
+        "research_only",
+        "prepared_only",
+        "execution_authorized",
+        "plan",
+        "history_snapshot",
+    )
+
+    missing = [
+        key
+        for key in required
+        if key not in request
+    ]
+
+    if missing:
+        raise RealRoundAdapterError(
+            "prepared request missing fields: "
+            + ",".join(missing)
+        )
+
+    round_no = _phase5_validate_target_round(
+        request["round"]
+    )
+
+    if (
+        request["execution_mode"]
+        != PHASE5_REAL_ROUND_PREPARED_MODE
+    ):
+        raise RealRoundAdapterError(
+            "prepared execution mode mismatch"
+        )
+
+    if request["research_only"] is not True:
+        raise RealRoundAdapterError(
+            "request must remain research-only"
+        )
+
+    if request["prepared_only"] is not True:
+        raise RealRoundAdapterError(
+            "request must remain preparation-only"
+        )
+
+    if request["execution_authorized"] is not False:
+        raise RealRoundAdapterError(
+            "real execution is not authorized"
+        )
+
+    snapshot = request["history_snapshot"]
+
+    if not isinstance(
+        snapshot,
+        _phase4_Mapping,
+    ):
+        raise RealRoundAdapterError(
+            "history snapshot must be a mapping"
+        )
+
+    rows = snapshot.get("history_rows")
+
+    if not isinstance(rows, list) or not rows:
+        raise RealRoundAdapterError(
+            "history rows missing"
+        )
+
+    if (
+        snapshot.get("history_cutoff_max_round")
+        != PHASE5_HISTORY_CUTOFF_MAX
+    ):
+        raise RealRoundAdapterError(
+            "history cutoff mismatch"
+        )
+
+    if (
+        int(snapshot.get("history_max_round"))
+        > PHASE5_HISTORY_CUTOFF_MAX
+    ):
+        raise RealRoundAdapterError(
+            "history exceeds cutoff"
+        )
+
+    if snapshot.get("database_read_only") is not True:
+        raise RealRoundAdapterError(
+            "database read-only flag mismatch"
+        )
+
+    if snapshot.get("database_query_only") is not True:
+        raise RealRoundAdapterError(
+            "database query-only flag mismatch"
+        )
+
+    if snapshot.get("target_future_leakage") is not False:
+        raise RealRoundAdapterError(
+            "leakage flag mismatch"
+        )
+
+    if (
+        snapshot.get("history_row_count")
+        != len(rows)
+    ):
+        raise RealRoundAdapterError(
+            "history row count mismatch"
+        )
+
+    if (
+        snapshot.get("history_digest")
+        != _phase4_digest(rows)
+    ):
+        raise RealRoundAdapterError(
+            "history digest mismatch"
+        )
+
+    plan = phase3_build_challenger_plan(
+        round_no,
+        request["challenger_id"],
+    )
+
+    if request["seed"] != plan["seed"]:
+        raise RealRoundAdapterError(
+            "prepared request seed mismatch"
+        )
+
+    if request["plan"] != plan:
+        raise RealRoundAdapterError(
+            "prepared challenger plan mismatch"
+        )
+
+    identity = {
+        "schema_version": 1,
+        "round": round_no,
+        "challenger_id": plan["challenger_id"],
+        "seed": plan["seed"],
+        "execution_mode": (
+            PHASE5_REAL_ROUND_PREPARED_MODE
+        ),
+        "database_sha256": (
+            snapshot["database_sha256"]
+        ),
+        "history_digest": (
+            snapshot["history_digest"]
+        ),
+    }
+
+    expected_request_id = _phase4_digest(
+        identity
+    )
+
+    if request["request_id"] != expected_request_id:
+        raise RealRoundAdapterError(
+            "prepared request digest mismatch"
+        )
+
+    return True
+
+
+def phase5_execute_real_round(
+    request,
+    adapter=None,
+):
+    """Fail closed until a separate exact round authorization exists."""
+    phase5_validate_prepared_request(
+        request
+    )
+
+    raise RealRoundAdapterError(
+        "round-1243 real challenger execution "
+        "is not authorized in Phase 5 adapter implementation"
+    )
+
+
+# === PHASE5_REAL_ROUND_ADAPTER_V1 END ===
