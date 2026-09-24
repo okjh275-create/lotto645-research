@@ -1384,3 +1384,291 @@ def test_phase3_plans_remain_execution_closed_and_phase2_remains_fail_closed():
 
 
 # === PHASE3_CHALLENGER_ENGINE_TESTS_V1 END ===
+
+# === PHASE4_RESEARCH_EXECUTOR_TESTS_V1 BEGIN ===
+
+
+def test_phase4_executor_authorization_is_synthetic_only():
+    auth = (
+        _phase2_product.phase4_executor_authorization()
+    )
+
+    assert auth["research_executor"] is True
+    assert auth["synthetic_fixture_execution"] is True
+
+    assert auth["real_round_execution"] is False
+    assert auth["real_database_shadow_execution"] is False
+    assert auth["real_shadow_publish"] is False
+    assert auth["production_helper_binding"] is False
+    assert auth["production_prediction_regeneration"] is False
+    assert auth["database_write"] is False
+    assert auth["production_cli_registration"] is False
+
+
+def test_phase4_request_is_deterministic_and_preserves_identity():
+    first = _phase2_product.phase4_build_request(
+        1243,
+        "CG00_RANDOM_FILTERED",
+    )
+
+    second = _phase2_product.phase4_build_request(
+        1243,
+        "CG00_RANDOM_FILTERED",
+    )
+
+    assert first == second
+    assert first["round"] == 1243
+    assert (
+        first["challenger_id"]
+        == "CG00_RANDOM_FILTERED"
+    )
+    assert (
+        first["seed"]
+        == _phase2_product.phase3_seed(
+            1243,
+            "CG00_RANDOM_FILTERED",
+        )
+    )
+    assert first["research_only"] is True
+    assert first["synthetic_fixture"] is True
+
+
+def test_phase4_real_execution_mode_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutorError
+    ):
+        _phase2_product.phase4_build_request(
+            1243,
+            "CG00_RANDOM_FILTERED",
+            execution_mode="real_round",
+        )
+
+
+def test_phase4_unknown_challenger_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase4_build_request(
+            1243,
+            "UNKNOWN",
+        )
+
+
+def test_phase4_out_of_window_round_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase4_build_request(
+            1242,
+            "CG00_RANDOM_FILTERED",
+        )
+
+
+def test_phase4_adapter_must_be_callable():
+    request = (
+        _phase2_product.phase4_build_request(
+            1243,
+            "PS01_RANDOM5",
+        )
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutorError
+    ):
+        _phase2_product.phase4_execute_synthetic(
+            request,
+            None,
+        )
+
+
+def test_phase4_adapter_output_must_be_mapping():
+    request = (
+        _phase2_product.phase4_build_request(
+            1243,
+            "PS01_RANDOM5",
+        )
+    )
+
+    def adapter(_plan):
+        return [1, 2, 3]
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutorError
+    ):
+        _phase2_product.phase4_execute_synthetic(
+            request,
+            adapter,
+        )
+
+
+def test_phase4_synthetic_result_preserves_request_identity():
+    request = (
+        _phase2_product.phase4_build_request(
+            1243,
+            "HF05_SOFT_ALL4",
+        )
+    )
+
+    def adapter(plan):
+        return {
+            "fixture": "ok",
+            "seed_seen": plan["seed"],
+        }
+
+    result = (
+        _phase2_product.phase4_execute_synthetic(
+            request,
+            adapter,
+        )
+    )
+
+    assert (
+        result["request_id"]
+        == request["request_id"]
+    )
+    assert result["round"] == request["round"]
+    assert (
+        result["challenger_id"]
+        == request["challenger_id"]
+    )
+    assert result["seed"] == request["seed"]
+
+    assert result["research_only"] is True
+    assert result["synthetic_fixture"] is True
+
+    assert result["real_round_execution"] is False
+    assert result["database_write"] is False
+    assert result["real_shadow_publish"] is False
+    assert result["production_helper_binding"] is False
+
+    assert (
+        _phase2_product.phase4_validate_result(
+            request,
+            result,
+        )
+        is True
+    )
+
+
+def test_phase4_pure_adapter_execution_is_deterministic():
+    request = (
+        _phase2_product.phase4_build_request(
+            1243,
+            "LG01_NO_GAP_SCORE",
+        )
+    )
+
+    def adapter(plan):
+        return {
+            "round": plan["round"],
+            "seed": plan["seed"],
+            "mode": "fixture",
+        }
+
+    first = (
+        _phase2_product.phase4_execute_synthetic(
+            request,
+            adapter,
+        )
+    )
+
+    second = (
+        _phase2_product.phase4_execute_synthetic(
+            request,
+            adapter,
+        )
+    )
+
+    assert first == second
+    assert first["result_id"] == second["result_id"]
+
+
+def test_phase4_adapter_receives_defensive_plan_copy():
+    request = (
+        _phase2_product.phase4_build_request(
+            1243,
+            "CG01_TEMP_060",
+        )
+    )
+
+    original_plan = _phase2_product._phase3_copy(
+        request["plan"]
+    )
+
+    def adapter(plan):
+        plan["round"] = 9999
+        plan["parameters"]["temperature"] = 9.9
+        return {"mutated_fixture_copy": True}
+
+    _phase2_product.phase4_execute_synthetic(
+        request,
+        adapter,
+    )
+
+    assert request["plan"] == original_plan
+    assert request["round"] == 1243
+
+
+def test_phase4_all_24_requests_are_deterministic_and_unique():
+    requests = (
+        _phase2_product.phase4_build_all_requests(
+            1243
+        )
+    )
+
+    assert len(requests) == 24
+
+    assert tuple(
+        item["challenger_id"]
+        for item in requests
+    ) == _phase2_product.phase3_challenger_ids()
+
+    assert len({
+        item["request_id"]
+        for item in requests
+    }) == 24
+
+    assert len({
+        item["seed"]
+        for item in requests
+    }) == 24
+
+    assert all(
+        item["execution_mode"]
+        == "synthetic_fixture"
+        for item in requests
+    )
+
+
+def test_phase4_does_not_open_phase2_or_phase3_execution_gates():
+    assert all(
+        value is False
+        for value in (
+            _phase2_product
+            .phase2_parity_authorization()
+            .values()
+        )
+    )
+
+    phase3 = (
+        _phase2_product
+        .phase3_execution_authorization()
+    )
+
+    assert all(
+        value is False
+        for value in phase3.values()
+    )
+
+    phase4 = (
+        _phase2_product
+        .phase4_executor_authorization()
+    )
+
+    assert phase4["real_round_execution"] is False
+    assert phase4["real_shadow_publish"] is False
+    assert phase4["database_write"] is False
+    assert phase4["production_helper_binding"] is False
+
+
+# === PHASE4_RESEARCH_EXECUTOR_TESTS_V1 END ===

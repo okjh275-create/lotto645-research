@@ -1805,3 +1805,342 @@ def phase3_validate_registry():
 phase3_validate_registry()
 
 # === PHASE3_CHALLENGER_ENGINE_V1 END ===
+
+# === PHASE4_RESEARCH_EXECUTOR_V1 BEGIN ===
+
+import json as _phase4_json
+from collections.abc import Mapping as _phase4_Mapping
+
+
+PHASE4_SYNTHETIC_EXECUTION_MODE = "synthetic_fixture"
+
+
+class ResearchExecutorError(ValueError):
+    """Raised when the Phase-4 research executor contract is violated."""
+
+
+def phase4_executor_authorization():
+    """Return the frozen Phase-4 implementation-only authorization."""
+    return {
+        "research_executor": True,
+        "synthetic_fixture_execution": True,
+        "real_round_execution": False,
+        "real_database_shadow_execution": False,
+        "real_shadow_publish": False,
+        "production_helper_binding": False,
+        "production_prediction_regeneration": False,
+        "database_write": False,
+        "production_cli_registration": False,
+    }
+
+
+def _phase4_canonical_bytes(value):
+    try:
+        text = _phase4_json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ResearchExecutorError(
+            "value is not canonical-json serializable"
+        ) from exc
+
+    return text.encode("utf-8")
+
+
+def _phase4_digest(value):
+    return _phase3_hashlib.sha256(
+        _phase4_canonical_bytes(value)
+    ).hexdigest()
+
+
+def phase4_build_request(
+    round_no,
+    challenger_id,
+    *,
+    execution_mode=PHASE4_SYNTHETIC_EXECUTION_MODE,
+):
+    """Build a deterministic research-only synthetic execution request."""
+    if execution_mode != PHASE4_SYNTHETIC_EXECUTION_MODE:
+        raise ResearchExecutorError(
+            "only synthetic_fixture execution is authorized in Phase 4"
+        )
+
+    plan = phase3_build_challenger_plan(
+        round_no,
+        challenger_id,
+    )
+
+    identity = {
+        "schema_version": 1,
+        "round": plan["round"],
+        "challenger_id": plan["challenger_id"],
+        "seed": plan["seed"],
+        "execution_mode": PHASE4_SYNTHETIC_EXECUTION_MODE,
+    }
+
+    request_id = _phase4_digest(identity)
+
+    return {
+        "schema_version": 1,
+        "request_id": request_id,
+        "round": plan["round"],
+        "challenger_id": plan["challenger_id"],
+        "seed": plan["seed"],
+        "category": plan["category"],
+        "execution_mode": PHASE4_SYNTHETIC_EXECUTION_MODE,
+        "research_only": True,
+        "synthetic_fixture": True,
+        "plan": _phase3_copy(plan),
+        "authorization": phase4_executor_authorization(),
+    }
+
+
+def phase4_build_all_requests(round_no):
+    """Build all 24 synthetic requests without executing any adapter."""
+    return tuple(
+        phase4_build_request(
+            round_no,
+            challenger_id,
+        )
+        for challenger_id
+        in phase3_challenger_ids()
+    )
+
+
+def _phase4_validate_request(request):
+    if not isinstance(request, _phase4_Mapping):
+        raise ResearchExecutorError(
+            "request must be a mapping"
+        )
+
+    required = (
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "execution_mode",
+        "research_only",
+        "synthetic_fixture",
+        "plan",
+    )
+
+    missing = [
+        key
+        for key in required
+        if key not in request
+    ]
+
+    if missing:
+        raise ResearchExecutorError(
+            "request missing required fields: "
+            + ",".join(missing)
+        )
+
+    if (
+        request["execution_mode"]
+        != PHASE4_SYNTHETIC_EXECUTION_MODE
+    ):
+        raise ResearchExecutorError(
+            "request execution mode is not authorized"
+        )
+
+    if request["research_only"] is not True:
+        raise ResearchExecutorError(
+            "request must be research-only"
+        )
+
+    if request["synthetic_fixture"] is not True:
+        raise ResearchExecutorError(
+            "request must be synthetic"
+        )
+
+    expected = phase4_build_request(
+        request["round"],
+        request["challenger_id"],
+    )
+
+    for key in (
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "execution_mode",
+    ):
+        if request[key] != expected[key]:
+            raise ResearchExecutorError(
+                "request identity mismatch: "
+                + key
+            )
+
+    if request["plan"] != expected["plan"]:
+        raise ResearchExecutorError(
+            "request plan mismatch"
+        )
+
+    return expected
+
+
+def phase4_execute_synthetic(
+    request,
+    adapter,
+):
+    """Execute only an injected synthetic adapter.
+
+    No production helper, database writer, CLI path, or real shadow
+    publication surface is invoked here.
+    """
+    expected_request = _phase4_validate_request(
+        request
+    )
+
+    if not callable(adapter):
+        raise ResearchExecutorError(
+            "synthetic adapter must be callable"
+        )
+
+    adapter_input = _phase3_copy(
+        expected_request["plan"]
+    )
+
+    adapter_output = adapter(
+        adapter_input
+    )
+
+    if not isinstance(
+        adapter_output,
+        _phase4_Mapping,
+    ):
+        raise ResearchExecutorError(
+            "synthetic adapter output must be a mapping"
+        )
+
+    output_copy = _phase3_copy(
+        dict(adapter_output)
+    )
+
+    result_identity = {
+        "schema_version": 1,
+        "request_id": expected_request["request_id"],
+        "round": expected_request["round"],
+        "challenger_id": expected_request["challenger_id"],
+        "seed": expected_request["seed"],
+        "execution_mode": PHASE4_SYNTHETIC_EXECUTION_MODE,
+        "adapter_output": output_copy,
+    }
+
+    result_id = _phase4_digest(
+        result_identity
+    )
+
+    return {
+        "schema_version": 1,
+        "result_id": result_id,
+        "request_id": expected_request["request_id"],
+        "round": expected_request["round"],
+        "challenger_id": expected_request["challenger_id"],
+        "seed": expected_request["seed"],
+        "execution_mode": PHASE4_SYNTHETIC_EXECUTION_MODE,
+        "research_only": True,
+        "synthetic_fixture": True,
+        "adapter_output": output_copy,
+        "real_round_execution": False,
+        "database_write": False,
+        "real_shadow_publish": False,
+        "production_helper_binding": False,
+        "production_prediction_regeneration": False,
+    }
+
+
+def phase4_validate_result(
+    request,
+    result,
+):
+    """Validate identity preservation of one synthetic result."""
+    expected_request = _phase4_validate_request(
+        request
+    )
+
+    if not isinstance(result, _phase4_Mapping):
+        raise ResearchExecutorError(
+            "result must be a mapping"
+        )
+
+    required = (
+        "result_id",
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "execution_mode",
+        "research_only",
+        "synthetic_fixture",
+        "adapter_output",
+    )
+
+    missing = [
+        key
+        for key in required
+        if key not in result
+    ]
+
+    if missing:
+        raise ResearchExecutorError(
+            "result missing required fields: "
+            + ",".join(missing)
+        )
+
+    for key in (
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "execution_mode",
+    ):
+        if result[key] != expected_request[key]:
+            raise ResearchExecutorError(
+                "result identity mismatch: "
+                + key
+            )
+
+    if result["research_only"] is not True:
+        raise ResearchExecutorError(
+            "result must remain research-only"
+        )
+
+    if result["synthetic_fixture"] is not True:
+        raise ResearchExecutorError(
+            "result must remain synthetic"
+        )
+
+    if not isinstance(
+        result["adapter_output"],
+        _phase4_Mapping,
+    ):
+        raise ResearchExecutorError(
+            "result adapter_output must be a mapping"
+        )
+
+    expected_result_id = _phase4_digest({
+        "schema_version": 1,
+        "request_id": result["request_id"],
+        "round": result["round"],
+        "challenger_id": result["challenger_id"],
+        "seed": result["seed"],
+        "execution_mode": result["execution_mode"],
+        "adapter_output": dict(
+            result["adapter_output"]
+        ),
+    })
+
+    if result["result_id"] != expected_result_id:
+        raise ResearchExecutorError(
+            "result digest mismatch"
+        )
+
+    return True
+
+
+# === PHASE4_RESEARCH_EXECUTOR_V1 END ===
