@@ -2104,3 +2104,417 @@ def test_phase5_snapshot_does_not_mutate_database_file(
 
 
 # === PHASE5_REAL_ROUND_ADAPTER_TESTS_V1 END ===
+
+# === PHASE6_RESEARCH_EXECUTION_ENGINE_TESTS_V1 BEGIN ===
+
+
+def _phase6_prepared_request(
+    tmp_path,
+    challenger_id="CG00_RANDOM_FILTERED",
+):
+    db_path = _phase5_make_history_db(
+        tmp_path
+    )
+
+    return (
+        _phase2_product
+        .phase5_prepare_real_round_request(
+            db_path,
+            challenger_id,
+        )
+    )
+
+
+def test_phase6_authorization_is_implementation_only():
+    auth = (
+        _phase2_product
+        .phase6_execution_engine_authorization()
+    )
+
+    assert auth["engine_implementation"] is True
+    assert auth["synthetic_test_execution"] is True
+    assert auth["prepared_request_test_execution"] is True
+
+    assert auth["actual_round1243_execution"] is False
+    assert auth["actual_challenger_execution"] is False
+    assert auth["real_shadow_publish"] is False
+    assert auth["database_access_inside_engine"] is False
+    assert auth["database_write"] is False
+    assert auth["production_helper_binding"] is False
+    assert auth["production_learning"] is False
+
+
+def test_phase6_execution_matrix_contains_all_24_ids_once():
+    matrix = (
+        _phase2_product
+        .phase6_execution_matrix()
+    )
+
+    assert len(matrix) == 24
+
+    ids = tuple(
+        item["challenger_id"]
+        for item in matrix
+    )
+
+    assert ids == (
+        _phase2_product
+        .phase3_challenger_ids()
+    )
+
+    assert len(set(ids)) == 24
+
+
+def test_phase6_unknown_challenger_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        _phase2_product.phase6_challenger_config(
+            "UNKNOWN_CHALLENGER"
+        )
+
+
+def test_phase6_execution_requires_explicit_test_mode(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        _phase2_product.phase6_execute_prepared_request(
+            request
+        )
+
+
+def test_phase6_actual_round_execution_stays_fail_closed():
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        _phase2_product.phase6_execute_actual_round1243()
+
+
+def test_phase6_result_is_deterministic_for_same_request(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    first = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    second = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    assert first == second
+    assert first["result_id"] == second["result_id"]
+
+
+def test_phase6_result_contract_top10_and_practical5(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path,
+        "PS02_SCORE_TOP5",
+    )
+
+    result = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    assert result["candidate_count"] == 10000
+    assert result["top_k"] == 10
+    assert result["practical_k"] == 5
+    assert len(result["sets"]) == 10
+    assert len(result["top5_practical"]) == 5
+
+    assert (
+        _phase2_product
+        .phase6_validate_result(
+            result
+        )
+        is True
+    )
+
+
+def test_phase6_top10_sets_are_legal_and_diverse(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path,
+        "HF00_CURRENT",
+    )
+
+    result = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    for item in result["sets"]:
+        numbers = item["numbers"]
+
+        assert len(numbers) == 6
+        assert len(set(numbers)) == 6
+        assert numbers == sorted(numbers)
+        assert all(
+            1 <= number <= 45
+            for number in numbers
+        )
+
+        features = item["features"]
+
+        assert 90 <= features["sum"] <= 200
+        assert features["odd_even"] in (
+            "2:4",
+            "3:3",
+            "4:2",
+        )
+        assert features["max_consecutive_run"] <= 2
+        assert features["max_same_ending"] <= 2
+        assert features["previous_overlap"] <= 1
+        assert features["long_gap_count"] >= 1
+        assert features["max_same_decade"] <= 3
+
+    assert (
+        result["diversity"]["max_jaccard"]
+        <= 0.33
+    )
+
+
+def test_phase6_engine_does_not_access_database(
+    tmp_path,
+    monkeypatch,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    def explode(*args, **kwargs):
+        raise AssertionError(
+            "database access inside Phase-6 engine"
+        )
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "_phase5_open_read_only_database",
+        explode,
+    )
+
+    monkeypatch.setattr(
+        _phase2_product._phase5_sqlite3,
+        "connect",
+        explode,
+    )
+
+    result = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    assert result["database_write"] is False
+
+
+def test_phase6_tampered_prepared_request_is_rejected(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    request["seed"] += 1
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        _phase2_product.phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+
+
+def test_phase6_candidate_generation_variants_change_only_generation_config():
+    base = (
+        _phase2_product
+        .phase6_challenger_config(
+            "CG01_TEMP_060"
+        )
+    )
+
+    other = (
+        _phase2_product
+        .phase6_challenger_config(
+            "CG02_TEMP_110"
+        )
+    )
+
+    assert base["generation"] != other["generation"]
+    assert base["scoring"] == other["scoring"]
+    assert base["filters"] == other["filters"]
+    assert (
+        base["practical_selector"]
+        == other["practical_selector"]
+    )
+
+
+def test_phase6_scoring_variants_change_only_scoring_config():
+    base = (
+        _phase2_product
+        .phase6_challenger_config(
+            "SC00_CURRENT"
+        )
+    )
+
+    other = (
+        _phase2_product
+        .phase6_challenger_config(
+            "SC01_RANDOM_RANK"
+        )
+    )
+
+    assert base["generation"] == other["generation"]
+    assert base["scoring"] != other["scoring"]
+    assert base["filters"] == other["filters"]
+    assert (
+        base["practical_selector"]
+        == other["practical_selector"]
+    )
+
+
+def test_phase6_filter_variants_change_only_filter_config():
+    base = (
+        _phase2_product
+        .phase6_challenger_config(
+            "HF00_CURRENT"
+        )
+    )
+
+    other = (
+        _phase2_product
+        .phase6_challenger_config(
+            "HF01_SOFT_ODD_EVEN"
+        )
+    )
+
+    assert base["generation"] == other["generation"]
+    assert base["scoring"] == other["scoring"]
+    assert base["filters"] != other["filters"]
+    assert (
+        base["practical_selector"]
+        == other["practical_selector"]
+    )
+
+
+def test_phase6_long_gap_variants_are_narrowly_scoped():
+    current = (
+        _phase2_product
+        .phase6_challenger_config(
+            "LG00_CURRENT"
+        )
+    )
+
+    no_score = (
+        _phase2_product
+        .phase6_challenger_config(
+            "LG01_NO_GAP_SCORE"
+        )
+    )
+
+    no_hard = (
+        _phase2_product
+        .phase6_challenger_config(
+            "LG02_NO_GAP_HARD_RULE"
+        )
+    )
+
+    assert (
+        current["generation"]
+        == no_score["generation"]
+        == no_hard["generation"]
+    )
+
+    assert (
+        no_score["scoring"]
+        != current["scoring"]
+    )
+
+    assert (
+        no_hard["filters"]
+        != current["filters"]
+    )
+
+
+def test_phase6_practical_variants_change_only_selector_config():
+    base = (
+        _phase2_product
+        .phase6_challenger_config(
+            "PS00_CURRENT_MMR"
+        )
+    )
+
+    other = (
+        _phase2_product
+        .phase6_challenger_config(
+            "PS01_RANDOM5"
+        )
+    )
+
+    assert base["generation"] == other["generation"]
+    assert base["scoring"] == other["scoring"]
+    assert base["filters"] == other["filters"]
+
+    assert (
+        base["practical_selector"]
+        != other["practical_selector"]
+    )
+
+
+def test_phase6_result_validation_detects_tampering(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path,
+        "SC02_QUANTILE_DIAGNOSTIC",
+    )
+
+    result = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    result["sets"][0]["numbers"][0] = 45
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        _phase2_product.phase6_validate_result(
+            result
+        )
+
+
+# === PHASE6_RESEARCH_EXECUTION_ENGINE_TESTS_V1 END ===

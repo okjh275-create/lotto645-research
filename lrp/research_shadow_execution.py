@@ -2789,3 +2789,2331 @@ def phase5_execute_real_round(
 
 
 # === PHASE5_REAL_ROUND_ADAPTER_V1 END ===
+
+# === PHASE6_RESEARCH_EXECUTION_ENGINE_V1 BEGIN ===
+
+import math as _phase6_math
+import random as _phase6_random
+from collections import Counter as _phase6_Counter
+from collections import defaultdict as _phase6_defaultdict
+
+
+PHASE6_CANDIDATE_COUNT = 10000
+PHASE6_TOP_K = 10
+PHASE6_PRACTICAL_K = 5
+PHASE6_JACCARD_MAX = 0.33
+PHASE6_MAX_OVERLAP_BETWEEN_SETS = 3
+PHASE6_SOFT_PENALTY = 0.03
+PHASE6_MAX_ATTEMPTS = 500000
+
+PHASE6_CURRENT_WEIGHTS = {
+    "recency": 0.35,
+    "frequency": 0.20,
+    "gap_reversion": 0.15,
+    "pair_graph": 0.10,
+    "terminal_dispersion": 0.08,
+    "sum_band": 0.07,
+    "parity_balance": 0.05,
+}
+
+PHASE6_SCORE_COMPONENTS = (
+    "recency",
+    "frequency",
+    "gap_reversion",
+    "pair_graph",
+    "terminal_dispersion",
+    "sum_band",
+    "parity_balance",
+)
+
+
+class ResearchExecutionEngineError(ValueError):
+    pass
+
+
+def _phase6_renormalize_weights(weights):
+    total = sum(
+        float(value)
+        for value in weights.values()
+    )
+
+    if total <= 0:
+        raise ResearchExecutionEngineError(
+            "weights must sum to a positive value"
+        )
+
+    return {
+        key: float(value) / total
+        for key, value in weights.items()
+    }
+
+
+def phase6_execution_engine_authorization():
+    return {
+        "research_only": True,
+        "engine_implementation": True,
+        "synthetic_test_execution": True,
+        "prepared_request_test_execution": True,
+        "actual_round1243_execution": False,
+        "actual_challenger_execution": False,
+        "real_shadow_publish": False,
+        "database_access_inside_engine": False,
+        "database_write": False,
+        "production_helper_binding": False,
+        "production_cli_mutation": False,
+        "production_learning": False,
+    }
+
+
+def phase6_challenger_config(challenger_id):
+    if challenger_id not in phase3_challenger_ids():
+        raise ResearchExecutionEngineError(
+            "unknown challenger id"
+        )
+
+    config = {
+        "challenger_id": challenger_id,
+        "candidate_count": PHASE6_CANDIDATE_COUNT,
+        "top_k": PHASE6_TOP_K,
+        "practical_k": PHASE6_PRACTICAL_K,
+        "generation": {
+            "mode": "weighted",
+            "temperature": 0.85,
+            "weight_profile": "current",
+        },
+        "scoring": {
+            "mode": "current",
+            "weights": dict(PHASE6_CURRENT_WEIGHTS),
+            "minimum_history_rows": 1,
+        },
+        "filters": {
+            "soft_rules": (),
+            "soft_penalty": PHASE6_SOFT_PENALTY,
+            "max_soft_violations": 0,
+            "long_gap_hard_rule": True,
+        },
+        "practical_selector": {
+            "mode": "current_mmr",
+        },
+    }
+
+    if challenger_id == "CG00_RANDOM_FILTERED":
+        config["generation"] = {
+            "mode": "uniform_filtered",
+            "temperature": 1.0,
+            "weight_profile": "uniform",
+        }
+
+    elif challenger_id == "CG01_TEMP_060":
+        config["generation"]["temperature"] = 0.60
+
+    elif challenger_id == "CG02_TEMP_110":
+        config["generation"]["temperature"] = 1.10
+
+    elif challenger_id == "CG03_EQUAL_WEIGHTS":
+        config["generation"]["weight_profile"] = "equal_components"
+
+    elif challenger_id == "CG04_NO_RECENCY":
+        config["generation"]["weight_profile"] = "no_recency"
+
+    elif challenger_id == "CG05_NO_PAIR_GRAPH":
+        config["generation"]["weight_profile"] = "no_pair_graph"
+
+    if challenger_id == "PS01_RANDOM5":
+        config["practical_selector"]["mode"] = "deterministic_random5"
+
+    elif challenger_id == "PS02_SCORE_TOP5":
+        config["practical_selector"]["mode"] = "score_top5"
+
+    elif challenger_id == "PS03_MAX_UNIQUE5":
+        config["practical_selector"]["mode"] = "max_unique5"
+
+    elif challenger_id == "PS04_DIVERSITY5":
+        config["practical_selector"]["mode"] = "diversity5"
+
+    if challenger_id == "SC01_RANDOM_RANK":
+        config["scoring"]["mode"] = "deterministic_random_rank"
+
+    elif challenger_id == "SC02_QUANTILE_DIAGNOSTIC":
+        config["scoring"]["mode"] = "quantile_diagnostic"
+
+    elif challenger_id == "SC03_PREQUENTIAL_PRIOR_SHADOW":
+        config["scoring"]["mode"] = "prequential_prior_shadow"
+        config["scoring"]["minimum_history_rows"] = 3
+
+    soft_map = {
+        "HF01_SOFT_ODD_EVEN": ("odd_even",),
+        "HF02_SOFT_TERMINAL": ("terminal",),
+        "HF03_SOFT_PREVIOUS_OVERLAP": ("previous_overlap",),
+        "HF04_SOFT_SAME_DECADE": ("same_decade",),
+        "HF05_SOFT_ALL4": (
+            "odd_even",
+            "terminal",
+            "previous_overlap",
+            "same_decade",
+        ),
+    }
+
+    if challenger_id in soft_map:
+        config["filters"]["soft_rules"] = soft_map[challenger_id]
+
+        config["filters"]["max_soft_violations"] = (
+            2
+            if challenger_id == "HF05_SOFT_ALL4"
+            else 1
+        )
+
+    if challenger_id == "LG01_NO_GAP_SCORE":
+        weights = dict(
+            config["scoring"]["weights"]
+        )
+        weights["gap_reversion"] = 0.0
+
+        config["scoring"]["weights"] = (
+            _phase6_renormalize_weights(
+                weights
+            )
+        )
+
+    elif challenger_id == "LG02_NO_GAP_HARD_RULE":
+        config["filters"]["long_gap_hard_rule"] = False
+
+    return _phase3_copy(config)
+
+
+def phase6_execution_matrix():
+    return tuple(
+        phase6_challenger_config(
+            challenger_id
+        )
+        for challenger_id
+        in phase3_challenger_ids()
+    )
+
+
+def _phase6_validate_prepared_request(request):
+    try:
+        phase5_validate_prepared_request(
+            request
+        )
+    except Exception as exc:
+        raise ResearchExecutionEngineError(
+            "prepared request validation failed"
+        ) from exc
+
+    if request["round"] != 1243:
+        raise ResearchExecutionEngineError(
+            "engine is locked to round 1243"
+        )
+
+    if request["execution_authorized"] is not False:
+        raise ResearchExecutionEngineError(
+            "prepared request unexpectedly authorizes execution"
+        )
+
+    snapshot = request[
+        "history_snapshot"
+    ]
+
+    if (
+        snapshot["history_cutoff_max_round"]
+        != 1242
+    ):
+        raise ResearchExecutionEngineError(
+            "history cutoff must remain 1242"
+        )
+
+    if snapshot["history_max_round"] > 1242:
+        raise ResearchExecutionEngineError(
+            "target/future leakage detected"
+        )
+
+    return True
+
+
+def _phase6_normalize_number_map(values):
+    numbers = range(1, 46)
+
+    minimum = min(
+        float(values.get(n, 0.0))
+        for n in numbers
+    )
+
+    maximum = max(
+        float(values.get(n, 0.0))
+        for n in numbers
+    )
+
+    if _phase6_math.isclose(
+        maximum,
+        minimum,
+    ):
+        return {
+            n: 0.5
+            for n in numbers
+        }
+
+    span = maximum - minimum
+
+    return {
+        n: (
+            float(values.get(n, 0.0))
+            - minimum
+        ) / span
+        for n in numbers
+    }
+
+
+def _phase6_history_statistics(history_rows):
+    if not history_rows:
+        raise ResearchExecutionEngineError(
+            "history rows are required"
+        )
+
+    numbers = range(1, 46)
+
+    recent_rows = history_rows[-10:]
+    mid_rows = history_rows[-20:]
+    long_rows = history_rows[-50:]
+
+    recency_raw = {
+        n: 0.0
+        for n in numbers
+    }
+
+    for age, row in enumerate(
+        reversed(recent_rows)
+    ):
+        weight = 0.85 ** age
+
+        for number in row["nums"]:
+            recency_raw[int(number)] += weight
+
+    frequency_raw = {
+        n: 0.0
+        for n in numbers
+    }
+
+    for window_rows in (
+        recent_rows,
+        mid_rows,
+        long_rows,
+    ):
+        denominator = max(
+            1,
+            len(window_rows),
+        )
+
+        counts = _phase6_Counter(
+            int(number)
+            for row in window_rows
+            for number in row["nums"]
+        )
+
+        for n in numbers:
+            frequency_raw[n] += (
+                counts[n] / denominator
+            )
+
+    gap_raw = {}
+
+    for n in numbers:
+        found_age = None
+
+        for age, row in enumerate(
+            reversed(history_rows)
+        ):
+            if n in row["nums"]:
+                found_age = age
+                break
+
+        gap_raw[n] = (
+            len(history_rows) + 5
+            if found_age is None
+            else found_age
+        )
+
+    pair_raw = _phase6_defaultdict(float)
+
+    pair_degree_raw = {
+        n: 0.0
+        for n in numbers
+    }
+
+    for age, row in enumerate(
+        reversed(long_rows)
+    ):
+        weight = 0.96 ** age
+
+        values = sorted(
+            int(n)
+            for n in row["nums"]
+        )
+
+        for left_index in range(
+            len(values)
+        ):
+            for right_index in range(
+                left_index + 1,
+                len(values),
+            ):
+                pair = (
+                    values[left_index],
+                    values[right_index],
+                )
+
+                pair_raw[pair] += weight
+                pair_degree_raw[pair[0]] += weight
+                pair_degree_raw[pair[1]] += weight
+
+    recent5_seen = {
+        int(number)
+        for row in history_rows[-5:]
+        for number in row["nums"]
+    }
+
+    long_gap_numbers = tuple(
+        n
+        for n in numbers
+        if n not in recent5_seen
+    )
+
+    previous_numbers = tuple(
+        sorted(
+            int(number)
+            for number
+            in history_rows[-1]["nums"]
+        )
+    )
+
+    historical_sums = [
+        sum(
+            int(n)
+            for n in row["nums"]
+        )
+        for row in long_rows
+    ]
+
+    target_sum = (
+        sum(historical_sums)
+        / len(historical_sums)
+        if historical_sums
+        else 138.0
+    )
+
+    pair_max = max(
+        [0.0]
+        + list(pair_raw.values())
+    )
+
+    return {
+        "recency":
+            _phase6_normalize_number_map(
+                recency_raw
+            ),
+
+        "frequency":
+            _phase6_normalize_number_map(
+                frequency_raw
+            ),
+
+        "gap_reversion":
+            _phase6_normalize_number_map(
+                gap_raw
+            ),
+
+        "pair_graph":
+            _phase6_normalize_number_map(
+                pair_degree_raw
+            ),
+
+        "pair_raw":
+            dict(pair_raw),
+
+        "pair_max":
+            pair_max,
+
+        "long_gap_numbers":
+            long_gap_numbers,
+
+        "previous_numbers":
+            previous_numbers,
+
+        "target_sum":
+            target_sum,
+
+        "history_row_count":
+            len(history_rows),
+    }
+
+
+def _phase6_sampling_weights(
+    stats,
+    config,
+):
+    profile = (
+        config["generation"][
+            "weight_profile"
+        ]
+    )
+
+    numbers = range(1, 46)
+
+    if profile == "uniform":
+        return {
+            n: 1.0
+            for n in numbers
+        }
+
+    base = {
+        "recency": 0.35,
+        "frequency": 0.20,
+        "gap_reversion": 0.15,
+        "pair_graph": 0.10,
+    }
+
+    if profile == "equal_components":
+        base = {
+            "recency": 0.25,
+            "frequency": 0.25,
+            "gap_reversion": 0.25,
+            "pair_graph": 0.25,
+        }
+
+    elif profile == "no_recency":
+        base["recency"] = 0.0
+
+    elif profile == "no_pair_graph":
+        base["pair_graph"] = 0.0
+
+    base = _phase6_renormalize_weights(
+        base
+    )
+
+    raw = {}
+
+    for n in numbers:
+        value = (
+            base["recency"]
+            * stats["recency"][n]
+
+            + base["frequency"]
+            * stats["frequency"][n]
+
+            + base["gap_reversion"]
+            * stats["gap_reversion"][n]
+
+            + base["pair_graph"]
+            * stats["pair_graph"][n]
+        )
+
+        raw[n] = (
+            0.25
+            + (
+                0.75
+                * max(
+                    0.0,
+                    value,
+                )
+            )
+        )
+
+    temperature = float(
+        config["generation"][
+            "temperature"
+        ]
+    )
+
+    if temperature <= 0:
+        raise ResearchExecutionEngineError(
+            "temperature must be positive"
+        )
+
+    inverse_temperature = (
+        1.0 / temperature
+    )
+
+    return {
+        n: (
+            max(
+                raw[n],
+                1e-12,
+            )
+            ** inverse_temperature
+        )
+        for n in numbers
+    }
+
+
+def _phase6_weighted_sample_without_replacement(
+    rng,
+    weights,
+    k,
+):
+    pool = list(
+        range(1, 46)
+    )
+
+    selected = []
+
+    for _ in range(k):
+        total = sum(
+            float(weights[n])
+            for n in pool
+        )
+
+        if total <= 0:
+            raise ResearchExecutionEngineError(
+                "sampling weights invalid"
+            )
+
+        target = (
+            rng.random()
+            * total
+        )
+
+        cumulative = 0.0
+        chosen = pool[-1]
+
+        for n in pool:
+            cumulative += float(
+                weights[n]
+            )
+
+            if target <= cumulative:
+                chosen = n
+                break
+
+        selected.append(
+            chosen
+        )
+
+        pool.remove(
+            chosen
+        )
+
+    return tuple(
+        sorted(selected)
+    )
+
+
+def _phase6_max_consecutive_run(
+    numbers,
+):
+    maximum = 1
+    current = 1
+
+    for previous, current_number in zip(
+        numbers,
+        numbers[1:],
+    ):
+        if (
+            current_number
+            == previous + 1
+        ):
+            current += 1
+
+            maximum = max(
+                maximum,
+                current,
+            )
+        else:
+            current = 1
+
+    return maximum
+
+
+def _phase6_features(
+    numbers,
+    stats,
+):
+    numbers = tuple(
+        sorted(
+            int(n)
+            for n in numbers
+        )
+    )
+
+    odd = sum(
+        1
+        for n in numbers
+        if n % 2 == 1
+    )
+
+    low = sum(
+        1
+        for n in numbers
+        if n <= 22
+    )
+
+    endings = tuple(
+        n % 10
+        for n in numbers
+    )
+
+    ending_counts = _phase6_Counter(
+            endings
+        )
+
+    decade_counts = _phase6_Counter(
+            (n - 1) // 10
+            for n in numbers
+        )
+
+    previous = set(
+        stats["previous_numbers"]
+    )
+
+    long_gap = set(
+        stats["long_gap_numbers"]
+    )
+
+    consecutive_pairs = tuple(
+        (left, right)
+        for left, right in zip(
+            numbers,
+            numbers[1:],
+        )
+        if right == left + 1
+    )
+
+    return {
+        "sum":
+            sum(numbers),
+
+        "odd_count":
+            odd,
+
+        "even_count":
+            6 - odd,
+
+        "odd_even":
+            f"{odd}:{6 - odd}",
+
+        "low_count":
+            low,
+
+        "high_count":
+            6 - low,
+
+        "low_high":
+            f"{low}:{6 - low}",
+
+        "max_consecutive_run":
+            _phase6_max_consecutive_run(
+                numbers
+            ),
+
+        "consecutive_pairs":
+            consecutive_pairs,
+
+        "end_digits":
+            endings,
+
+        "max_same_ending":
+            max(
+                ending_counts.values()
+            ),
+
+        "previous_overlap":
+            len(
+                previous.intersection(
+                    numbers
+                )
+            ),
+
+        "long_gap_count":
+            len(
+                long_gap.intersection(
+                    numbers
+                )
+            ),
+
+        "max_same_decade":
+            max(
+                decade_counts.values()
+            ),
+    }
+
+
+def _phase6_filter_candidate(
+    numbers,
+    stats,
+    config,
+):
+    features = _phase6_features(
+            numbers,
+            stats,
+        )
+
+    violations = []
+
+    if not (
+        90
+        <= features["sum"]
+        <= 200
+    ):
+        violations.append(
+            "sum"
+        )
+
+    if not (
+        2
+        <= features["odd_count"]
+        <= 4
+    ):
+        violations.append(
+            "odd_even"
+        )
+
+    if (
+        features["low_count"] < 1
+        or features["high_count"] < 1
+    ):
+        violations.append(
+            "low_high"
+        )
+
+    if (
+        features[
+            "max_consecutive_run"
+        ] > 2
+    ):
+        violations.append(
+            "consecutive"
+        )
+
+    if (
+        features[
+            "max_same_ending"
+        ] > 2
+    ):
+        violations.append(
+            "terminal"
+        )
+
+    if (
+        features[
+            "previous_overlap"
+        ] > 1
+    ):
+        violations.append(
+            "previous_overlap"
+        )
+
+    if (
+        config["filters"][
+            "long_gap_hard_rule"
+        ]
+        and
+        features[
+            "long_gap_count"
+        ] < 1
+    ):
+        violations.append(
+            "long_gap"
+        )
+
+    if (
+        features[
+            "max_same_decade"
+        ] > 3
+    ):
+        violations.append(
+            "same_decade"
+        )
+
+    soft_rules = set(
+        config["filters"][
+            "soft_rules"
+        ]
+    )
+
+    always_hard = {
+        "sum",
+        "low_high",
+        "consecutive",
+        "long_gap",
+    }
+
+    hard_violations = [
+        item
+        for item in violations
+        if (
+            item in always_hard
+            or item not in soft_rules
+        )
+    ]
+
+    soft_violations = [
+        item
+        for item in violations
+        if item in soft_rules
+    ]
+
+    if hard_violations:
+        return None
+
+    if (
+        len(soft_violations)
+        >
+        int(
+            config["filters"][
+                "max_soft_violations"
+            ]
+        )
+    ):
+        return None
+
+    return {
+        "numbers":
+            numbers,
+
+        "features":
+            features,
+
+        "risk_flags":
+            tuple(
+                soft_violations
+            ),
+
+        "soft_penalty":
+            (
+                float(
+                    config["filters"][
+                        "soft_penalty"
+                    ]
+                )
+                * len(
+                    soft_violations
+                )
+            ),
+    }
+
+
+def _phase6_pair_affinity(
+    numbers,
+    stats,
+):
+    values = tuple(
+        sorted(numbers)
+    )
+
+    pair_values = []
+
+    for left_index in range(
+        len(values)
+    ):
+        for right_index in range(
+            left_index + 1,
+            len(values),
+        ):
+            pair = (
+                values[left_index],
+                values[right_index],
+            )
+
+            pair_values.append(
+                float(
+                    stats[
+                        "pair_raw"
+                    ].get(
+                        pair,
+                        0.0,
+                    )
+                )
+            )
+
+    if (
+        not pair_values
+        or stats["pair_max"] <= 0
+    ):
+        return 0.0
+
+    return (
+        sum(pair_values)
+        / len(pair_values)
+        / stats["pair_max"]
+    )
+
+
+def _phase6_component_scores(
+    candidate,
+    stats,
+):
+    numbers = candidate["numbers"]
+
+    features = candidate["features"]
+
+    recency = (
+        sum(
+            stats["recency"][n]
+            for n in numbers
+        )
+        / 6.0
+    )
+
+    frequency = (
+        sum(
+            stats["frequency"][n]
+            for n in numbers
+        )
+        / 6.0
+    )
+
+    gap = (
+        sum(
+            stats["gap_reversion"][n]
+            for n in numbers
+        )
+        / 6.0
+    )
+
+    pair = _phase6_pair_affinity(
+            numbers,
+            stats,
+        )
+
+    terminal = (
+        len(
+            set(
+                features[
+                    "end_digits"
+                ]
+            )
+        )
+        / 6.0
+    )
+
+    sum_fit = max(
+        0.0,
+        (
+            1.0
+            -
+            (
+                abs(
+                    features["sum"]
+                    - stats[
+                        "target_sum"
+                    ]
+                )
+                / 110.0
+            )
+        ),
+    )
+
+    odd_count = features["odd_count"]
+
+    if odd_count == 3:
+        parity = 1.0
+
+    elif odd_count in (
+        2,
+        4,
+    ):
+        parity = 0.85
+
+    else:
+        parity = 0.0
+
+    return {
+        "recency":
+            recency,
+
+        "frequency":
+            frequency,
+
+        "gap_reversion":
+            gap,
+
+        "pair_graph":
+            pair,
+
+        "terminal_dispersion":
+            terminal,
+
+        "sum_band":
+            sum_fit,
+
+        "parity_balance":
+            parity,
+    }
+
+
+def _phase6_hash_unit_interval(
+    seed,
+    numbers,
+):
+    token = (
+        str(seed)
+        + "|"
+        + ",".join(
+            str(n)
+            for n in numbers
+        )
+    )
+
+    digest = _phase3_hashlib.sha256(
+            token.encode(
+                "utf-8"
+            )
+        ).digest()
+
+    value = int.from_bytes(
+            digest[:8],
+            "big",
+            signed=False,
+        )
+
+    return (
+        value
+        / float(2 ** 64)
+    )
+
+
+def _phase6_score_candidate(
+    candidate,
+    stats,
+    config,
+    seed,
+):
+    components = _phase6_component_scores(
+            candidate,
+            stats,
+        )
+
+    weights = config["scoring"][
+            "weights"
+        ]
+
+    base_score = sum(
+        float(weights[key])
+        * float(
+            components[key]
+        )
+        for key
+        in PHASE6_SCORE_COMPONENTS
+    )
+
+    mode = config["scoring"][
+            "mode"
+        ]
+
+    if mode == "deterministic_random_rank":
+        raw_score = _phase6_hash_unit_interval(
+                seed,
+                candidate[
+                    "numbers"
+                ],
+            )
+
+    elif mode == "quantile_diagnostic":
+        raw_score = (
+            round(
+                base_score
+                * 10.0
+            )
+            / 10.0
+        )
+
+    elif mode == "prequential_prior_shadow":
+        if (
+            stats[
+                "history_row_count"
+            ]
+            <
+            int(
+                config[
+                    "scoring"
+                ][
+                    "minimum_history_rows"
+                ]
+            )
+        ):
+            raise ResearchExecutionEngineError(
+                "prequential prior requires at least 3 history rows"
+            )
+
+        prior = components[
+                "frequency"
+            ]
+
+        raw_score = (
+            0.80
+            * base_score
+            +
+            0.20
+            * prior
+        )
+
+    else:
+        raw_score = base_score
+
+    raw_score -= float(
+        candidate[
+            "soft_penalty"
+        ]
+    )
+
+    result = dict(
+        candidate
+    )
+
+    result[
+        "components"
+    ] = components
+
+    result[
+        "raw_score"
+    ] = raw_score
+
+    return result
+
+
+def _phase6_minmax_scores(
+    candidates,
+):
+    values = [
+        float(
+            item["raw_score"]
+        )
+        for item in candidates
+    ]
+
+    minimum = min(values)
+
+    maximum = max(values)
+
+    if _phase6_math.isclose(
+        minimum,
+        maximum,
+    ):
+        normalized = [
+            0.5
+            for _ in values
+        ]
+
+    else:
+        span = (
+            maximum
+            - minimum
+        )
+
+        normalized = [
+            (
+                value
+                - minimum
+            )
+            / span
+            for value in values
+        ]
+
+    result = []
+
+    for item, score in zip(
+        candidates,
+        normalized,
+    ):
+        enriched = dict(
+            item
+        )
+
+        enriched[
+            "score"
+        ] = float(score)
+
+        result.append(
+            enriched
+        )
+
+    return result
+
+
+def _phase6_jaccard(
+    left,
+    right,
+):
+    left_set = set(left)
+
+    right_set = set(right)
+
+    union = left_set.union(
+            right_set
+        )
+
+    if not union:
+        return 0.0
+
+    return (
+        len(
+            left_set.intersection(
+                right_set
+            )
+        )
+        / len(union)
+    )
+
+
+def _phase6_pairwise_allowed(
+    left,
+    right,
+):
+    overlap = len(
+        set(left).intersection(
+            right
+        )
+    )
+
+    jaccard = _phase6_jaccard(
+            left,
+            right,
+        )
+
+    return (
+        overlap
+        <= PHASE6_MAX_OVERLAP_BETWEEN_SETS
+
+        and
+
+        jaccard
+        <= PHASE6_JACCARD_MAX
+    )
+
+
+def _phase6_select_top10(
+    scored,
+):
+    ordered = sorted(
+        scored,
+        key=lambda item: (
+            -float(
+                item["score"]
+            ),
+            tuple(
+                item["numbers"]
+            ),
+        ),
+    )
+
+    selected = []
+
+    candidate_pool = ordered[:4000]
+
+    while (
+        len(selected)
+        < PHASE6_TOP_K
+    ):
+        best = None
+        best_value = None
+
+        for item in candidate_pool:
+            if item in selected:
+                continue
+
+            if any(
+                not _phase6_pairwise_allowed(
+                    item["numbers"],
+                    existing[
+                        "numbers"
+                    ],
+                )
+                for existing
+                in selected
+            ):
+                continue
+
+            max_similarity = max(
+                [
+                    _phase6_jaccard(
+                        item[
+                            "numbers"
+                        ],
+                        existing[
+                            "numbers"
+                        ],
+                    )
+                    for existing
+                    in selected
+                ]
+                or [0.0]
+            )
+
+            mmr_value = (
+                float(
+                    item[
+                        "score"
+                    ]
+                )
+                -
+                (
+                    0.15
+                    * max_similarity
+                )
+            )
+
+            tie_key = (
+                mmr_value,
+                float(
+                    item[
+                        "score"
+                    ]
+                ),
+                tuple(
+                    -n
+                    for n
+                    in item[
+                        "numbers"
+                    ]
+                ),
+            )
+
+            if (
+                best_value is None
+                or tie_key
+                > best_value
+            ):
+                best = item
+                best_value = tie_key
+
+        if best is None:
+            raise ResearchExecutionEngineError(
+                "unable to select 10 diverse sets"
+            )
+
+        selected.append(
+            best
+        )
+
+    return selected
+
+
+def _phase6_practical_indices(
+    top10,
+    config,
+    seed,
+):
+    mode = config[
+            "practical_selector"
+        ][
+            "mode"
+        ]
+
+    if mode == "deterministic_random5":
+        rng = _phase6_random.Random(
+                int(seed)
+                ^ 0x5A17
+            )
+
+        return tuple(
+            sorted(
+                rng.sample(
+                    range(
+                        PHASE6_TOP_K
+                    ),
+                    PHASE6_PRACTICAL_K,
+                )
+            )
+        )
+
+    if mode == "score_top5":
+        return tuple(
+            index
+            for index, _item
+            in sorted(
+                enumerate(
+                    top10
+                ),
+                key=lambda pair: (
+                    -float(
+                        pair[1][
+                            "score"
+                        ]
+                    ),
+                    pair[0],
+                ),
+            )[
+                :PHASE6_PRACTICAL_K
+            ]
+        )
+
+    if mode == "max_unique5":
+        chosen = []
+        used_numbers = set()
+
+        while (
+            len(chosen)
+            < PHASE6_PRACTICAL_K
+        ):
+            choices = []
+
+            for index, item in enumerate(
+                top10
+            ):
+                if index in chosen:
+                    continue
+
+                new_count = len(
+                    set(
+                        item[
+                            "numbers"
+                        ]
+                    )
+                    - used_numbers
+                )
+
+                choices.append(
+                    (
+                        new_count,
+                        float(
+                            item[
+                                "score"
+                            ]
+                        ),
+                        -index,
+                        index,
+                    )
+                )
+
+            (
+                _new_count,
+                _score,
+                _neg_index,
+                index,
+            ) = max(
+                choices
+            )
+
+            chosen.append(
+                index
+            )
+
+            used_numbers.update(
+                top10[index][
+                    "numbers"
+                ]
+            )
+
+        return tuple(
+            sorted(chosen)
+        )
+
+    if mode == "diversity5":
+        chosen = [0]
+
+        while (
+            len(chosen)
+            < PHASE6_PRACTICAL_K
+        ):
+            choices = []
+
+            for index, item in enumerate(
+                top10
+            ):
+                if index in chosen:
+                    continue
+
+                max_similarity = max(
+                    _phase6_jaccard(
+                        item[
+                            "numbers"
+                        ],
+                        top10[
+                            chosen_index
+                        ][
+                            "numbers"
+                        ],
+                    )
+                    for chosen_index
+                    in chosen
+                )
+
+                choices.append(
+                    (
+                        -max_similarity,
+                        float(
+                            item[
+                                "score"
+                            ]
+                        ),
+                        -index,
+                        index,
+                    )
+                )
+
+            (
+                _neg_similarity,
+                _score,
+                _neg_index,
+                index,
+            ) = max(
+                choices
+            )
+
+            chosen.append(
+                index
+            )
+
+        return tuple(
+            sorted(chosen)
+        )
+
+    return tuple(
+        range(
+            PHASE6_PRACTICAL_K
+        )
+    )
+
+
+def _phase6_generate_candidates(
+    request,
+    stats,
+    config,
+):
+    rng = _phase6_random.Random(
+            int(
+                request[
+                    "seed"
+                ]
+            )
+        )
+
+    weights = _phase6_sampling_weights(
+            stats,
+            config,
+        )
+
+    accepted = {}
+    attempts = 0
+
+    while (
+        len(accepted)
+        < PHASE6_CANDIDATE_COUNT
+        and
+        attempts
+        < PHASE6_MAX_ATTEMPTS
+    ):
+        attempts += 1
+
+        if (
+            config[
+                "generation"
+            ][
+                "mode"
+            ]
+            == "uniform_filtered"
+        ):
+            numbers = tuple(
+                sorted(
+                    rng.sample(
+                        range(1, 46),
+                        6,
+                    )
+                )
+            )
+
+        else:
+            numbers = (
+                _phase6_weighted_sample_without_replacement(
+                    rng,
+                    weights,
+                    6,
+                )
+            )
+
+        if numbers in accepted:
+            continue
+
+        filtered = _phase6_filter_candidate(
+                numbers,
+                stats,
+                config,
+            )
+
+        if filtered is not None:
+            accepted[
+                numbers
+            ] = filtered
+
+    if (
+        len(accepted)
+        != PHASE6_CANDIDATE_COUNT
+    ):
+        raise ResearchExecutionEngineError(
+            "unable to retain exactly 10000 legal candidates"
+        )
+
+    return (
+        list(
+            accepted.values()
+        ),
+        attempts,
+    )
+
+
+def _phase6_render_top_sets(
+    top10,
+):
+    rendered = []
+
+    for index, item in enumerate(
+        top10,
+        start=1,
+    ):
+        features = item["features"]
+
+        rendered.append({
+            "id":
+                f"S{index}",
+
+            "numbers":
+                list(
+                    item[
+                        "numbers"
+                    ]
+                ),
+
+            "score":
+                float(
+                    item[
+                        "score"
+                    ]
+                ),
+
+            "raw_score":
+                float(
+                    item[
+                        "raw_score"
+                    ]
+                ),
+
+            "components": {
+                key:
+                    float(value)
+                for key, value
+                in item[
+                    "components"
+                ].items()
+            },
+
+            "risk_flags":
+                list(
+                    item[
+                        "risk_flags"
+                    ]
+                ),
+
+            "features": {
+                "sum":
+                    int(
+                        features[
+                            "sum"
+                        ]
+                    ),
+
+                "odd_even":
+                    features[
+                        "odd_even"
+                    ],
+
+                "low_high":
+                    features[
+                        "low_high"
+                    ],
+
+                "consecutives": [
+                    list(pair)
+                    for pair
+                    in features[
+                        "consecutive_pairs"
+                    ]
+                ],
+
+                "end_digits":
+                    list(
+                        features[
+                            "end_digits"
+                        ]
+                    ),
+
+                "max_consecutive_run":
+                    int(
+                        features[
+                            "max_consecutive_run"
+                        ]
+                    ),
+
+                "max_same_ending":
+                    int(
+                        features[
+                            "max_same_ending"
+                        ]
+                    ),
+
+                "previous_overlap":
+                    int(
+                        features[
+                            "previous_overlap"
+                        ]
+                    ),
+
+                "long_gap_count":
+                    int(
+                        features[
+                            "long_gap_count"
+                        ]
+                    ),
+
+                "max_same_decade":
+                    int(
+                        features[
+                            "max_same_decade"
+                        ]
+                    ),
+            },
+        })
+
+    return rendered
+
+
+def _phase6_diversity(
+    top_sets,
+):
+    pairs = []
+
+    for left_index in range(
+        len(top_sets)
+    ):
+        for right_index in range(
+            left_index + 1,
+            len(top_sets),
+        ):
+            pairs.append(
+                _phase6_jaccard(
+                    top_sets[
+                        left_index
+                    ][
+                        "numbers"
+                    ],
+                    top_sets[
+                        right_index
+                    ][
+                        "numbers"
+                    ],
+                )
+            )
+
+    unique_numbers = len({
+        number
+        for item in top_sets
+        for number
+        in item["numbers"]
+    })
+
+    return {
+        "avg_jaccard":
+            (
+                sum(pairs)
+                / len(pairs)
+                if pairs
+                else 0.0
+            ),
+
+        "max_jaccard":
+            (
+                max(pairs)
+                if pairs
+                else 0.0
+            ),
+
+        "unique_numbers":
+            unique_numbers,
+    }
+
+
+def phase6_execute_prepared_request(
+    request,
+    *,
+    test_mode=False,
+):
+    _phase6_validate_prepared_request(
+        request
+    )
+
+    if test_mode is not True:
+        raise ResearchExecutionEngineError(
+            "Phase-6 execution is authorized only for tests"
+        )
+
+    config = phase6_challenger_config(
+            request[
+                "challenger_id"
+            ]
+        )
+
+    history_rows = (
+        request[
+            "history_snapshot"
+        ][
+            "history_rows"
+        ]
+    )
+
+    stats = _phase6_history_statistics(
+            history_rows
+        )
+
+    (
+        candidates,
+        attempts,
+    ) = _phase6_generate_candidates(
+        request,
+        stats,
+        config,
+    )
+
+    scored = [
+        _phase6_score_candidate(
+            candidate,
+            stats,
+            config,
+            request["seed"],
+        )
+        for candidate
+        in candidates
+    ]
+
+    normalized = _phase6_minmax_scores(
+            scored
+        )
+
+    top10_internal = _phase6_select_top10(
+            normalized
+        )
+
+    practical_indices = _phase6_practical_indices(
+            top10_internal,
+            config,
+            request["seed"],
+        )
+
+    top_sets = _phase6_render_top_sets(
+            top10_internal
+        )
+
+    practical_ids = [
+        f"S{index + 1}"
+        for index
+        in practical_indices
+    ]
+
+    payload = {
+        "schema_version":
+            1,
+
+        "request_id":
+            request[
+                "request_id"
+            ],
+
+        "round":
+            request[
+                "round"
+            ],
+
+        "challenger_id":
+            request[
+                "challenger_id"
+            ],
+
+        "seed":
+            request[
+                "seed"
+            ],
+
+        "research_only":
+            True,
+
+        "execution_context":
+            "phase6_test_only",
+
+        "actual_round_execution":
+            False,
+
+        "real_shadow_publish":
+            False,
+
+        "database_write":
+            False,
+
+        "candidate_count":
+            PHASE6_CANDIDATE_COUNT,
+
+        "candidate_attempts":
+            attempts,
+
+        "top_k":
+            PHASE6_TOP_K,
+
+        "practical_k":
+            PHASE6_PRACTICAL_K,
+
+        "config":
+            config,
+
+        "sets":
+            top_sets,
+
+        "top5_practical":
+            practical_ids,
+
+        "diversity":
+            _phase6_diversity(
+                top_sets
+            ),
+    }
+
+    result = dict(payload)
+
+    result[
+        "result_id"
+    ] = _phase4_digest(
+        payload
+    )
+
+    phase6_validate_result(
+        result
+    )
+
+    return result
+
+
+def phase6_validate_result(
+    result,
+):
+    if not isinstance(
+        result,
+        _phase4_Mapping,
+    ):
+        raise ResearchExecutionEngineError(
+            "result must be a mapping"
+        )
+
+    required = (
+        "result_id",
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "research_only",
+        "execution_context",
+        "actual_round_execution",
+        "real_shadow_publish",
+        "database_write",
+        "candidate_count",
+        "top_k",
+        "practical_k",
+        "sets",
+        "top5_practical",
+        "diversity",
+    )
+
+    missing = [
+        key
+        for key in required
+        if key not in result
+    ]
+
+    if missing:
+        raise ResearchExecutionEngineError(
+            "result missing fields: "
+            + ",".join(
+                missing
+            )
+        )
+
+    if result["round"] != 1243:
+        raise ResearchExecutionEngineError(
+            "result round mismatch"
+        )
+
+    if (
+        result[
+            "challenger_id"
+        ]
+        not in phase3_challenger_ids()
+    ):
+        raise ResearchExecutionEngineError(
+            "unknown result challenger"
+        )
+
+    if (
+        result[
+            "research_only"
+        ]
+        is not True
+    ):
+        raise ResearchExecutionEngineError(
+            "result must remain research-only"
+        )
+
+    if (
+        result[
+            "execution_context"
+        ]
+        != "phase6_test_only"
+    ):
+        raise ResearchExecutionEngineError(
+            "execution context mismatch"
+        )
+
+    if (
+        result[
+            "actual_round_execution"
+        ]
+        is not False
+    ):
+        raise ResearchExecutionEngineError(
+            "actual round execution must remain false"
+        )
+
+    if (
+        result[
+            "real_shadow_publish"
+        ]
+        is not False
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow publish must remain false"
+        )
+
+    if (
+        result[
+            "database_write"
+        ]
+        is not False
+    ):
+        raise ResearchExecutionEngineError(
+            "database write must remain false"
+        )
+
+    if (
+        result[
+            "candidate_count"
+        ]
+        != PHASE6_CANDIDATE_COUNT
+    ):
+        raise ResearchExecutionEngineError(
+            "candidate count mismatch"
+        )
+
+    if (
+        result[
+            "top_k"
+        ]
+        != PHASE6_TOP_K
+    ):
+        raise ResearchExecutionEngineError(
+            "Top-K mismatch"
+        )
+
+    if (
+        result[
+            "practical_k"
+        ]
+        != PHASE6_PRACTICAL_K
+    ):
+        raise ResearchExecutionEngineError(
+            "Practical-K mismatch"
+        )
+
+    sets = result["sets"]
+
+    if (
+        not isinstance(
+            sets,
+            list,
+        )
+        or
+        len(sets)
+        != PHASE6_TOP_K
+    ):
+        raise ResearchExecutionEngineError(
+            "result must contain 10 sets"
+        )
+
+    ids = []
+
+    for index, item in enumerate(
+        sets,
+        start=1,
+    ):
+        if (
+            item.get(
+                "id"
+            )
+            != f"S{index}"
+        ):
+            raise ResearchExecutionEngineError(
+                "set id mismatch"
+            )
+
+        numbers = item.get(
+                "numbers"
+            )
+
+        if (
+            not isinstance(
+                numbers,
+                list,
+            )
+            or
+            len(numbers) != 6
+            or
+            len(
+                set(numbers)
+            ) != 6
+            or
+            numbers
+            != sorted(numbers)
+            or
+            any(
+                isinstance(
+                    n,
+                    bool,
+                )
+                or
+                not isinstance(
+                    n,
+                    int,
+                )
+                or
+                not (
+                    1
+                    <= n
+                    <= 45
+                )
+                for n
+                in numbers
+            )
+        ):
+            raise ResearchExecutionEngineError(
+                "illegal six-number set"
+            )
+
+        ids.append(
+            item["id"]
+        )
+
+    for left_index in range(
+        len(sets)
+    ):
+        for right_index in range(
+            left_index + 1,
+            len(sets),
+        ):
+            left = (
+                sets[
+                    left_index
+                ][
+                    "numbers"
+                ]
+            )
+
+            right = (
+                sets[
+                    right_index
+                ][
+                    "numbers"
+                ]
+            )
+
+            overlap = len(
+                set(left).intersection(
+                    right
+                )
+            )
+
+            if (
+                overlap
+                >
+                PHASE6_MAX_OVERLAP_BETWEEN_SETS
+            ):
+                raise ResearchExecutionEngineError(
+                    "set overlap exceeds maximum"
+                )
+
+            if (
+                _phase6_jaccard(
+                    left,
+                    right,
+                )
+                >
+                PHASE6_JACCARD_MAX
+            ):
+                raise ResearchExecutionEngineError(
+                    "Jaccard exceeds maximum"
+                )
+
+    practical = result["top5_practical"]
+
+    if (
+        not isinstance(
+            practical,
+            list,
+        )
+        or
+        len(practical)
+        != PHASE6_PRACTICAL_K
+        or
+        len(
+            set(practical)
+        )
+        != PHASE6_PRACTICAL_K
+        or
+        any(
+            item not in ids
+            for item
+            in practical
+        )
+    ):
+        raise ResearchExecutionEngineError(
+            "invalid practical Top5"
+        )
+
+    payload = {
+        key:
+            _phase3_copy(
+                value
+            )
+        for key, value
+        in result.items()
+        if key != "result_id"
+    }
+
+    expected_result_id = _phase4_digest(
+            payload
+        )
+
+    if (
+        result[
+            "result_id"
+        ]
+        != expected_result_id
+    ):
+        raise ResearchExecutionEngineError(
+            "result digest mismatch"
+        )
+
+    return True
+
+
+def phase6_execute_actual_round1243(
+    *args,
+    **kwargs,
+):
+    raise ResearchExecutionEngineError(
+        "actual round-1243 execution remains unauthorized"
+    )
+
+
+# === PHASE6_RESEARCH_EXECUTION_ENGINE_V1 END ===
