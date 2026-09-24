@@ -4630,6 +4630,44 @@ def _phase6_diversity(
     }
 
 
+def _phase7_execute_request_core(
+    request,
+    *,
+    execution_context,
+    actual_round_execution,
+):
+    _phase6_validate_prepared_request(
+        request
+    )
+
+    config = phase6_challenger_config(request['challenger_id'])
+
+    history_rows = request['history_snapshot']['history_rows']
+
+    stats = _phase6_history_statistics(history_rows)
+
+    candidates, attempts = _phase6_generate_candidates(request, stats, config)
+
+    scored = [_phase6_score_candidate(candidate, stats, config, request['seed']) for candidate in candidates]
+
+    normalized = _phase6_minmax_scores(scored)
+
+    top10_internal = _phase6_select_top10(normalized)
+
+    practical_indices = _phase6_practical_indices(top10_internal, config, request['seed'])
+
+    top_sets = _phase6_render_top_sets(top10_internal)
+
+    practical_ids = [f'S{index + 1}' for index in practical_indices]
+
+    payload = {'schema_version': 1, 'request_id': request['request_id'], 'round': request['round'], 'challenger_id': request['challenger_id'], 'seed': request['seed'], 'research_only': True, 'execution_context': execution_context, 'actual_round_execution': actual_round_execution, 'real_shadow_publish': False, 'database_write': False, 'candidate_count': PHASE6_CANDIDATE_COUNT, 'candidate_attempts': attempts, 'top_k': PHASE6_TOP_K, 'practical_k': PHASE6_PRACTICAL_K, 'config': config, 'sets': top_sets, 'top5_practical': practical_ids, 'diversity': _phase6_diversity(top_sets)}
+
+    result = dict(payload)
+
+    result['result_id'] = _phase4_digest(payload)
+
+    return result
+
 def phase6_execute_prepared_request(
     request,
     *,
@@ -4644,140 +4682,10 @@ def phase6_execute_prepared_request(
             "Phase-6 execution is authorized only for tests"
         )
 
-    config = phase6_challenger_config(
-            request[
-                "challenger_id"
-            ]
-        )
-
-    history_rows = (
-        request[
-            "history_snapshot"
-        ][
-            "history_rows"
-        ]
-    )
-
-    stats = _phase6_history_statistics(
-            history_rows
-        )
-
-    (
-        candidates,
-        attempts,
-    ) = _phase6_generate_candidates(
+    result = _phase7_execute_request_core(
         request,
-        stats,
-        config,
-    )
-
-    scored = [
-        _phase6_score_candidate(
-            candidate,
-            stats,
-            config,
-            request["seed"],
-        )
-        for candidate
-        in candidates
-    ]
-
-    normalized = _phase6_minmax_scores(
-            scored
-        )
-
-    top10_internal = _phase6_select_top10(
-            normalized
-        )
-
-    practical_indices = _phase6_practical_indices(
-            top10_internal,
-            config,
-            request["seed"],
-        )
-
-    top_sets = _phase6_render_top_sets(
-            top10_internal
-        )
-
-    practical_ids = [
-        f"S{index + 1}"
-        for index
-        in practical_indices
-    ]
-
-    payload = {
-        "schema_version":
-            1,
-
-        "request_id":
-            request[
-                "request_id"
-            ],
-
-        "round":
-            request[
-                "round"
-            ],
-
-        "challenger_id":
-            request[
-                "challenger_id"
-            ],
-
-        "seed":
-            request[
-                "seed"
-            ],
-
-        "research_only":
-            True,
-
-        "execution_context":
-            "phase6_test_only",
-
-        "actual_round_execution":
-            False,
-
-        "real_shadow_publish":
-            False,
-
-        "database_write":
-            False,
-
-        "candidate_count":
-            PHASE6_CANDIDATE_COUNT,
-
-        "candidate_attempts":
-            attempts,
-
-        "top_k":
-            PHASE6_TOP_K,
-
-        "practical_k":
-            PHASE6_PRACTICAL_K,
-
-        "config":
-            config,
-
-        "sets":
-            top_sets,
-
-        "top5_practical":
-            practical_ids,
-
-        "diversity":
-            _phase6_diversity(
-                top_sets
-            ),
-    }
-
-    result = dict(payload)
-
-    result[
-        "result_id"
-    ] = _phase4_digest(
-        payload
+        execution_context="phase6_test_only",
+        actual_round_execution=False,
     )
 
     phase6_validate_result(
@@ -5117,3 +5025,274 @@ def phase6_execute_actual_round1243(
 
 
 # === PHASE6_RESEARCH_EXECUTION_ENGINE_V1 END ===
+
+# === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_V1 BEGIN ===
+
+PHASE7_EXECUTION_CONTEXT = (
+    "phase7_actual_shadow"
+)
+
+
+def phase7_execution_bridge_authorization():
+    return {
+        "research_only": True,
+        "bridge_implementation": True,
+        "explicit_runtime_authorization_required": True,
+        "actual_round1243_execution": False,
+        "actual_challenger_execution": False,
+        "real_shadow_publish": False,
+        "database_write": False,
+        "production_helper_binding": False,
+        "production_cli_mutation": False,
+        "production_model_mutation": False,
+        "production_learning": False,
+    }
+
+
+def phase7_validate_shadow_result(
+    result,
+):
+    if not isinstance(
+        result,
+        _phase4_Mapping,
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow result must be a mapping"
+        )
+
+    if result.get(
+        "research_only"
+    ) is not True:
+        raise ResearchExecutionEngineError(
+            "shadow result must remain research-only"
+        )
+
+    if (
+        result.get(
+            "execution_context"
+        )
+        != PHASE7_EXECUTION_CONTEXT
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow execution context mismatch"
+        )
+
+    if result.get(
+        "actual_round_execution"
+    ) is not True:
+        raise ResearchExecutionEngineError(
+            "shadow result must mark actual round execution"
+        )
+
+    if result.get(
+        "real_shadow_publish"
+    ) is not False:
+        raise ResearchExecutionEngineError(
+            "shadow publication must remain disabled"
+        )
+
+    if result.get(
+        "database_write"
+    ) is not False:
+        raise ResearchExecutionEngineError(
+            "shadow database write must remain disabled"
+        )
+
+    payload = {
+        key:
+            _phase3_copy(
+                value
+            )
+        for key, value
+        in result.items()
+        if key != "result_id"
+    }
+
+    expected_result_id = _phase4_digest(
+        payload
+    )
+
+    if (
+        result.get(
+            "result_id"
+        )
+        != expected_result_id
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow result digest mismatch"
+        )
+
+    normalized = {
+        key:
+            _phase3_copy(
+                value
+            )
+        for key, value
+        in result.items()
+    }
+
+    normalized[
+        "execution_context"
+    ] = "phase6_test_only"
+
+    normalized[
+        "actual_round_execution"
+    ] = False
+
+    normalized_payload = {
+        key:
+            _phase3_copy(
+                value
+            )
+        for key, value
+        in normalized.items()
+        if key != "result_id"
+    }
+
+    normalized[
+        "result_id"
+    ] = _phase4_digest(
+        normalized_payload
+    )
+
+    phase6_validate_result(
+        normalized
+    )
+
+    return True
+
+
+def phase7_execute_shadow_prepared_request(
+    request,
+    *,
+    execution_authorized=False,
+):
+    _phase6_validate_prepared_request(
+        request
+    )
+
+    if execution_authorized is not True:
+        raise ResearchExecutionEngineError(
+            "Phase-7 shadow execution requires explicit authorization"
+        )
+
+    result = _phase7_execute_request_core(
+        request,
+        execution_context=PHASE7_EXECUTION_CONTEXT,
+        actual_round_execution=True,
+    )
+
+    phase7_validate_shadow_result(
+        result
+    )
+
+    return result
+
+
+def phase7_execute_actual_shadow_round1243(
+    db_path,
+    *,
+    execution_authorized=False,
+):
+    if execution_authorized is not True:
+        raise ResearchExecutionEngineError(
+            "Phase-7 actual round-1243 shadow execution "
+            "requires explicit authorization"
+        )
+
+    requests = (
+        phase5_prepare_all_real_round_requests(
+            db_path,
+            round_no=1243,
+        )
+    )
+
+    expected_ids = tuple(
+        phase3_challenger_ids()
+    )
+
+    if (
+        not isinstance(
+            requests,
+            tuple,
+        )
+        or len(requests) != 24
+        or len(requests)
+        != len(expected_ids)
+    ):
+        raise ResearchExecutionEngineError(
+            "Phase-7 bridge requires exactly 24 prepared requests"
+        )
+
+    actual_ids = tuple(
+        request.get(
+            "challenger_id"
+        )
+        for request
+        in requests
+    )
+
+    if actual_ids != expected_ids:
+        raise ResearchExecutionEngineError(
+            "prepared challenger order mismatch"
+        )
+
+    results = []
+
+    for (
+        expected_id,
+        request,
+    ) in zip(
+        expected_ids,
+        requests,
+    ):
+        _phase6_validate_prepared_request(
+            request
+        )
+
+        if (
+            request[
+                "challenger_id"
+            ]
+            != expected_id
+        ):
+            raise ResearchExecutionEngineError(
+                "prepared challenger identity mismatch"
+            )
+
+        result = (
+            phase7_execute_shadow_prepared_request(
+                request,
+                execution_authorized=True,
+            )
+        )
+
+        phase7_validate_shadow_result(
+            result
+        )
+
+        results.append(
+            result
+        )
+
+    result_ids = [
+        result[
+            "result_id"
+        ]
+        for result
+        in results
+    ]
+
+    if len(
+        set(result_ids)
+    ) != 24:
+        raise ResearchExecutionEngineError(
+            "Phase-7 shadow result ids must be unique"
+        )
+
+    return tuple(
+        results
+    )
+
+
+# === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_V1 END ===

@@ -2518,3 +2518,380 @@ def test_phase6_result_validation_detects_tampering(
 
 
 # === PHASE6_RESEARCH_EXECUTION_ENGINE_TESTS_V1 END ===
+
+# === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_TESTS_V1 BEGIN ===
+
+
+def test_phase7_bridge_authorization_is_implementation_only():
+    authorization = (
+        _phase2_product
+        .phase7_execution_bridge_authorization()
+    )
+
+    assert authorization["research_only"] is True
+    assert authorization["bridge_implementation"] is True
+
+    assert (
+        authorization[
+            "explicit_runtime_authorization_required"
+        ]
+        is True
+    )
+
+    assert (
+        authorization[
+            "actual_round1243_execution"
+        ]
+        is False
+    )
+
+    assert (
+        authorization[
+            "actual_challenger_execution"
+        ]
+        is False
+    )
+
+    assert authorization["real_shadow_publish"] is False
+    assert authorization["database_write"] is False
+    assert authorization["production_cli_mutation"] is False
+    assert authorization["production_learning"] is False
+
+
+def test_phase7_shadow_prepared_request_requires_explicit_authorization(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        (
+            _phase2_product
+            .phase7_execute_shadow_prepared_request(
+                request
+            )
+        )
+
+
+def test_phase7_shadow_prepared_request_uses_actual_shadow_context(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    result = (
+        _phase2_product
+        .phase7_execute_shadow_prepared_request(
+            request,
+            execution_authorized=True,
+        )
+    )
+
+    assert result["research_only"] is True
+
+    assert (
+        result[
+            "execution_context"
+        ]
+        == "phase7_actual_shadow"
+    )
+
+    assert (
+        result[
+            "actual_round_execution"
+        ]
+        is True
+    )
+
+    assert result["real_shadow_publish"] is False
+    assert result["database_write"] is False
+
+    assert (
+        _phase2_product
+        .phase7_validate_shadow_result(
+            result
+        )
+        is True
+    )
+
+
+def test_phase7_shadow_prepared_request_is_deterministic(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path,
+        "CG00_RANDOM_FILTERED",
+    )
+
+    first = (
+        _phase2_product
+        .phase7_execute_shadow_prepared_request(
+            request,
+            execution_authorized=True,
+        )
+    )
+
+    second = (
+        _phase2_product
+        .phase7_execute_shadow_prepared_request(
+            request,
+            execution_authorized=True,
+        )
+    )
+
+    assert first == second
+    assert first["result_id"] == second["result_id"]
+
+
+def test_phase7_batch_requires_authorization_before_preparation(
+    monkeypatch,
+):
+    calls = []
+
+    def explode(
+        db_path,
+        *,
+        round_no=1243,
+    ):
+        calls.append(
+            (
+                db_path,
+                round_no,
+            )
+        )
+
+        raise AssertionError(
+            "preparation must not run"
+        )
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "phase5_prepare_all_real_round_requests",
+        explode,
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        (
+            _phase2_product
+            .phase7_execute_actual_shadow_round1243(
+                "unused.db"
+            )
+        )
+
+    assert calls == []
+
+
+def test_phase7_batch_orchestration_is_exactly_24_in_registry_order(
+    monkeypatch,
+):
+    challenger_ids = tuple(
+        _phase2_product
+        .phase3_challenger_ids()
+    )
+
+    assert len(challenger_ids) == 24
+
+    requests = tuple(
+        {
+            "challenger_id":
+                challenger_id,
+        }
+        for challenger_id
+        in challenger_ids
+    )
+
+    preparation_calls = []
+
+    def fake_prepare(
+        db_path,
+        *,
+        round_no=1243,
+    ):
+        preparation_calls.append(
+            (
+                db_path,
+                round_no,
+            )
+        )
+
+        return requests
+
+    validated_requests = []
+
+    def fake_validate_request(
+        request,
+    ):
+        validated_requests.append(
+            request[
+                "challenger_id"
+            ]
+        )
+
+        return True
+
+    executed = []
+
+    def fake_execute(
+        request,
+        *,
+        execution_authorized=False,
+    ):
+        assert execution_authorized is True
+
+        challenger_id = request[
+            "challenger_id"
+        ]
+
+        executed.append(
+            challenger_id
+        )
+
+        return {
+            "challenger_id":
+                challenger_id,
+
+            "result_id":
+                "RID-" + challenger_id,
+        }
+
+    validated_results = []
+
+    def fake_validate_result(
+        result,
+    ):
+        validated_results.append(
+            result[
+                "challenger_id"
+            ]
+        )
+
+        return True
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "phase5_prepare_all_real_round_requests",
+        fake_prepare,
+    )
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "_phase6_validate_prepared_request",
+        fake_validate_request,
+    )
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "phase7_execute_shadow_prepared_request",
+        fake_execute,
+    )
+
+    monkeypatch.setattr(
+        _phase2_product,
+        "phase7_validate_shadow_result",
+        fake_validate_result,
+    )
+
+    results = (
+        _phase2_product
+        .phase7_execute_actual_shadow_round1243(
+            "unused.db",
+            execution_authorized=True,
+        )
+    )
+
+    assert preparation_calls == [
+        (
+            "unused.db",
+            1243,
+        )
+    ]
+
+    assert tuple(
+        result[
+            "challenger_id"
+        ]
+        for result
+        in results
+    ) == challenger_ids
+
+    assert tuple(
+        validated_requests
+    ) == challenger_ids
+
+    assert tuple(
+        executed
+    ) == challenger_ids
+
+    assert tuple(
+        validated_results
+    ) == challenger_ids
+
+
+def test_phase7_preserves_phase6_test_only_contract(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    result = (
+        _phase2_product
+        .phase6_execute_prepared_request(
+            request,
+            test_mode=True,
+        )
+    )
+
+    assert (
+        result[
+            "execution_context"
+        ]
+        == "phase6_test_only"
+    )
+
+    assert (
+        result[
+            "actual_round_execution"
+        ]
+        is False
+    )
+
+    assert result["real_shadow_publish"] is False
+    assert result["database_write"] is False
+
+
+def test_phase7_phase6_executor_still_rejects_without_test_mode(
+    tmp_path,
+):
+    request = _phase6_prepared_request(
+        tmp_path
+    )
+
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        (
+            _phase2_product
+            .phase6_execute_prepared_request(
+                request
+            )
+        )
+
+
+def test_phase7_preserves_phase6_actual_wrapper_fail_closed():
+    with _phase2_pytest.raises(
+        _phase2_product.ResearchExecutionEngineError
+    ):
+        (
+            _phase2_product
+            .phase6_execute_actual_round1243()
+        )
+
+
+# === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_TESTS_V1 END ===
