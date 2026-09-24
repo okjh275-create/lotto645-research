@@ -1006,3 +1006,381 @@ def test_phase2_probe_matrix_rejects_missing_surface():
 
 
 # === PHASE2_PARITY_HARNESS_TESTS_V1 END ===
+
+# === PHASE3_CHALLENGER_ENGINE_TESTS_V1 BEGIN ===
+
+
+def test_phase3_exact_24_challenger_ids():
+    ids = _phase2_product.phase3_challenger_ids()
+
+    assert len(ids) == 24
+    assert len(set(ids)) == 24
+
+    assert ids[0] == "CG00_RANDOM_FILTERED"
+    assert ids[-1] == "LG02_NO_GAP_HARD_RULE"
+
+
+def test_phase3_category_counts_are_frozen():
+    assert (
+        _phase2_product.phase3_category_counts()
+        == {
+            "CG": 6,
+            "PS": 5,
+            "SC": 4,
+            "HF": 6,
+            "LG": 3,
+        }
+    )
+
+
+def test_phase3_registry_validation_is_green():
+    assert (
+        _phase2_product.phase3_validate_registry()
+        is True
+    )
+
+
+def test_phase3_unknown_challenger_fails_closed():
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase3_challenger_definition(
+            "UNKNOWN"
+        )
+
+
+def test_phase3_round_below_window_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase3_build_all_plans(
+            1242
+        )
+
+
+def test_phase3_round_above_window_is_rejected():
+    with _phase2_pytest.raises(
+        _phase2_product.ChallengerPlanError
+    ):
+        _phase2_product.phase3_build_all_plans(
+            1253
+        )
+
+
+def test_phase3_seed_matches_frozen_known_value():
+    assert (
+        _phase2_product.phase3_seed(
+            1243,
+            "CG00_RANDOM_FILTERED",
+        )
+        == 1081018488
+    )
+
+
+def test_phase3_seed_is_repeatable():
+    first = _phase2_product.phase3_seed(
+        1243,
+        "PS01_RANDOM5",
+    )
+
+    second = _phase2_product.phase3_seed(
+        1243,
+        "PS01_RANDOM5",
+    )
+
+    assert first == second
+    assert first > 0
+
+
+def test_phase3_different_challengers_have_distinct_round1243_seeds():
+    seeds = {
+        _phase2_product.phase3_seed(
+            1243,
+            challenger_id,
+        )
+        for challenger_id
+        in _phase2_product.phase3_challenger_ids()
+    }
+
+    assert len(seeds) == 24
+
+
+def test_phase3_build_all_plans_is_exact_and_ordered():
+    plans = (
+        _phase2_product.phase3_build_all_plans(
+            1243
+        )
+    )
+
+    assert len(plans) == 24
+
+    assert tuple(
+        plan["challenger_id"]
+        for plan in plans
+    ) == _phase2_product.phase3_challenger_ids()
+
+    assert all(
+        plan["round"] == 1243
+        for plan in plans
+    )
+
+
+def test_phase3_cg_temperature_contracts():
+    low = (
+        _phase2_product.phase3_challenger_definition(
+            "CG01_TEMP_060"
+        )
+    )
+
+    high = (
+        _phase2_product.phase3_challenger_definition(
+            "CG02_TEMP_110"
+        )
+    )
+
+    assert low["parameters"]["temperature"] == 0.60
+    assert high["parameters"]["temperature"] == 1.10
+
+
+def test_phase3_cg_weight_ablation_contracts():
+    equal = (
+        _phase2_product.phase3_challenger_definition(
+            "CG03_EQUAL_WEIGHTS"
+        )
+    )
+
+    weights = equal["parameters"]["weights"]
+
+    assert len(weights) == 7
+    assert len(set(weights.values())) == 1
+    assert abs(sum(weights.values()) - 1.0) < 1e-12
+
+    no_recency = (
+        _phase2_product.phase3_challenger_definition(
+            "CG04_NO_RECENCY"
+        )
+    )
+
+    no_pair = (
+        _phase2_product.phase3_challenger_definition(
+            "CG05_NO_PAIR_GRAPH"
+        )
+    )
+
+    assert (
+        tuple(
+            no_recency["parameters"][
+                "disabled_score_components"
+            ]
+        )
+        == ("recency",)
+    )
+
+    assert (
+        tuple(
+            no_pair["parameters"][
+                "disabled_score_components"
+            ]
+        )
+        == ("pair_graph",)
+    )
+
+
+def test_phase3_practical_selector_contracts():
+    expected = {
+        "PS00_CURRENT_MMR": "current_mmr",
+        "PS01_RANDOM5": "deterministic_random5",
+        "PS02_SCORE_TOP5": "score_top5",
+        "PS03_MAX_UNIQUE5": "max_unique5",
+        "PS04_DIVERSITY5": "diversity5",
+    }
+
+    for challenger_id, selector in expected.items():
+        definition = (
+            _phase2_product.phase3_challenger_definition(
+                challenger_id
+            )
+        )
+
+        assert (
+            definition["parameters"]["selector"]
+            == selector
+        )
+
+        assert (
+            definition["parameters"]["practical_k"]
+            == 5
+        )
+
+
+def test_phase3_scoring_rank_contracts():
+    assert (
+        _phase2_product.phase3_challenger_definition(
+            "SC00_CURRENT"
+        )["parameters"]["ranking_mode"]
+        == "current"
+    )
+
+    assert (
+        _phase2_product.phase3_challenger_definition(
+            "SC01_RANDOM_RANK"
+        )["parameters"]["ranking_mode"]
+        == "deterministic_random"
+    )
+
+    assert (
+        _phase2_product.phase3_challenger_definition(
+            "SC02_QUANTILE_DIAGNOSTIC"
+        )["parameters"]["ranking_mode"]
+        == "quantile_diagnostic"
+    )
+
+    prior = (
+        _phase2_product.phase3_challenger_definition(
+            "SC03_PREQUENTIAL_PRIOR_SHADOW"
+        )
+    )
+
+    assert (
+        prior["parameters"]["ranking_mode"]
+        == "prequential_prior_shadow"
+    )
+
+    assert (
+        prior["parameters"]["minimum_prior_sample"]
+        == 3
+    )
+
+
+def test_phase3_hf_always_hard_filters_are_preserved():
+    always_hard = {
+        "sum",
+        "low_high",
+        "consecutive",
+        "long_gap",
+    }
+
+    for challenger_id in (
+        "HF00_CURRENT",
+        "HF01_SOFT_ODD_EVEN",
+        "HF02_SOFT_TERMINAL",
+        "HF03_SOFT_PREVIOUS_OVERLAP",
+        "HF04_SOFT_SAME_DECADE",
+        "HF05_SOFT_ALL4",
+    ):
+        definition = (
+            _phase2_product.phase3_challenger_definition(
+                challenger_id
+            )
+        )
+
+        assert always_hard.issubset(
+            set(
+                definition["parameters"][
+                    "hard_filters"
+                ]
+            )
+        )
+
+
+def test_phase3_hf_soft_penalty_and_hf05_limit_are_exact():
+    for challenger_id in (
+        "HF01_SOFT_ODD_EVEN",
+        "HF02_SOFT_TERMINAL",
+        "HF03_SOFT_PREVIOUS_OVERLAP",
+        "HF04_SOFT_SAME_DECADE",
+        "HF05_SOFT_ALL4",
+    ):
+        definition = (
+            _phase2_product.phase3_challenger_definition(
+                challenger_id
+            )
+        )
+
+        assert (
+            definition["parameters"]["soft_penalty"]
+            == 0.03
+        )
+
+    all4 = (
+        _phase2_product.phase3_challenger_definition(
+            "HF05_SOFT_ALL4"
+        )
+    )
+
+    assert set(
+        all4["parameters"]["soft_filters"]
+    ) == {
+        "odd_even",
+        "terminal",
+        "previous_overlap",
+        "same_decade",
+    }
+
+    assert (
+        all4["parameters"]["max_soft_violations"]
+        == 2
+    )
+
+
+def test_phase3_long_gap_ablation_contracts():
+    current = (
+        _phase2_product.phase3_challenger_definition(
+            "LG00_CURRENT"
+        )["parameters"]
+    )
+
+    no_score = (
+        _phase2_product.phase3_challenger_definition(
+            "LG01_NO_GAP_SCORE"
+        )["parameters"]
+    )
+
+    no_hard = (
+        _phase2_product.phase3_challenger_definition(
+            "LG02_NO_GAP_HARD_RULE"
+        )["parameters"]
+    )
+
+    assert current == {
+        "gap_score_enabled": True,
+        "long_gap_hard_rule_enabled": True,
+    }
+
+    assert no_score == {
+        "gap_score_enabled": False,
+        "long_gap_hard_rule_enabled": True,
+    }
+
+    assert no_hard == {
+        "gap_score_enabled": True,
+        "long_gap_hard_rule_enabled": False,
+    }
+
+
+def test_phase3_plans_remain_execution_closed_and_phase2_remains_fail_closed():
+    plans = (
+        _phase2_product.phase3_build_all_plans(
+            1243
+        )
+    )
+
+    for plan in plans:
+        assert plan["implementation_only"] is True
+        assert all(
+            value is False
+            for value
+            in plan["authorization"].values()
+        )
+
+    assert all(
+        value is False
+        for value in (
+            _phase2_product
+            .phase2_parity_authorization()
+            .values()
+        )
+    )
+
+
+# === PHASE3_CHALLENGER_ENGINE_TESTS_V1 END ===

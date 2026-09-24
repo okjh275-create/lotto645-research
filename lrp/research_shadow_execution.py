@@ -1236,3 +1236,572 @@ def phase2_binding_decisions_fail_closed(results):
 
 
 # === PHASE2_PARITY_HARNESS_V1 END ===
+
+# === PHASE3_CHALLENGER_ENGINE_V1 BEGIN ===
+
+import hashlib as _phase3_hashlib
+
+
+PHASE3_SHADOW_START_ROUND = 1243
+PHASE3_SHADOW_END_ROUND = 1252
+
+PHASE3_CHALLENGER_IDS = (
+    "CG00_RANDOM_FILTERED",
+    "CG01_TEMP_060",
+    "CG02_TEMP_110",
+    "CG03_EQUAL_WEIGHTS",
+    "CG04_NO_RECENCY",
+    "CG05_NO_PAIR_GRAPH",
+    "PS00_CURRENT_MMR",
+    "PS01_RANDOM5",
+    "PS02_SCORE_TOP5",
+    "PS03_MAX_UNIQUE5",
+    "PS04_DIVERSITY5",
+    "SC00_CURRENT",
+    "SC01_RANDOM_RANK",
+    "SC02_QUANTILE_DIAGNOSTIC",
+    "SC03_PREQUENTIAL_PRIOR_SHADOW",
+    "HF00_CURRENT",
+    "HF01_SOFT_ODD_EVEN",
+    "HF02_SOFT_TERMINAL",
+    "HF03_SOFT_PREVIOUS_OVERLAP",
+    "HF04_SOFT_SAME_DECADE",
+    "HF05_SOFT_ALL4",
+    "LG00_CURRENT",
+    "LG01_NO_GAP_SCORE",
+    "LG02_NO_GAP_HARD_RULE",
+)
+
+_PHASE3_SCORE_COMPONENTS = (
+    "recency",
+    "frequency",
+    "gap_reversion",
+    "pair_graph",
+    "terminal_dispersion",
+    "sum_band",
+    "parity_balance",
+)
+
+_PHASE3_EQUAL_WEIGHT = 1.0 / len(
+    _PHASE3_SCORE_COMPONENTS
+)
+
+_PHASE3_ALWAYS_HARD = (
+    "sum",
+    "low_high",
+    "consecutive",
+    "long_gap",
+)
+
+_PHASE3_ALL_CURRENT_HARD = (
+    "sum",
+    "odd_even",
+    "low_high",
+    "consecutive",
+    "terminal",
+    "previous_overlap",
+    "long_gap",
+    "same_decade",
+)
+
+
+class ChallengerPlanError(ValueError):
+    """Raised when a Phase-3 challenger plan violates the frozen contract."""
+
+
+def _phase3_definition(
+    *,
+    challenger_id,
+    category,
+    semantic,
+    parameters,
+):
+    return {
+        "challenger_id": challenger_id,
+        "category": category,
+        "semantic": semantic,
+        "parameters": parameters,
+        "implementation_only": True,
+    }
+
+
+PHASE3_CHALLENGER_DEFINITIONS = {
+    "CG00_RANDOM_FILTERED": _phase3_definition(
+        challenger_id="CG00_RANDOM_FILTERED",
+        category="CG",
+        semantic="filtered random control",
+        parameters={
+            "generation_mode": "random_filtered_control",
+            "temperature": None,
+        },
+    ),
+    "CG01_TEMP_060": _phase3_definition(
+        challenger_id="CG01_TEMP_060",
+        category="CG",
+        semantic="temperature=0.60",
+        parameters={
+            "generation_mode": "weighted_sampling",
+            "temperature": 0.60,
+        },
+    ),
+    "CG02_TEMP_110": _phase3_definition(
+        challenger_id="CG02_TEMP_110",
+        category="CG",
+        semantic="temperature=1.10",
+        parameters={
+            "generation_mode": "weighted_sampling",
+            "temperature": 1.10,
+        },
+    ),
+    "CG03_EQUAL_WEIGHTS": _phase3_definition(
+        challenger_id="CG03_EQUAL_WEIGHTS",
+        category="CG",
+        semantic="equal component weights",
+        parameters={
+            "weights_mode": "equal",
+            "weights": {
+                name: _PHASE3_EQUAL_WEIGHT
+                for name in _PHASE3_SCORE_COMPONENTS
+            },
+        },
+    ),
+    "CG04_NO_RECENCY": _phase3_definition(
+        challenger_id="CG04_NO_RECENCY",
+        category="CG",
+        semantic="recency score component removed",
+        parameters={
+            "disabled_score_components": (
+                "recency",
+            ),
+        },
+    ),
+    "CG05_NO_PAIR_GRAPH": _phase3_definition(
+        challenger_id="CG05_NO_PAIR_GRAPH",
+        category="CG",
+        semantic="pair-graph score component removed",
+        parameters={
+            "disabled_score_components": (
+                "pair_graph",
+            ),
+        },
+    ),
+
+    "PS00_CURRENT_MMR": _phase3_definition(
+        challenger_id="PS00_CURRENT_MMR",
+        category="PS",
+        semantic="current practical MMR selector",
+        parameters={
+            "selector": "current_mmr",
+            "practical_k": 5,
+        },
+    ),
+    "PS01_RANDOM5": _phase3_definition(
+        challenger_id="PS01_RANDOM5",
+        category="PS",
+        semantic="deterministic random five-set selector",
+        parameters={
+            "selector": "deterministic_random5",
+            "practical_k": 5,
+        },
+    ),
+    "PS02_SCORE_TOP5": _phase3_definition(
+        challenger_id="PS02_SCORE_TOP5",
+        category="PS",
+        semantic="top five sets by score",
+        parameters={
+            "selector": "score_top5",
+            "practical_k": 5,
+        },
+    ),
+    "PS03_MAX_UNIQUE5": _phase3_definition(
+        challenger_id="PS03_MAX_UNIQUE5",
+        category="PS",
+        semantic="maximize unique-number coverage",
+        parameters={
+            "selector": "max_unique5",
+            "practical_k": 5,
+        },
+    ),
+    "PS04_DIVERSITY5": _phase3_definition(
+        challenger_id="PS04_DIVERSITY5",
+        category="PS",
+        semantic="diversity-oriented five-set selector",
+        parameters={
+            "selector": "diversity5",
+            "practical_k": 5,
+        },
+    ),
+
+    "SC00_CURRENT": _phase3_definition(
+        challenger_id="SC00_CURRENT",
+        category="SC",
+        semantic="current score/rank behavior",
+        parameters={
+            "ranking_mode": "current",
+        },
+    ),
+    "SC01_RANDOM_RANK": _phase3_definition(
+        challenger_id="SC01_RANDOM_RANK",
+        category="SC",
+        semantic="deterministic random ranking control",
+        parameters={
+            "ranking_mode": "deterministic_random",
+        },
+    ),
+    "SC02_QUANTILE_DIAGNOSTIC": _phase3_definition(
+        challenger_id="SC02_QUANTILE_DIAGNOSTIC",
+        category="SC",
+        semantic="score quantile diagnostic ordering",
+        parameters={
+            "ranking_mode": "quantile_diagnostic",
+        },
+    ),
+    "SC03_PREQUENTIAL_PRIOR_SHADOW": _phase3_definition(
+        challenger_id="SC03_PREQUENTIAL_PRIOR_SHADOW",
+        category="SC",
+        semantic="prequential prior-only shadow",
+        parameters={
+            "ranking_mode": "prequential_prior_shadow",
+            "minimum_prior_sample": 3,
+        },
+    ),
+
+    "HF00_CURRENT": _phase3_definition(
+        challenger_id="HF00_CURRENT",
+        category="HF",
+        semantic="current hard-filter behavior",
+        parameters={
+            "hard_filters": _PHASE3_ALL_CURRENT_HARD,
+            "soft_filters": (),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 0,
+        },
+    ),
+    "HF01_SOFT_ODD_EVEN": _phase3_definition(
+        challenger_id="HF01_SOFT_ODD_EVEN",
+        category="HF",
+        semantic="odd/even becomes soft",
+        parameters={
+            "hard_filters": tuple(
+                item
+                for item in _PHASE3_ALL_CURRENT_HARD
+                if item != "odd_even"
+            ),
+            "soft_filters": ("odd_even",),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 1,
+        },
+    ),
+    "HF02_SOFT_TERMINAL": _phase3_definition(
+        challenger_id="HF02_SOFT_TERMINAL",
+        category="HF",
+        semantic="terminal-dispersion becomes soft",
+        parameters={
+            "hard_filters": tuple(
+                item
+                for item in _PHASE3_ALL_CURRENT_HARD
+                if item != "terminal"
+            ),
+            "soft_filters": ("terminal",),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 1,
+        },
+    ),
+    "HF03_SOFT_PREVIOUS_OVERLAP": _phase3_definition(
+        challenger_id="HF03_SOFT_PREVIOUS_OVERLAP",
+        category="HF",
+        semantic="previous-round overlap becomes soft",
+        parameters={
+            "hard_filters": tuple(
+                item
+                for item in _PHASE3_ALL_CURRENT_HARD
+                if item != "previous_overlap"
+            ),
+            "soft_filters": ("previous_overlap",),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 1,
+        },
+    ),
+    "HF04_SOFT_SAME_DECADE": _phase3_definition(
+        challenger_id="HF04_SOFT_SAME_DECADE",
+        category="HF",
+        semantic="same-decade concentration becomes soft",
+        parameters={
+            "hard_filters": tuple(
+                item
+                for item in _PHASE3_ALL_CURRENT_HARD
+                if item != "same_decade"
+            ),
+            "soft_filters": ("same_decade",),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 1,
+        },
+    ),
+    "HF05_SOFT_ALL4": _phase3_definition(
+        challenger_id="HF05_SOFT_ALL4",
+        category="HF",
+        semantic="four research filters become soft",
+        parameters={
+            "hard_filters": _PHASE3_ALWAYS_HARD,
+            "soft_filters": (
+                "odd_even",
+                "terminal",
+                "previous_overlap",
+                "same_decade",
+            ),
+            "soft_penalty": 0.03,
+            "max_soft_violations": 2,
+        },
+    ),
+
+    "LG00_CURRENT": _phase3_definition(
+        challenger_id="LG00_CURRENT",
+        category="LG",
+        semantic="current gap score and hard rule",
+        parameters={
+            "gap_score_enabled": True,
+            "long_gap_hard_rule_enabled": True,
+        },
+    ),
+    "LG01_NO_GAP_SCORE": _phase3_definition(
+        challenger_id="LG01_NO_GAP_SCORE",
+        category="LG",
+        semantic="gap score component removed; hard rule retained",
+        parameters={
+            "gap_score_enabled": False,
+            "long_gap_hard_rule_enabled": True,
+        },
+    ),
+    "LG02_NO_GAP_HARD_RULE": _phase3_definition(
+        challenger_id="LG02_NO_GAP_HARD_RULE",
+        category="LG",
+        semantic="long-gap hard inclusion rule removed",
+        parameters={
+            "gap_score_enabled": True,
+            "long_gap_hard_rule_enabled": False,
+        },
+    ),
+}
+
+
+def _phase3_copy(value):
+    return _phase2_copy(value)
+
+
+def phase3_challenger_ids():
+    """Return the exact frozen 24-challenger registry."""
+    return tuple(PHASE3_CHALLENGER_IDS)
+
+
+def _phase3_validate_round(round_no):
+    try:
+        value = int(round_no)
+    except (TypeError, ValueError) as exc:
+        raise ChallengerPlanError(
+            "round must be an integer"
+        ) from exc
+
+    if not (
+        PHASE3_SHADOW_START_ROUND
+        <= value
+        <= PHASE3_SHADOW_END_ROUND
+    ):
+        raise ChallengerPlanError(
+            "round outside frozen shadow window"
+        )
+
+    return value
+
+
+def _phase3_validate_challenger_id(challenger_id):
+    value = str(challenger_id)
+
+    if value not in PHASE3_CHALLENGER_DEFINITIONS:
+        raise ChallengerPlanError(
+            "unknown challenger id: "
+            + value
+        )
+
+    return value
+
+
+def phase3_seed(round_no, challenger_id):
+    """Derive the frozen deterministic OP-116 shadow seed."""
+    round_value = _phase3_validate_round(
+        round_no
+    )
+
+    challenger_value = (
+        _phase3_validate_challenger_id(
+            challenger_id
+        )
+    )
+
+    token = (
+        "LRP-v4.0|shadow|"
+        + str(round_value)
+        + "|"
+        + challenger_value
+    )
+
+    digest = _phase3_hashlib.sha256(
+        token.encode("utf-8")
+    ).digest()
+
+    seed = (
+        int.from_bytes(
+            digest[:8],
+            byteorder="big",
+            signed=False,
+        )
+        % 2147483647
+    )
+
+    return 1 if seed == 0 else seed
+
+
+def phase3_challenger_definition(challenger_id):
+    """Return a defensive copy of one frozen challenger definition."""
+    challenger_value = (
+        _phase3_validate_challenger_id(
+            challenger_id
+        )
+    )
+
+    return _phase3_copy(
+        PHASE3_CHALLENGER_DEFINITIONS[
+            challenger_value
+        ]
+    )
+
+
+def phase3_execution_authorization():
+    """Phase 3 is implementation-only and remains execution-closed."""
+    return {
+        "candidate_generation": False,
+        "challenger_generation": False,
+        "challenger_execution": False,
+        "real_shadow_publish": False,
+        "production_prediction_regeneration": False,
+        "database_write": False,
+        "production_cli_registration": False,
+        "production_helper_binding_change": False,
+    }
+
+
+def phase3_build_challenger_plan(
+    round_no,
+    challenger_id,
+):
+    """Build a deterministic execution-disabled challenger plan."""
+    round_value = _phase3_validate_round(
+        round_no
+    )
+
+    challenger_value = (
+        _phase3_validate_challenger_id(
+            challenger_id
+        )
+    )
+
+    definition = (
+        phase3_challenger_definition(
+            challenger_value
+        )
+    )
+
+    return {
+        "round": round_value,
+        "challenger_id": challenger_value,
+        "category": definition["category"],
+        "semantic": definition["semantic"],
+        "parameters": definition["parameters"],
+        "seed": phase3_seed(
+            round_value,
+            challenger_value,
+        ),
+        "implementation_only": True,
+        "authorization": (
+            phase3_execution_authorization()
+        ),
+    }
+
+
+def phase3_build_all_plans(round_no):
+    """Build all 24 frozen plans without executing any challenger."""
+    round_value = _phase3_validate_round(
+        round_no
+    )
+
+    return tuple(
+        phase3_build_challenger_plan(
+            round_value,
+            challenger_id,
+        )
+        for challenger_id
+        in PHASE3_CHALLENGER_IDS
+    )
+
+
+def phase3_category_counts():
+    counts = {
+        "CG": 0,
+        "PS": 0,
+        "SC": 0,
+        "HF": 0,
+        "LG": 0,
+    }
+
+    for challenger_id in PHASE3_CHALLENGER_IDS:
+        category = (
+            PHASE3_CHALLENGER_DEFINITIONS[
+                challenger_id
+            ]["category"]
+        )
+        counts[category] += 1
+
+    return counts
+
+
+def phase3_validate_registry():
+    """Fail closed if the embedded Phase-3 registry drifts."""
+    ids = phase3_challenger_ids()
+
+    if len(ids) != 24:
+        raise ChallengerPlanError(
+            "challenger registry count mismatch"
+        )
+
+    if len(set(ids)) != 24:
+        raise ChallengerPlanError(
+            "duplicate challenger ids"
+        )
+
+    if set(ids) != set(
+        PHASE3_CHALLENGER_DEFINITIONS
+    ):
+        raise ChallengerPlanError(
+            "challenger definition coverage mismatch"
+        )
+
+    expected_counts = {
+        "CG": 6,
+        "PS": 5,
+        "SC": 4,
+        "HF": 6,
+        "LG": 3,
+    }
+
+    if phase3_category_counts() != expected_counts:
+        raise ChallengerPlanError(
+            "challenger category counts mismatch"
+        )
+
+    return True
+
+
+# Validate immutable internal structure only.
+# This performs no candidate generation or challenger execution.
+phase3_validate_registry()
+
+# === PHASE3_CHALLENGER_ENGINE_V1 END ===
