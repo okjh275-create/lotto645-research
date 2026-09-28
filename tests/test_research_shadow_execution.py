@@ -3445,3 +3445,168 @@ def test_op197r2_window_constants():
     )
 
 # ===== END OP-197R2 MULTI-ROUND REGRESSION TESTS =====
+
+
+# ===== OP-202R2C SHARED CORE VALIDATION OWNERSHIP TESTS =====
+
+import ast as _op202r2c_ast
+import inspect as _op202r2c_inspect
+
+
+def _op202r2c_call_name(
+    node,
+):
+    if isinstance(
+        node,
+        _op202r2c_ast.Name,
+    ):
+        return node.id
+
+    if isinstance(
+        node,
+        _op202r2c_ast.Attribute,
+    ):
+        return node.attr
+
+    return None
+
+
+def _op202r2c_call_names(
+    function,
+):
+    source = _op202r2c_inspect.getsource(
+        function
+    )
+
+    tree = _op202r2c_ast.parse(
+        source
+    )
+
+    return [
+        _op202r2c_call_name(
+            node.func
+        )
+        for node in _op202r2c_ast.walk(
+            tree
+        )
+        if isinstance(
+            node,
+            _op202r2c_ast.Call,
+        )
+    ]
+
+
+def test_op202r2c_shared_core_is_context_validation_neutral():
+    calls = _op202r2c_call_names(
+        _phase2_product
+        ._phase7_execute_request_core
+    )
+
+    assert (
+        "_phase6_validate_prepared_request"
+        not in calls
+    )
+
+    assert (
+        "phase6_validate_result"
+        not in calls
+    )
+
+    assert (
+        "_phase7_validate_prepared_request"
+        not in calls
+    )
+
+    assert (
+        "phase7_validate_shadow_result"
+        not in calls
+    )
+
+
+def test_op202r2c_phase6_wrapper_owns_request_and_result_validation():
+    source = _op202r2c_inspect.getsource(
+        _phase2_product
+        .phase6_execute_prepared_request
+    )
+
+    request_index = source.index(
+        "_phase6_validate_prepared_request"
+    )
+
+    core_index = source.index(
+        "_phase7_execute_request_core"
+    )
+
+    result_index = source.index(
+        "phase6_validate_result"
+    )
+
+    assert (
+        request_index
+        < core_index
+        < result_index
+    )
+
+
+def test_op202r2c_phase7_wrapper_owns_request_and_result_validation():
+    source = _op202r2c_inspect.getsource(
+        _phase2_product
+        .phase7_execute_shadow_prepared_request
+    )
+
+    request_index = source.index(
+        "_phase7_validate_prepared_request"
+    )
+
+    core_index = source.index(
+        "_phase7_execute_request_core"
+    )
+
+    result_index = source.index(
+        "phase7_validate_shadow_result"
+    )
+
+    assert (
+        request_index
+        < core_index
+        < result_index
+    )
+
+
+def test_op202r2c_phase6_hard_lock_remains_in_phase6_wrapper_path():
+    validator_source = (
+        _op202r2c_inspect.getsource(
+            _phase2_product
+            ._phase6_validate_prepared_request
+        )
+    )
+
+    wrapper_calls = _op202r2c_call_names(
+        _phase2_product
+        .phase6_execute_prepared_request
+    )
+
+    core_calls = _op202r2c_call_names(
+        _phase2_product
+        ._phase7_execute_request_core
+    )
+
+    assert (
+        'request["round"] != 1243'
+        in validator_source
+    )
+
+    assert (
+        "engine is locked to round 1243"
+        in validator_source
+    )
+
+    assert (
+        "_phase6_validate_prepared_request"
+        in wrapper_calls
+    )
+
+    assert (
+        "_phase6_validate_prepared_request"
+        not in core_calls
+    )

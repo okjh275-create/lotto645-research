@@ -4683,9 +4683,6 @@ def _phase7_execute_request_core(
     execution_context,
     actual_round_execution,
 ):
-    _phase6_validate_prepared_request(
-        request
-    )
 
     config = phase6_challenger_config(request['challenger_id'])
 
