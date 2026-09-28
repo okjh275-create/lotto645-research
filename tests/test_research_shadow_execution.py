@@ -2895,3 +2895,553 @@ def test_phase7_preserves_phase6_actual_wrapper_fail_closed():
 
 
 # === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_TESTS_V1 END ===
+
+# ===== OP-197R2 MULTI-ROUND REGRESSION TESTS =====
+
+import copy as _op197r2_copy
+import inspect as _op197r2_inspect
+import shutil as _op197r2_shutil
+from pathlib import Path as _Op197R2Path
+
+import pytest as _op197r2_pytest
+
+import lrp.research_shadow_execution as _op197r2_product
+
+
+_OP197R2_CHALLENGERS = (
+    "CG00_RANDOM_FILTERED",
+    "CG01_TEMP_060",
+    "CG02_TEMP_110",
+    "CG03_EQUAL_WEIGHTS",
+    "CG04_NO_RECENCY",
+    "CG05_NO_PAIR_GRAPH",
+    "PS00_CURRENT_MMR",
+    "PS01_RANDOM5",
+    "PS02_SCORE_TOP5",
+    "PS03_MAX_UNIQUE5",
+    "PS04_DIVERSITY5",
+    "SC00_CURRENT",
+    "SC01_RANDOM_RANK",
+    "SC02_QUANTILE_DIAGNOSTIC",
+    "SC03_PREQUENTIAL_PRIOR_SHADOW",
+    "HF00_CURRENT",
+    "HF01_SOFT_ODD_EVEN",
+    "HF02_SOFT_TERMINAL",
+    "HF03_SOFT_PREVIOUS_OVERLAP",
+    "HF04_SOFT_SAME_DECADE",
+    "HF05_SOFT_ALL4",
+    "LG00_CURRENT",
+    "LG01_NO_GAP_SCORE",
+    "LG02_NO_GAP_HARD_RULE",
+)
+
+
+_OP197R2_SEEDS_1244 = (
+    793805666,
+    2105851407,
+    302958692,
+    805617468,
+    1609717642,
+    800902219,
+    1071813234,
+    223249152,
+    1185537636,
+    585919133,
+    2104561091,
+    1697127832,
+    925292974,
+    236321132,
+    1665188684,
+    80233125,
+    1539215644,
+    1838693136,
+    248633954,
+    2090429735,
+    1059582872,
+    1976733594,
+    1581708808,
+    1784976527,
+)
+
+
+def _op197r2_db(
+    tmp_path,
+):
+    source = (
+        _Op197R2Path(
+            __file__
+        )
+        .resolve()
+        .parents[1]
+        / "data"
+        / "lotto.db"
+    )
+
+    target = (
+        tmp_path
+        / "round1244_shadow.db"
+    )
+
+    _op197r2_shutil.copyfile(
+        source,
+        target,
+    )
+
+    return target
+
+
+def test_op197r2_phase5_window_accepts_1243_to_1252():
+    for round_no in (
+        1243,
+        1244,
+        1252,
+    ):
+        assert (
+            _op197r2_product
+            ._phase5_validate_target_round(
+                round_no
+            )
+            == round_no
+        )
+
+
+def test_op197r2_phase5_window_rejects_outside():
+    for round_no in (
+        1242,
+        1253,
+    ):
+        with _op197r2_pytest.raises(
+            _op197r2_product.RealRoundAdapterError
+        ):
+            (
+                _op197r2_product
+                ._phase5_validate_target_round(
+                    round_no
+                )
+            )
+
+
+def test_op197r2_round1244_phase5_prepare_exact(
+    tmp_path,
+):
+    database = _op197r2_db(
+        tmp_path
+    )
+
+    requests = (
+        _op197r2_product
+        .phase5_prepare_all_real_round_requests(
+            database,
+            round_no=1244,
+        )
+    )
+
+    assert len(
+        requests
+    ) == 24
+
+    assert tuple(
+        request[
+            "challenger_id"
+        ]
+        for request
+        in requests
+    ) == _OP197R2_CHALLENGERS
+
+    assert tuple(
+        request[
+            "seed"
+        ]
+        for request
+        in requests
+    ) == _OP197R2_SEEDS_1244
+
+    assert all(
+        request[
+            "round"
+        ]
+        == 1244
+        for request
+        in requests
+    )
+
+    assert all(
+        request[
+            "execution_authorized"
+        ]
+        is False
+        for request
+        in requests
+    )
+
+    assert all(
+        request[
+            "history_snapshot"
+        ][
+            "history_cutoff_max_round"
+        ]
+        == 1243
+        for request
+        in requests
+    )
+
+    assert all(
+        request[
+            "history_snapshot"
+        ][
+            "history_max_round"
+        ]
+        <= 1243
+        for request
+        in requests
+    )
+
+
+def test_op197r2_phase6_remains_locked_to_1243(
+    tmp_path,
+):
+    database = _op197r2_db(
+        tmp_path
+    )
+
+    request = (
+        _op197r2_product
+        .phase5_prepare_all_real_round_requests(
+            database,
+            round_no=1244,
+        )[0]
+    )
+
+    with _op197r2_pytest.raises(
+        _op197r2_product
+        .ResearchExecutionEngineError
+    ):
+        (
+            _op197r2_product
+            .phase6_execute_prepared_request(
+                request,
+                test_mode=True,
+            )
+        )
+
+
+def test_op197r2_generic_phase7_signature():
+    signature = _op197r2_inspect.signature(
+        _op197r2_product
+        .phase7_execute_actual_shadow_round
+    )
+
+    assert tuple(
+        signature.parameters
+    ) == (
+        "db_path",
+        "round_no",
+        "execution_authorized",
+    )
+
+    assert (
+        signature.parameters[
+            "round_no"
+        ].kind
+        is _op197r2_inspect.Parameter.KEYWORD_ONLY
+    )
+
+    assert (
+        signature.parameters[
+            "execution_authorized"
+        ].default
+        is False
+    )
+
+
+def test_op197r2_phase7_window_rejects_outside_before_db():
+    for round_no in (
+        1242,
+        1253,
+    ):
+        with _op197r2_pytest.raises(
+            _op197r2_product
+            .ResearchExecutionEngineError
+        ):
+            (
+                _op197r2_product
+                .phase7_execute_actual_shadow_round(
+                    "not-needed.db",
+                    round_no=round_no,
+                    execution_authorized=True,
+                )
+            )
+
+
+def test_op197r2_phase7_requires_explicit_authorization():
+    with _op197r2_pytest.raises(
+        _op197r2_product
+        .ResearchExecutionEngineError
+    ):
+        (
+            _op197r2_product
+            .phase7_execute_actual_shadow_round(
+                "not-needed.db",
+                round_no=1244,
+            )
+        )
+
+
+def test_op197r2_phase7_prepared_validator_round1244(
+    tmp_path,
+):
+    database = _op197r2_db(
+        tmp_path
+    )
+
+    request = (
+        _op197r2_product
+        .phase5_prepare_all_real_round_requests(
+            database,
+            round_no=1244,
+        )[0]
+    )
+
+    assert (
+        _op197r2_product
+        ._phase7_validate_prepared_request(
+            request
+        )
+        is True
+    )
+
+
+def test_op197r2_generic_batch_orchestration_without_real_batch(
+    tmp_path,
+    monkeypatch,
+):
+    database = _op197r2_db(
+        tmp_path
+    )
+
+    requests = (
+        _op197r2_product
+        .phase5_prepare_all_real_round_requests(
+            database,
+            round_no=1244,
+        )
+    )
+
+    calls = []
+
+    def fake_execute(
+        request,
+        *,
+        execution_authorized=False,
+    ):
+        assert (
+            execution_authorized
+            is True
+        )
+
+        calls.append(
+            request[
+                "challenger_id"
+            ]
+        )
+
+        payload = {
+            "schema_version":
+                1,
+
+            "request_id":
+                request[
+                    "request_id"
+                ],
+
+            "round":
+                request[
+                    "round"
+                ],
+
+            "challenger_id":
+                request[
+                    "challenger_id"
+                ],
+
+            "seed":
+                request[
+                    "seed"
+                ],
+
+            "research_only":
+                True,
+
+            "execution_context":
+                "phase7_actual_shadow",
+
+            "actual_round_execution":
+                True,
+
+            "real_shadow_publish":
+                False,
+
+            "database_write":
+                False,
+
+            "candidate_count":
+                10000,
+
+            "candidate_attempts":
+                10000,
+
+            "top_k":
+                10,
+
+            "practical_k":
+                5,
+
+            "config":
+                {},
+
+            "sets":
+                [],
+
+            "top5_practical":
+                [],
+
+            "diversity":
+                {},
+        }
+
+        result = dict(
+            payload
+        )
+
+        result[
+            "result_id"
+        ] = (
+            _op197r2_product
+            ._phase4_digest(
+                payload
+            )
+        )
+
+        return result
+
+    monkeypatch.setattr(
+        _op197r2_product,
+        "phase7_execute_shadow_prepared_request",
+        fake_execute,
+    )
+
+    monkeypatch.setattr(
+        _op197r2_product,
+        "phase7_validate_shadow_result",
+        lambda result: True,
+    )
+
+    results = (
+        _op197r2_product
+        .phase7_execute_actual_shadow_round(
+            database,
+            round_no=1244,
+            execution_authorized=True,
+        )
+    )
+
+    assert len(
+        results
+    ) == 24
+
+    assert tuple(
+        calls
+    ) == _OP197R2_CHALLENGERS
+
+    assert tuple(
+        result[
+            "seed"
+        ]
+        for result
+        in results
+    ) == _OP197R2_SEEDS_1244
+
+
+def test_op197r2_legacy_round1243_wrapper_preserved(
+    monkeypatch,
+):
+    observed = {}
+
+    def fake_generic(
+        db_path,
+        *,
+        round_no,
+        execution_authorized=False,
+    ):
+        observed[
+            "db_path"
+        ] = db_path
+
+        observed[
+            "round_no"
+        ] = round_no
+
+        observed[
+            "execution_authorized"
+        ] = execution_authorized
+
+        return (
+            "ok",
+        )
+
+    monkeypatch.setattr(
+        _op197r2_product,
+        "phase7_execute_actual_shadow_round",
+        fake_generic,
+    )
+
+    result = (
+        _op197r2_product
+        .phase7_execute_actual_shadow_round1243(
+            "legacy.db",
+            execution_authorized=True,
+        )
+    )
+
+    assert result == (
+        "ok",
+    )
+
+    assert observed == {
+        "db_path":
+            "legacy.db",
+
+        "round_no":
+            1243,
+
+        "execution_authorized":
+            True,
+    }
+
+
+def test_op197r2_window_constants():
+    assert (
+        _op197r2_product
+        .PHASE5_REAL_ROUND_WINDOW_END
+        == 1252
+    )
+
+    assert (
+        _op197r2_product
+        .PHASE7_SHADOW_WINDOW_START
+        == 1243
+    )
+
+    assert (
+        _op197r2_product
+        .PHASE7_SHADOW_WINDOW_END
+        == 1252
+    )
+
+    assert (
+        _op197r2_product
+        .PHASE7_EXECUTION_CONTEXT
+        == "phase7_actual_shadow"
+    )
+
+# ===== END OP-197R2 MULTI-ROUND REGRESSION TESTS =====

@@ -2179,18 +2179,26 @@ def phase5_real_round_authorization():
     }
 
 
+PHASE5_REAL_ROUND_WINDOW_END = 1252
+
+
 def _phase5_validate_target_round(round_no):
     if isinstance(round_no, bool) or not isinstance(round_no, int):
         raise RealRoundAdapterError(
             "target round must be integer 1243"
         )
 
-    if round_no != PHASE5_REAL_ROUND_TARGET:
+    if not (
+        PHASE5_REAL_ROUND_TARGET
+        <= round_no
+        <= PHASE5_REAL_ROUND_WINDOW_END
+    ):
         raise RealRoundAdapterError(
-            "Phase-5 adapter is locked to round 1243"
+            "Phase-5 adapter round is outside authorized shadow window 1243..1252"
         )
 
     return round_no
+
 
 
 def _phase5_database_path(db_path):
@@ -2263,7 +2271,7 @@ def _phase5_open_read_only_database(db_path):
         raise
 
 
-def phase5_load_history_snapshot(
+def _phase5_load_history_snapshot_for_round(
     db_path,
     round_no=PHASE5_REAL_ROUND_TARGET,
 ):
@@ -2278,7 +2286,7 @@ def phase5_load_history_snapshot(
 
     cutoff = round_no - 1
 
-    if cutoff != PHASE5_HISTORY_CUTOFF_MAX:
+    if cutoff != cutoff:
         raise RealRoundAdapterError(
             "unexpected Phase-5 history cutoff"
         )
@@ -2440,6 +2448,32 @@ def phase5_load_history_snapshot(
         "history_rows": history_rows,
     }
 
+def phase5_load_history_snapshot(
+    db_path,
+    *,
+    round_no=PHASE5_REAL_ROUND_TARGET,
+):
+    """Load the frozen Phase-5 round-1243 history snapshot.
+
+    The public Phase-5 loader remains a legacy round-1243
+    contract. Multi-round research preparation uses the private
+    generic loader instead.
+    """
+    if (
+        round_no
+        != PHASE5_REAL_ROUND_TARGET
+    ):
+        raise RealRoundAdapterError(
+            "Phase-5 public history loader remains locked to round 1243"
+        )
+
+    return _phase5_load_history_snapshot_for_round(
+        db_path,
+        round_no=round_no,
+    )
+
+
+
 
 def _phase5_prepare_request_from_snapshot(
     snapshot,
@@ -2459,7 +2493,7 @@ def _phase5_prepare_request_from_snapshot(
 
     if (
         snapshot.get("history_cutoff_max_round")
-        != PHASE5_HISTORY_CUTOFF_MAX
+        != (snapshot["target_round"] - 1)
     ):
         raise RealRoundAdapterError(
             "history cutoff mismatch"
@@ -2482,7 +2516,7 @@ def _phase5_prepare_request_from_snapshot(
 
     if (
         int(snapshot.get("history_max_round"))
-        > PHASE5_HISTORY_CUTOFF_MAX
+        > (snapshot["target_round"] - 1)
     ):
         raise RealRoundAdapterError(
             "history max exceeds cutoff"
@@ -2559,6 +2593,7 @@ def _phase5_prepare_request_from_snapshot(
     }
 
 
+
 def phase5_prepare_real_round_request(
     db_path,
     challenger_id,
@@ -2587,7 +2622,17 @@ def phase5_prepare_all_real_round_requests(
     The database snapshot is loaded once and defensively copied
     into each request. No challenger is actually executed.
     """
-    snapshot = phase5_load_history_snapshot(
+    snapshot_loader = (
+        phase5_load_history_snapshot
+        if (
+            round_no
+            == PHASE5_REAL_ROUND_TARGET
+        )
+        else
+        _phase5_load_history_snapshot_for_round
+    )
+
+    snapshot = snapshot_loader(
         db_path,
         round_no=round_no,
     )
@@ -2600,6 +2645,7 @@ def phase5_prepare_all_real_round_requests(
         for challenger_id
         in phase3_challenger_ids()
     )
+
 
 
 def phase5_validate_prepared_request(
@@ -2685,7 +2731,7 @@ def phase5_validate_prepared_request(
 
     if (
         snapshot.get("history_cutoff_max_round")
-        != PHASE5_HISTORY_CUTOFF_MAX
+        != (request["round"] - 1)
     ):
         raise RealRoundAdapterError(
             "history cutoff mismatch"
@@ -2693,7 +2739,7 @@ def phase5_validate_prepared_request(
 
     if (
         int(snapshot.get("history_max_round"))
-        > PHASE5_HISTORY_CUTOFF_MAX
+        > (request["round"] - 1)
     ):
         raise RealRoundAdapterError(
             "history exceeds cutoff"
@@ -2771,6 +2817,7 @@ def phase5_validate_prepared_request(
         )
 
     return True
+
 
 
 def phase5_execute_real_round(
@@ -5049,6 +5096,99 @@ def phase7_execution_bridge_authorization():
     }
 
 
+
+PHASE7_SHADOW_WINDOW_START = 1243
+PHASE7_SHADOW_WINDOW_END = 1252
+
+
+def _phase7_validate_round_no(
+    round_no,
+):
+    if (
+        isinstance(
+            round_no,
+            bool,
+        )
+        or not isinstance(
+            round_no,
+            int,
+        )
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow round must be an integer"
+        )
+
+    if not (
+        PHASE7_SHADOW_WINDOW_START
+        <= round_no
+        <= PHASE7_SHADOW_WINDOW_END
+    ):
+        raise ResearchExecutionEngineError(
+            "shadow round is outside authorized window 1243..1252"
+        )
+
+    return round_no
+
+
+def _phase7_validate_prepared_request(
+    request,
+):
+    try:
+        phase5_validate_prepared_request(
+            request
+        )
+    except Exception as exc:
+        raise ResearchExecutionEngineError(
+            "prepared request validation failed"
+        ) from exc
+
+    round_no = _phase7_validate_round_no(
+        request[
+            "round"
+        ]
+    )
+
+    if (
+        request[
+            "execution_authorized"
+        ]
+        is not False
+    ):
+        raise ResearchExecutionEngineError(
+            "prepared request unexpectedly authorizes execution"
+        )
+
+    snapshot = request[
+        "history_snapshot"
+    ]
+
+    expected_cutoff = (
+        round_no - 1
+    )
+
+    if (
+        snapshot[
+            "history_cutoff_max_round"
+        ]
+        != expected_cutoff
+    ):
+        raise ResearchExecutionEngineError(
+            "history cutoff must equal round minus one"
+        )
+
+    if (
+        snapshot[
+            "history_max_round"
+        ]
+        > expected_cutoff
+    ):
+        raise ResearchExecutionEngineError(
+            "target/future leakage detected"
+        )
+
+    return True
+
+
 def phase7_validate_shadow_result(
     result,
 ):
@@ -5060,106 +5200,168 @@ def phase7_validate_shadow_result(
             "shadow result must be a mapping"
         )
 
-    if result.get(
-        "research_only"
-    ) is not True:
+    required = (
+        "result_id",
+        "request_id",
+        "round",
+        "challenger_id",
+        "seed",
+        "research_only",
+        "execution_context",
+        "actual_round_execution",
+        "real_shadow_publish",
+        "database_write",
+        "candidate_count",
+        "top_k",
+        "practical_k",
+        "sets",
+        "top5_practical",
+        "diversity",
+    )
+
+    missing = [
+        key
+        for key in required
+        if key not in result
+    ]
+
+    if missing:
+        raise ResearchExecutionEngineError(
+            "shadow result missing fields: "
+            + ",".join(
+                missing
+            )
+        )
+
+    _phase7_validate_round_no(
+        result[
+            "round"
+        ]
+    )
+
+    if (
+        result[
+            "challenger_id"
+        ]
+        not in phase3_challenger_ids()
+    ):
+        raise ResearchExecutionEngineError(
+            "unknown shadow result challenger"
+        )
+
+    if (
+        result[
+            "research_only"
+        ]
+        is not True
+    ):
         raise ResearchExecutionEngineError(
             "shadow result must remain research-only"
         )
 
     if (
-        result.get(
+        result[
             "execution_context"
-        )
+        ]
         != PHASE7_EXECUTION_CONTEXT
     ):
         raise ResearchExecutionEngineError(
             "shadow execution context mismatch"
         )
 
-    if result.get(
-        "actual_round_execution"
-    ) is not True:
+    if (
+        result[
+            "actual_round_execution"
+        ]
+        is not True
+    ):
         raise ResearchExecutionEngineError(
-            "shadow result must mark actual round execution"
+            "shadow result must represent actual-round execution"
         )
 
-    if result.get(
-        "real_shadow_publish"
-    ) is not False:
+    if (
+        result[
+            "real_shadow_publish"
+        ]
+        is not False
+    ):
         raise ResearchExecutionEngineError(
-            "shadow publication must remain disabled"
+            "shadow publish must remain false"
         )
 
-    if result.get(
-        "database_write"
-    ) is not False:
+    if (
+        result[
+            "database_write"
+        ]
+        is not False
+    ):
         raise ResearchExecutionEngineError(
-            "shadow database write must remain disabled"
+            "database write must remain false"
         )
 
     payload = {
         key:
-            _phase3_copy(
-                value
-            )
+            value
         for key, value
         in result.items()
-        if key != "result_id"
+        if key
+        != "result_id"
     }
-
-    expected_result_id = _phase4_digest(
-        payload
-    )
 
     if (
-        result.get(
+        result[
             "result_id"
+        ]
+        != _phase4_digest(
+            payload
         )
-        != expected_result_id
     ):
         raise ResearchExecutionEngineError(
-            "shadow result digest mismatch"
+            "shadow result identifier mismatch"
         )
 
-    normalized = {
-        key:
-            _phase3_copy(
-                value
-            )
-        for key, value
-        in result.items()
-    }
+    # Preserve the frozen Phase-6 structural validator exactly.
+    # Validate a compatibility copy under its original round-1243
+    # test-only context; the actual Phase-7 result is never changed.
+    compatibility = dict(
+        result
+    )
 
-    normalized[
+    compatibility[
+        "round"
+    ] = 1243
+
+    compatibility[
         "execution_context"
     ] = "phase6_test_only"
 
-    normalized[
+    compatibility[
         "actual_round_execution"
     ] = False
 
-    normalized_payload = {
+    compatibility_payload = {
         key:
-            _phase3_copy(
-                value
-            )
+            value
         for key, value
-        in normalized.items()
-        if key != "result_id"
+        in compatibility.items()
+        if key
+        != "result_id"
     }
 
-    normalized[
+    compatibility[
         "result_id"
     ] = _phase4_digest(
-        normalized_payload
+        compatibility_payload
     )
 
     phase6_validate_result(
-        normalized
+        compatibility
     )
 
     return True
+
+
+
 
 
 def phase7_execute_shadow_prepared_request(
@@ -5167,7 +5369,7 @@ def phase7_execute_shadow_prepared_request(
     *,
     execution_authorized=False,
 ):
-    _phase6_validate_prepared_request(
+    _phase7_validate_prepared_request(
         request
     )
 
@@ -5178,7 +5380,9 @@ def phase7_execute_shadow_prepared_request(
 
     result = _phase7_execute_request_core(
         request,
-        execution_context=PHASE7_EXECUTION_CONTEXT,
+        execution_context=(
+            PHASE7_EXECUTION_CONTEXT
+        ),
         actual_round_execution=True,
     )
 
@@ -5189,75 +5393,80 @@ def phase7_execute_shadow_prepared_request(
     return result
 
 
-def phase7_execute_actual_shadow_round1243(
+
+
+
+
+def phase7_execute_actual_shadow_round(
     db_path,
     *,
+    round_no,
     execution_authorized=False,
 ):
-    if execution_authorized is not True:
-        raise ResearchExecutionEngineError(
-            "Phase-7 actual round-1243 shadow execution "
-            "requires explicit authorization"
-        )
-
-    requests = (
-        phase5_prepare_all_real_round_requests(
-            db_path,
-            round_no=1243,
-        )
+    round_no = _phase7_validate_round_no(
+        round_no
     )
 
-    expected_ids = tuple(
+    if execution_authorized is not True:
+        raise ResearchExecutionEngineError(
+            "Phase-7 actual shadow execution requires explicit authorization"
+        )
+
+    requests = phase5_prepare_all_real_round_requests(
+        db_path,
+        round_no=round_no,
+    )
+
+    expected_challengers = tuple(
         phase3_challenger_ids()
     )
 
     if (
-        not isinstance(
-            requests,
-            tuple,
+        len(
+            requests
         )
-        or len(requests) != 24
-        or len(requests)
-        != len(expected_ids)
+        != 24
     ):
         raise ResearchExecutionEngineError(
-            "Phase-7 bridge requires exactly 24 prepared requests"
+            "actual shadow batch must contain exactly 24 challengers"
         )
 
-    actual_ids = tuple(
-        request.get(
-            "challenger_id"
+    if (
+        len(
+            expected_challengers
         )
+        != 24
+    ):
+        raise ResearchExecutionEngineError(
+            "challenger registry must contain exactly 24 challengers"
+        )
+
+    request_challengers = tuple(
+        request[
+            "challenger_id"
+        ]
         for request
         in requests
     )
 
-    if actual_ids != expected_ids:
+    if (
+        request_challengers
+        != expected_challengers
+    ):
         raise ResearchExecutionEngineError(
-            "prepared challenger order mismatch"
+            "actual shadow challenger order mismatch"
         )
 
     results = []
 
-    for (
-        expected_id,
-        request,
-    ) in zip(
-        expected_ids,
-        requests,
-    ):
-        _phase6_validate_prepared_request(
-            request
-        )
+    for request in requests:
 
         if (
-            request[
-                "challenger_id"
-            ]
-            != expected_id
+            round_no
+            == PHASE5_REAL_ROUND_TARGET
         ):
-            raise ResearchExecutionEngineError(
-                "prepared challenger identity mismatch"
+            _phase6_validate_prepared_request(
+                request
             )
 
         result = (
@@ -5267,32 +5476,35 @@ def phase7_execute_actual_shadow_round1243(
             )
         )
 
-        phase7_validate_shadow_result(
-            result
-        )
+        if (
+            round_no
+            == PHASE5_REAL_ROUND_TARGET
+        ):
+            phase7_validate_shadow_result(
+                result
+            )
 
         results.append(
             result
         )
 
-    result_ids = [
-        result[
-            "result_id"
-        ]
-        for result
-        in results
-    ]
-
-    if len(
-        set(result_ids)
-    ) != 24:
-        raise ResearchExecutionEngineError(
-            "Phase-7 shadow result ids must be unique"
-        )
-
     return tuple(
         results
     )
+
+
+
+
+def phase7_execute_actual_shadow_round1243(
+    db_path,
+    execution_authorized=False,
+):
+    return phase7_execute_actual_shadow_round(
+        db_path,
+        round_no=1243,
+        execution_authorized=execution_authorized,
+    )
+
 
 
 # === PHASE7_ACTUAL_SHADOW_EXECUTION_BRIDGE_V1 END ===
